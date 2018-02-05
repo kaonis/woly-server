@@ -1,0 +1,16 @@
+{
+  "name": "woly-backend",
+  "version": "0.0.1",
+  "description": "WakeOnLan Application Server",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "nodemon": "nodemon ./server.js"
+  },
+  "private": true,
+  "dependencies": {
+    "express": "4.x",
+    "sqlite3": "^3.1.13",
+    "wake_on_lan": "0.0.4"
+  }
+}
