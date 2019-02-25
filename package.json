@@ -2,11 +2,11 @@
   "name": "woly-backend",
   "version": "0.0.1",
   "description": "WakeOnLan Application Server",
-  "main": "server.js",
+  "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "nodemon": "nodemon ./server.js",
-    "start": "nodemon ./server.js"
+    "nodemon": "nodemon ./app.js",
+    "start": "nodemon ./app.js"
   },
   "private": true,
   "dependencies": {

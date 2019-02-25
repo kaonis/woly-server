@@ -10,7 +10,7 @@ router.get('/hosts/:name', hosts.findByName);
 router.get('/hosts/wakeup/:name', hosts.wakeUp);
 */
 
-app.get('/hosts', hosts);
+app.use('/hosts', hosts);
 
 const server = app.listen(8082, () => {
   const { host } = server.address().address;
