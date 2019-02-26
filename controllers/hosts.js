@@ -37,14 +37,12 @@ exports.getAllHosts = (req, res, next) => {
 };
 
 exports.getHost = (req, res, next) => {
-  const { name } = req.params.name;
+  const { name } = req.params;
   console.log(`Retrieving host with name ${name}`);
 
   // SQL statement
   const sql =
-    'SELECT hosts.name name, hosts.mac mac, hosts.ip ip, hosts.status status' +
-    'FROM hosts' +
-    'WHERE name  = ?';
+    'SELECT hosts.name name, hosts.mac mac, hosts.ip ip, hosts.status status FROM hosts WHERE name  = ?';
 
   // return first row only
   db.get(sql, [name], (err, row) => {
@@ -62,15 +60,14 @@ exports.getHost = (req, res, next) => {
 };
 
 exports.wakeUpHost = (req, res, next) => {
-  const { name } = req.params.name;
-  console.log(`Trying to wake up host with name $name`);
+  const { name } = req.params;
+  console.log(`Trying to wake up host with name ${name}`);
 
   // SQL statement
-  const sql = `SELECT hosts.name name, hosts.mac mac, hosts.ip ip, hosts.status status
-           FROM hosts
-           WHERE name  = ?`;
+  const sql =
+    'SELECT hosts.name name, hosts.mac mac, hosts.ip ip, hosts.status status FROM hosts WHERE name  = ?';
 
-  db.get(sql, [name], (err, row) => {
+  db.get(sql, name, (err, row) => {
     if (err) {
       return console.error(err.message);
     }
