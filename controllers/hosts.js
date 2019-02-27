@@ -83,7 +83,8 @@ exports.wakeUpHost = (req, res, next) => {
       }
       wol.createMagicPacket(row.mac);
       console.log(`Sent WoL to host with name ${name}`);
-      res.status(200).send(`[{"name": ${row.name},"result": "success"}]`);
+      // res.status(200).json(JSON.parse(`{"host":  ["name": ${row.name},"result": "success"}]}`));
+      res.status(200).json('success');
       return null;
     });
 
