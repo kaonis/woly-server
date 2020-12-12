@@ -10,7 +10,7 @@
   },
   "private": true,
   "dependencies": {
-    "express": "4.16.4",
+    "express": "4.17.1",
     "sqlite3": "4.0.6",
     "wake_on_lan": "0.0.4"
   },
