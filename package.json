@@ -15,7 +15,7 @@
     "wake_on_lan": "1.0.0"
   },
   "devDependencies": {
-    "eslint": "5.16.0",
+    "eslint": "7.15.0",
     "eslint-config-airbnb": "17.1.1",
     "eslint-config-prettier": "4.3.0",
     "eslint-plugin-import": "2.22.1",
