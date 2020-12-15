@@ -12,7 +12,7 @@
   "dependencies": {
     "express": "4.17.1",
     "sqlite3": "5.0.0",
-    "wake_on_lan": "0.0.5"
+    "wake_on_lan": "1.0.0"
   },
   "devDependencies": {
     "eslint": "5.16.0",
