@@ -102,21 +102,27 @@ db.run(
     //    ' table_constraint\n' +
     ');',
   err => {
-    for (let i = 0; i < hostTable.length; i += 1) {
-      db.run(
-        'INSERT INTO hosts("name", "mac", "ip", "status") VALUES(?,?,?,?)',
-        hostTable[i][0],
-        hostTable[i][1],
-        hostTable[i][2],
-        hostTable[i][3],
-        function(error) {
-          if (error) {
-            return console.log(error.message);
-          }
-          return console.log(`Row inserted ${this.changes}`);
+    // Check if table already has data before inserting
+    db.get('SELECT COUNT(*) as count FROM hosts', (countErr, row) => {
+      if (row && row.count === 0) {
+        // Only insert if table is empty
+        for (let i = 0; i < hostTable.length; i += 1) {
+          db.run(
+            'INSERT INTO hosts("name", "mac", "ip", "status") VALUES(?,?,?,?)',
+            hostTable[i][0],
+            hostTable[i][1],
+            hostTable[i][2],
+            hostTable[i][3],
+            function(error) {
+              if (error) {
+                return console.log(error.message);
+              }
+              return console.log(`Row inserted ${this.changes}`);
+            }
+          );
         }
-      );
-    }
+      }
+    });
     if (err) {
       return console.log(err.stack);
     }
