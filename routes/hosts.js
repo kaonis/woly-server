@@ -16,6 +16,9 @@ router.post('/', hostsController.addHost);
 // Get a specific host by name
 router.get('/:name', hostsController.getHost);
 
+// Get MAC address vendor information
+router.get('/mac-vendor/:mac', hostsController.getMacVendor);
+
 // Wake up a specific host
 router.post('/wakeup/:name', hostsController.wakeUpHost);
 

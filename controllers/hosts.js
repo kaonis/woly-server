@@ -1,7 +1,14 @@
 const wol = require('wake_on_lan');
+const axios = require('axios');
 
 // Database service will be set by app.js
 let hostDb = null;
+
+// Rate limiting for MAC vendor API
+const macVendorCache = new Map();
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+let lastMacVendorRequest = 0;
+const MIN_REQUEST_INTERVAL = 1000; // 1 second between requests
 
 function setHostDatabase(db) {
   hostDb = db;
@@ -109,6 +116,93 @@ exports.addHost = async (req, res, next) => {
   } catch (error) {
     console.error('Error adding host:', error);
     res.status(500).json({ error: 'Failed to add host' });
+  }
+};
+
+/**
+ * Get MAC address vendor information with caching and rate limiting
+ */
+exports.getMacVendor = async (req, res, next) => {
+  const { mac } = req.params;
+  
+  if (!mac) {
+    res.status(400).json({ error: 'MAC address is required' });
+    return;
+  }
+
+  // Normalize MAC address for cache key
+  const normalizedMac = mac.toUpperCase().replace(/[:-]/g, '');
+  
+  // Check cache first
+  const cached = macVendorCache.get(normalizedMac);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    console.log(`MAC vendor cache hit for ${mac}`);
+    return res.status(200).json({ 
+      mac, 
+      vendor: cached.vendor,
+      source: 'macvendors.com (cached)'
+    });
+  }
+
+  try {
+    // Rate limiting: ensure minimum interval between requests
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastMacVendorRequest;
+    
+    if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+      const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+      console.log(`Throttling MAC vendor request for ${mac}, waiting ${waitTime}ms`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+    
+    lastMacVendorRequest = Date.now();
+    
+    // Use macvendors.com API (free, no API key required)
+    const response = await axios.get(`https://api.macvendors.com/${encodeURIComponent(mac)}`, {
+      timeout: 5000,
+      headers: {
+        'User-Agent': 'WoLy-App/1.0'
+      }
+    });
+    
+    const vendor = response.data;
+    
+    // Cache the result
+    macVendorCache.set(normalizedMac, {
+      vendor,
+      timestamp: Date.now()
+    });
+    
+    res.status(200).json({ 
+      mac, 
+      vendor,
+      source: 'macvendors.com'
+    });
+  } catch (error) {
+    if (error.response && error.response.status === 404) {
+      const vendor = 'Unknown Vendor';
+      
+      // Cache unknown vendors too
+      macVendorCache.set(normalizedMac, {
+        vendor,
+        timestamp: Date.now()
+      });
+      
+      res.status(200).json({ 
+        mac, 
+        vendor,
+        source: 'macvendors.com'
+      });
+    } else if (error.response && error.response.status === 429) {
+      console.error('MAC vendor API rate limit exceeded');
+      res.status(429).json({ 
+        error: 'Rate limit exceeded, please try again later',
+        mac
+      });
+    } else {
+      console.error('MAC vendor lookup error:', error.message);
+      res.status(500).json({ error: 'Failed to lookup MAC vendor' });
+    }
   }
 };
 
