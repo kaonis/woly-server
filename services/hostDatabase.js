@@ -140,6 +140,7 @@ class HostDatabase {
 
   /**
    * Update host's last seen time and mark as discovered
+   * Throws error if host not found
    */
   updateHostSeen(mac) {
     return new Promise((resolve, reject) => {
@@ -147,6 +148,9 @@ class HostDatabase {
       this.db.run(sql, [mac], function(err) {
         if (err) {
           reject(err);
+        } else if (this.changes === 0) {
+          // No rows were updated - MAC doesn't exist
+          reject(new Error(`Host with MAC ${mac} not found in database`));
         } else {
           resolve();
         }
@@ -185,16 +189,41 @@ class HostDatabase {
 
       console.log(`Discovered ${discoveredHosts.length} hosts on network`);
 
-      // Update lastSeen for hosts that were discovered
+      let newHostCount = 0;
+      let updatedHostCount = 0;
+
+      // Process each discovered host
       for (const host of discoveredHosts) {
+        const formattedMac = networkDiscovery.formatMAC(host.mac);
+        
         try {
-          await this.updateHostSeen(networkDiscovery.formatMAC(host.mac));
+          // Try to update existing host
+          await this.updateHostSeen(formattedMac);
+          updatedHostCount++;
         } catch (err) {
-          // Host not in DB yet, could add it if needed
+          // Host not in DB yet, try to add it
+          try {
+            // Generate hostname: prefer actual hostname, fallback to IP-based name
+            let hostName;
+            
+            if (host.hostname) {
+              // Use actual network hostname if available
+              hostName = host.hostname;
+            } else {
+              // Generate from IP address (e.g., "device-192-168-1-115")
+              hostName = `device-${host.ip.replace(/\./g, '-')}`;
+            }
+            
+            await this.addHost(hostName, formattedMac, host.ip);
+            newHostCount++;
+          } catch (addErr) {
+            // Silently skip if adding fails (might be duplicate MAC/IP)
+            console.debug(`Could not add discovered host ${formattedMac}:`, addErr.message);
+          }
         }
       }
 
-      console.log('Network sync complete');
+      console.log(`Network sync complete: ${updatedHostCount} updated, ${newHostCount} new hosts`);
     } catch (error) {
       console.error('Network sync error:', error.message);
     }
