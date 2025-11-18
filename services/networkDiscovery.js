@@ -2,6 +2,7 @@ const localDevices = require('local-devices');
 const dns = require('dns').promises;
 const { execSync } = require('child_process');
 const os = require('os');
+const ping = require('ping');
 
 /**
  * Network Discovery Service
@@ -154,9 +155,28 @@ function formatMAC(mac) {
   return mac.toUpperCase().replace(/-/g, ':');
 }
 
+/**
+ * Check if a host is alive using ICMP ping
+ * @param {string} ip - IP address to ping
+ * @returns {Promise<boolean>} True if host responds to ping
+ */
+async function isHostAlive(ip) {
+  try {
+    const result = await ping.promise.probe(ip, {
+      timeout: 2,
+      extra: ['-n', '1'] // Windows: 1 packet
+    });
+    return result.alive;
+  } catch (error) {
+    console.error(`Ping failed for ${ip}:`, error.message);
+    return false;
+  }
+}
+
 module.exports = {
   scanNetworkARP,
   getMACAddress,
   formatMAC,
-  reverseDNSLookup
+  reverseDNSLookup,
+  isHostAlive
 };
