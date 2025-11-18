@@ -12,9 +12,8 @@ router.get('/hosts/wakeup/:name', hosts.wakeUp);
 
 app.use('/hosts', hosts);
 
-const server = app.listen(8082, () => {
-  const { host } = server.address().address;
-  const { port } = server.address().port;
+const server = app.listen(8082, '0.0.0.0', () => {
+  const { address, port } = server.address();
 
-  console.log('WoLy listening at http://%s:%s', host, port);
+  console.log('WoLy listening at http://%s:%s', address, port);
 });
