@@ -21,7 +21,8 @@ async function startServer() {
     hostsController.setHostDatabase(hostDb);
     
     // Start periodic network scanning (every 5 minutes)
-    hostDb.startPeriodicSync(5 * 60 * 1000);
+    // Initial scan runs in background after 5 seconds for faster API availability
+    hostDb.startPeriodicSync(5 * 60 * 1000, false);
     
     // Routes
     app.use('/hosts', hosts);

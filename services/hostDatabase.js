@@ -237,12 +237,22 @@ class HostDatabase {
   /**
    * Start periodic network scanning
    * @param {number} intervalMs - Scan interval in milliseconds (default: 5 minutes)
+   * @param {boolean} immediateSync - Whether to run initial sync (default: false for better startup)
    */
-  startPeriodicSync(intervalMs = 5 * 60 * 1000) {
+  startPeriodicSync(intervalMs = 5 * 60 * 1000, immediateSync = false) {
     console.log(`Starting periodic network sync every ${intervalMs / 1000}s`);
     
-    // Initial scan
-    this.syncWithNetwork();
+    if (immediateSync) {
+      // Initial scan (blocks startup)
+      this.syncWithNetwork();
+    } else {
+      // Run initial scan in background after short delay
+      console.log('Deferring initial network scan to background (5 seconds)');
+      setTimeout(() => {
+        console.log('Running deferred initial network scan...');
+        this.syncWithNetwork();
+      }, 5000);
+    }
     
     // Recurring scans
     this.syncInterval = setInterval(() => {
