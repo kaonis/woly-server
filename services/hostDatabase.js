@@ -55,13 +55,9 @@ class HostDatabase {
    */
   seedInitialHosts(callback) {
     const hostTable = [
-      ['whitehead', '50:E5:49:55:4A:8C', '192.168.1.10', 'asleep', null, 0],
-      ['phantom-senior', '00:24:8C:23:D6:3E', '192.168.1.7', 'asleep', null, 0],
-      ['phantom qualcomm', '40:8D:5C:53:90:91', '192.168.1.100', 'asleep', null, 0],
-      ['phantom intel', '40:8D:5C:53:90:93', '192.168.1.101', 'asleep', null, 0],
-      ['giota-pc', '74:2F:68:C8:BD:C5', '192.168.1.8', 'asleep', null, 0],
-      ['jb-ng', '50:E5:49:EF:26:DA', '192.168.1.49', 'asleep', null, 0],
-      ['jb-pc', '50:E5:49:56:4A:8C', '192.168.1.50', 'asleep', null, 0]
+      ['PHANTOM-MBP', '80:6D:97:60:39:08', '192.168.1.147', 'asleep', null, 0],
+      ['PHANTOM-NAS', 'BC:07:1D:DD:5B:9C', '192.168.1.5', 'asleep', null, 0],
+      ['RASPBERRYPI', 'B8:27:EB:B9:EF:D7', '192.168.1.6', 'asleep', null, 0]
     ];
 
     this.db.get('SELECT COUNT(*) as count FROM hosts', (err, row) => {
@@ -139,13 +135,13 @@ class HostDatabase {
   }
 
   /**
-   * Update host's last seen time and mark as discovered
+   * Update host's last seen time, status, and mark as discovered
    * Throws error if host not found
    */
-  updateHostSeen(mac) {
+  updateHostSeen(mac, status = 'awake') {
     return new Promise((resolve, reject) => {
-      const sql = `UPDATE hosts SET lastSeen = datetime('now'), discovered = 1 WHERE mac = ?`;
-      this.db.run(sql, [mac], function(err) {
+      const sql = `UPDATE hosts SET lastSeen = datetime('now'), discovered = 1, status = ? WHERE mac = ?`;
+      this.db.run(sql, [status, mac], function(err) {
         if (err) {
           reject(err);
         } else if (this.changes === 0) {
@@ -191,14 +187,21 @@ class HostDatabase {
 
       let newHostCount = 0;
       let updatedHostCount = 0;
+      let awakeCount = 0;
 
-      // Process each discovered host
+      // Process each discovered host with ping check
       for (const host of discoveredHosts) {
         const formattedMac = networkDiscovery.formatMAC(host.mac);
         
+        // Check if host is alive via ICMP ping
+        const isAlive = await networkDiscovery.isHostAlive(host.ip);
+        const status = isAlive ? 'awake' : 'asleep';
+        
+        if (isAlive) awakeCount++;
+        
         try {
-          // Try to update existing host
-          await this.updateHostSeen(formattedMac);
+          // Try to update existing host with status
+          await this.updateHostSeen(formattedMac, status);
           updatedHostCount++;
         } catch (err) {
           // Host not in DB yet, try to add it
@@ -215,6 +218,8 @@ class HostDatabase {
             }
             
             await this.addHost(hostName, formattedMac, host.ip);
+            // Update status for newly added host
+            await this.updateHostStatus(hostName, status);
             newHostCount++;
           } catch (addErr) {
             // Silently skip if adding fails (might be duplicate MAC/IP)
@@ -223,7 +228,7 @@ class HostDatabase {
         }
       }
 
-      console.log(`Network sync complete: ${updatedHostCount} updated, ${newHostCount} new hosts`);
+      console.log(`Network sync complete: ${updatedHostCount} updated, ${newHostCount} new hosts, ${awakeCount} awake`);
     } catch (error) {
       console.error('Network sync error:', error.message);
     }
