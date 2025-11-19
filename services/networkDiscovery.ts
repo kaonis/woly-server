@@ -40,15 +40,15 @@ async function reverseDNSLookup(ip: string): Promise<string | null> {
 function getHostnameViaNBT(ip: string): string | null {
   try {
     const platform = os.platform();
-    
+
     if (platform === 'win32') {
       // Windows: Use nbtstat to get NetBIOS name
-      const output = execSync(`nbtstat -A ${ip}`, { 
-        encoding: 'utf-8', 
+      const output = execSync(`nbtstat -A ${ip}`, {
+        encoding: 'utf-8',
         timeout: 2000,
-        windowsHide: true 
+        windowsHide: true,
       });
-      
+
       // Parse output for computer name (look for <00> UNIQUE which is the workstation name)
       const lines = output.split('\n');
       for (const line of lines) {
@@ -60,9 +60,9 @@ function getHostnameViaNBT(ip: string): string | null {
     } else if (platform === 'linux') {
       // Linux: Try nmblookup if available
       try {
-        const output = execSync(`nmblookup -A ${ip}`, { 
-          encoding: 'utf-8', 
-          timeout: 2000 
+        const output = execSync(`nmblookup -A ${ip}`, {
+          encoding: 'utf-8',
+          timeout: 2000,
         });
         const match = output.match(/^\s+(\S+)\s+<00>/m);
         if (match && match[1]) {
@@ -85,10 +85,10 @@ function getHostnameViaNBT(ip: string): string | null {
 async function scanNetworkARP(): Promise<DiscoveredHost[]> {
   try {
     logger.info('Starting ARP network scan...');
-    
+
     // local-devices returns an array of { name, ip, mac }
     const devices = await localDevices();
-    
+
     if (!devices || devices.length === 0) {
       logger.warn('No devices found on network');
       return [];
@@ -97,37 +97,38 @@ async function scanNetworkARP(): Promise<DiscoveredHost[]> {
     // Format devices for our system with DNS and NetBIOS fallbacks
     const hostsPromises = devices.map(async (device) => {
       // Clean up hostname - some devices return '?' or empty strings
-      let cleanName = device.name;
-      
+      const cleanName = device.name;
+
       // Check if hostname is valid (not ?, unknown, empty, or just an IP)
-      const isValidHostname = cleanName && 
-                             cleanName !== '?' && 
-                             cleanName !== 'unknown' && 
-                             cleanName.trim() !== '' &&
-                             !/^\d+\.\d+\.\d+\.\d+$/.test(cleanName); // Not an IP address
-      
+      const isValidHostname =
+        cleanName &&
+        cleanName !== '?' &&
+        cleanName !== 'unknown' &&
+        cleanName.trim() !== '' &&
+        !/^\d+\.\d+\.\d+\.\d+$/.test(cleanName); // Not an IP address
+
       let hostname = isValidHostname ? cleanName : null;
-      
+
       // Fallback 1: Try reverse DNS lookup
       if (!hostname) {
         hostname = await reverseDNSLookup(device.ip);
       }
-      
+
       // Fallback 2: Try NetBIOS/NBT lookup (works well on Windows networks)
       if (!hostname) {
         hostname = getHostnameViaNBT(device.ip);
       }
-      
+
       return {
         ip: device.ip,
         mac: formatMAC(device.mac),
-        hostname: hostname
+        hostname: hostname,
       };
     });
 
     const hosts = await Promise.all(hostsPromises);
-    
-    const hostnamesFound = hosts.filter(h => h.hostname).length;
+
+    const hostnamesFound = hosts.filter((h) => h.hostname).length;
     logger.info(`Network scan found ${hosts.length} devices (${hostnamesFound} with hostnames)`);
     return hosts;
   } catch (error: any) {
@@ -143,7 +144,7 @@ async function scanNetworkARP(): Promise<DiscoveredHost[]> {
 async function getMACAddress(ip: string): Promise<string | null> {
   try {
     const devices = await localDevices();
-    const device = devices.find(d => d.ip === ip);
+    const device = devices.find((d) => d.ip === ip);
     return device ? formatMAC(device.mac) : null;
   } catch (error: any) {
     logger.error(`Failed to get MAC for IP ${ip}:`, { error: error.message });
@@ -167,7 +168,7 @@ async function isHostAlive(ip: string): Promise<boolean> {
   try {
     const result = await ping.promise.probe(ip, {
       timeout: config.network.pingTimeout / 1000, // Convert ms to seconds
-      extra: ['-n', '1'] // Windows: 1 packet
+      extra: ['-n', '1'], // Windows: 1 packet
     });
     return result.alive;
   } catch (error: any) {
@@ -176,10 +177,4 @@ async function isHostAlive(ip: string): Promise<boolean> {
   }
 }
 
-export {
-  scanNetworkARP,
-  getMACAddress,
-  formatMAC,
-  reverseDNSLookup,
-  isHostAlive
-};
+export { scanNetworkARP, getMACAddress, formatMAC, reverseDNSLookup, isHostAlive };
