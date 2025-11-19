@@ -6,11 +6,11 @@ import { logger } from '../utils/logger';
  * Allows 100 requests per 15 minutes per IP
  */
 export const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 15,
   message: {
     error: 'Too many requests from this IP, please try again later.',
-    retryAfter: '15 minutes',
+    retryAfter: '1 minutes',
   },
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
@@ -18,7 +18,7 @@ export const apiLimiter = rateLimit({
     logger.warn(`Rate limit exceeded for IP: ${req.ip} on path: ${req.path}`);
     res.status(429).json({
       error: 'Too many requests from this IP, please try again later.',
-      retryAfter: '15 minutes',
+      retryAfter: '1 minutes',
     });
   },
 });
