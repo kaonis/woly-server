@@ -14,7 +14,10 @@
     "start": "ts-node app.ts",
     "dev": "nodemon --exec ts-node app.ts",
     "prod": "npm run build && node dist/app.js",
-    "prepare": "husky"
+    "prepare": "husky",
+    "lint": "eslint .",
+    "lint-fix": "eslint --fix .",
+    "format": "prettier --write ."
   },
   "private": true,
   "dependencies": {
