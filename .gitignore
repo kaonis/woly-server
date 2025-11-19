@@ -46,6 +46,9 @@ dist/
 coverage/
 .nyc_output/
 
+# Environment variables
+.env
+
 # BUCK
 buck-out/
 \.buckd/
