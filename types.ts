@@ -24,6 +24,8 @@ export interface MacVendorCacheEntry {
 
 export interface HostsResponse {
   hosts: Host[];
+  scanInProgress: boolean;
+  lastScanTime: string | null;
 }
 
 export interface ScanResponse {

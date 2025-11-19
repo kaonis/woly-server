@@ -24,7 +24,14 @@ const getAllHosts = async (req: Request, res: Response, next: NextFunction): Pro
       return;
     }
     const hosts = await hostDb.getAllHosts();
-    res.status(200).json({ hosts });
+    const scanInProgress = hostDb.isScanInProgress();
+    const lastScanTime = hostDb.getLastScanTime();
+    
+    res.status(200).json({ 
+      hosts,
+      scanInProgress,
+      lastScanTime
+    });
   } catch (error) {
     console.error('Error fetching hosts:', error);
     res.status(500).json({ error: 'Failed to fetch hosts' });
