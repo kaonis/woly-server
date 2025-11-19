@@ -14,7 +14,9 @@ module.exports = {
     '!**/coverage/**',
     '!jest.config.js',
     '!jest.setup.ts',
-    '!**/types/**'
+    '!**/types/**',
+    '!app.ts',
+    '!swagger.ts'
   ],
   coverageThreshold: {
     global: {
