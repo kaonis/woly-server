@@ -77,9 +77,17 @@ class HostDatabase {
         ip text NOT NULL UNIQUE,
         status text NOT NULL,
         lastSeen datetime,
-        discovered integer DEFAULT 0
+        discovered integer DEFAULT 0,
+        pingResponsive integer
       )`,
-      callback
+      () => {
+        this.db.run(`ALTER TABLE hosts ADD COLUMN pingResponsive integer`, (err) => {
+          if (err && !err.message.includes('duplicate column')) {
+            logger.warn('Could not add pingResponsive column:', { error: err.message });
+          }
+          callback();
+        });
+      }
     );
   }
 
@@ -88,9 +96,9 @@ class HostDatabase {
    */
   seedInitialHosts(callback: () => void): void {
     const hostTable = [
-      ['PHANTOM-MBP', '80:6D:97:60:39:08', '192.168.1.147', 'asleep', null, 0],
-      ['PHANTOM-NAS', 'BC:07:1D:DD:5B:9C', '192.168.1.5', 'asleep', null, 0],
-      ['RASPBERRYPI', 'B8:27:EB:B9:EF:D7', '192.168.1.6', 'asleep', null, 0],
+      ['PHANTOM-MBP', '80:6D:97:60:39:08', '192.168.1.147', 'asleep', null, 0, null],
+      ['PHANTOM-NAS', 'BC:07:1D:DD:5B:9C', '192.168.1.5', 'asleep', null, 0, null],
+      ['RASPBERRYPI', 'B8:27:EB:B9:EF:D7', '192.168.1.6', 'asleep', null, 0, null],
     ];
 
     this.db.get(
@@ -102,8 +110,8 @@ class HostDatabase {
 
           hostTable.forEach((host) => {
             this.db.run(
-              `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered)
-             VALUES(?,?,?,?,?,?)`,
+              `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered, pingResponsive)
+             VALUES(?,?,?,?,?,?,?)`,
               host,
               (error: Error | null) => {
                 if (error) {
@@ -130,7 +138,8 @@ class HostDatabase {
    */
   getAllHosts(): Promise<Host[]> {
     return new Promise((resolve, reject) => {
-      const sql = 'SELECT name, mac, ip, status, lastSeen, discovered FROM hosts ORDER BY name';
+      const sql =
+        'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts ORDER BY name';
       this.db.all(sql, (err: Error | null, rows: Host[]) => {
         if (err) {
           reject(err);
@@ -160,7 +169,8 @@ class HostDatabase {
    */
   getHost(name: string): Promise<Host | undefined> {
     return new Promise((resolve, reject) => {
-      const sql = 'SELECT name, mac, ip, status, lastSeen, discovered FROM hosts WHERE name = ?';
+      const sql =
+        'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts WHERE name = ?';
       this.db.get(sql, [name], (err: Error | null, row: Host | undefined) => {
         if (err) {
           reject(err);
@@ -176,8 +186,8 @@ class HostDatabase {
    */
   addHost(name: string, mac: string, ip: string): Promise<Host> {
     return new Promise((resolve, reject) => {
-      const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered)
-                   VALUES(?, ?, ?, ?, datetime('now'), 1)`;
+      const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered, pingResponsive)
+                   VALUES(?, ?, ?, ?, datetime('now'), 1, NULL)`;
       this.db.run(
         sql,
         [name, mac, ip, 'asleep'],
@@ -196,6 +206,7 @@ class HostDatabase {
               status: 'asleep',
               lastSeen: new Date().toISOString(),
               discovered: 1,
+              pingResponsive: undefined,
             });
           }
         }
@@ -207,19 +218,27 @@ class HostDatabase {
    * Update host's last seen time, status, and mark as discovered
    * Throws error if host not found
    */
-  updateHostSeen(mac: string, status: 'awake' | 'asleep' = 'awake'): Promise<void> {
+  updateHostSeen(
+    mac: string,
+    status: 'awake' | 'asleep' = 'awake',
+    pingResponsive: number | null = null
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
-      const sql = `UPDATE hosts SET lastSeen = datetime('now'), discovered = 1, status = ? WHERE mac = ?`;
-      this.db.run(sql, [status, mac], function (this: sqlite3.RunResult, err: Error | null) {
-        if (err) {
-          reject(err);
-        } else if (this.changes === 0) {
-          // No rows were updated - MAC doesn't exist
-          reject(new Error(`Host with MAC ${mac} not found in database`));
-        } else {
-          resolve();
+      const sql = `UPDATE hosts SET lastSeen = datetime('now'), discovered = 1, status = ?, pingResponsive = ? WHERE mac = ?`;
+      this.db.run(
+        sql,
+        [status, pingResponsive, mac],
+        function (this: sqlite3.RunResult, err: Error | null) {
+          if (err) {
+            reject(err);
+          } else if (this.changes === 0) {
+            // No rows were updated - MAC doesn't exist
+            reject(new Error(`Host with MAC ${mac} not found in database`));
+          } else {
+            resolve();
+          }
         }
-      });
+      );
     });
   }
 
@@ -266,19 +285,40 @@ class HostDatabase {
       let updatedHostCount = 0;
       let awakeCount = 0;
 
-      // Process each discovered host with ping check
+      // Process each discovered host
       for (const host of discoveredHosts) {
         const formattedMac = networkDiscovery.formatMAC(host.mac);
 
-        // Check if host is alive via ICMP ping
-        const isAlive = await networkDiscovery.isHostAlive(host.ip);
+        // Determine if host is alive:
+        // - If found via ARP, it's responding to network requests (awake by default)
+        // - Always check ping responsiveness for additional status information
+        let isAlive = true; // ARP discovery means host is awake
+        let pingResponsive: number | null = null;
+
+        // Always check ping to track responsiveness
+        const pingResult = await networkDiscovery.isHostAlive(host.ip);
+        pingResponsive = pingResult ? 1 : 0;
+
+        if (config.network.usePingValidation) {
+          // If ping validation is enabled, use it to determine awake status
+          // (but this is not recommended as many devices block ping)
+          isAlive = pingResult;
+          if (!isAlive) {
+            logger.debug(
+              `Host ${host.ip} found via ARP but did not respond to ping - marking as awake anyway`
+            );
+            // Even if ping fails, ARP response means it's awake
+            isAlive = true;
+          }
+        }
+
         const status = isAlive ? 'awake' : 'asleep';
 
         if (isAlive) awakeCount++;
 
         try {
-          // Try to update existing host with status
-          await this.updateHostSeen(formattedMac, status);
+          // Try to update existing host with status and ping responsiveness
+          await this.updateHostSeen(formattedMac, status, pingResponsive);
           updatedHostCount++;
         } catch (err) {
           // Host not in DB yet, try to add it
@@ -295,8 +335,9 @@ class HostDatabase {
             }
 
             await this.addHost(hostName, formattedMac, host.ip);
-            // Update status for newly added host
+            // Update status and ping responsiveness for newly added host
             await this.updateHostStatus(hostName, status);
+            await this.updateHostSeen(formattedMac, status, pingResponsive);
             newHostCount++;
           } catch (addErr) {
             // Silently skip if adding fails (might be duplicate MAC/IP)

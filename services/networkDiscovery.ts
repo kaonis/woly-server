@@ -168,11 +168,18 @@ async function isHostAlive(ip: string): Promise<boolean> {
   try {
     const result = await ping.promise.probe(ip, {
       timeout: config.network.pingTimeout / 1000, // Convert ms to seconds
-      extra: ['-n', '1'], // Windows: 1 packet
+      min_reply: 1, // Consider alive if at least 1 reply received
     });
+
+    // Log ping failures at debug level to avoid log spam
+    if (!result.alive) {
+      logger.debug(`Host ${ip} did not respond to ping`);
+    }
+
     return result.alive;
   } catch (error: any) {
-    logger.error(`Ping failed for ${ip}:`, { error: error.message });
+    // Downgrade to debug level - ping failures are common and not always errors
+    logger.debug(`Ping error for ${ip}:`, { error: error.message });
     return false;
   }
 }

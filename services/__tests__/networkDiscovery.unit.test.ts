@@ -203,7 +203,7 @@ describe('networkDiscovery', () => {
       expect(isAlive).toBe(true);
       expect(ping.promise.probe).toHaveBeenCalledWith('192.168.1.100', {
         timeout: 2,
-        extra: ['-n', '1'],
+        min_reply: 1,
       });
     });
 

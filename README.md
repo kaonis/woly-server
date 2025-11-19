@@ -9,6 +9,7 @@ Node.js backend for [WoLy](https://github.com/kaonis/woly) - A Wake-on-LAN appli
 
 - 🔍 **Automatic Network Discovery** - ARP scanning with DNS/NetBIOS hostname resolution
 - 💤 **Wake-on-LAN** - Remote host wake-up via magic packets
+- 📡 **Dual Status Tracking** - Separate `status` (awake/asleep via ARP) and `pingResponsive` (ICMP) fields
 - 🔐 **Security** - Rate limiting, input validation, CORS, Helmet headers
 - 📊 **Health Monitoring** - Enhanced health checks with database status
 - 📝 **API Documentation** - Interactive Swagger UI
@@ -70,6 +71,28 @@ npm run test:unit       # Run only unit tests
 npm run test:integration # Run only integration tests
 ```
 
+## Host Status Fields
+
+Hosts have two separate status indicators:
+
+### `status` (awake/asleep)
+
+- **Source**: ARP network discovery
+- **Meaning**: If a device responds to ARP, it's on the network and awake
+- **Reliability**: Very reliable - ARP responses mean the device is active
+
+### `pingResponsive` (1/0/null)
+
+- **Source**: ICMP ping test
+- **Values**:
+  - `1` - Host responds to ping
+  - `0` - Host doesn't respond to ping (may still be awake due to firewall)
+  - `null` - Not yet tested
+- **Meaning**: Additional diagnostic information about network reachability
+- **Note**: Many devices block ping for security, so `pingResponsive: 0` doesn't mean the host is asleep
+
+**Recommended interpretation**: Use `status` for determining if a device is awake. Use `pingResponsive` for network diagnostics and troubleshooting.
+
 ## API Documentation
 
 ### Interactive Documentation
@@ -121,7 +144,8 @@ GET /hosts
       "ip": "192.168.1.147",
       "status": "awake",
       "lastSeen": "2025-11-19 09:24:30",
-      "discovered": 1
+      "discovered": 1,
+      "pingResponsive": 1
     }
   ],
   "scanInProgress": false,
@@ -238,6 +262,10 @@ DB_PATH=./db/woly.db
 SCAN_INTERVAL=300000    # 5 minutes
 SCAN_DELAY=5000         # 5 seconds initial delay
 PING_TIMEOUT=2000       # 2 seconds
+USE_PING_VALIDATION=false  # Use ping to validate awake status (default: false, ARP is sufficient)
+# Note: ARP discovery means a host is responding on the network (awake)
+# Ping validation is optional but may fail even for awake hosts due to firewalls
+# All hosts are always ping-tested to track pingResponsive status (separate from awake/asleep)
 
 # Caching
 MAC_VENDOR_TTL=86400000        # 24 hours
