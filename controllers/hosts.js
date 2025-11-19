@@ -4,7 +4,7 @@ const axios = require('axios');
 // Database service will be set by app.js
 let hostDb = null;
 
-// Rate limiting for MAC vendor API
+// Rate limiting for MAC vendor API - using simple Map instead of LRU
 const macVendorCache = new Map();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 let lastMacVendorRequest = 0;
@@ -126,10 +126,8 @@ exports.getMacVendor = async (req, res, next) => {
   const { mac } = req.params;
   
   if (!mac) {
-    res.status(400).json({ error: 'MAC address is required' });
-    return;
+    return res.status(400).json({ error: 'MAC address is required' });
   }
-
   // Normalize MAC address for cache key
   const normalizedMac = mac.toUpperCase().replace(/[:-]/g, '');
   
