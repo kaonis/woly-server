@@ -1,6 +1,6 @@
 import wol from 'wake_on_lan';
 import axios from 'axios';
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
 import HostDatabase from '../services/hostDatabase';
 import { MacVendorCacheEntry, MacVendorResponse, ErrorResponse } from '../types';
 
@@ -17,120 +17,100 @@ function setHostDatabase(db: HostDatabase): void {
   hostDb = db;
 }
 
-const getAllHosts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    if (!hostDb) {
-      res.status(500).json({ error: 'Database not initialized' });
-      return;
-    }
-    const hosts = await hostDb.getAllHosts();
-    const scanInProgress = hostDb.isScanInProgress();
-    const lastScanTime = hostDb.getLastScanTime();
-    
-    res.status(200).json({ 
-      hosts,
-      scanInProgress,
-      lastScanTime
-    });
-  } catch (error) {
-    console.error('Error fetching hosts:', error);
-    res.status(500).json({ error: 'Failed to fetch hosts' });
+const getAllHosts = async (req: Request, res: Response): Promise<void> => {
+  if (!hostDb) {
+    res.status(500).json({ error: 'Database not initialized' });
+    return;
   }
+  const hosts = await hostDb.getAllHosts();
+  const scanInProgress = hostDb.isScanInProgress();
+  const lastScanTime = hostDb.getLastScanTime();
+  
+  res.status(200).json({ 
+    hosts,
+    scanInProgress,
+    lastScanTime
+  });
 };
 
-const getHost = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+const getHost = async (req: Request, res: Response): Promise<void> => {
   const { name } = req.params;
   console.log(`Retrieving host with name ${name}`);
 
-  try {
-    if (!hostDb) {
-      res.status(500).json({ error: 'Database not initialized' });
-      return;
-    }
-    const host = await hostDb.getHost(name);
-    if (!host) {
-      res.status(204).send();
-      console.log(`No host found with the name ${name}`);
-      return;
-    }
-    res.json(host);
-    console.log(`Found and sent host ${host.name} details`);
-  } catch (error) {
-    console.error('Error fetching host:', error);
-    res.status(500).json({ error: 'Failed to fetch host' });
+  if (!hostDb) {
+    res.status(500).json({ error: 'Database not initialized' });
+    return;
   }
+  const host = await hostDb.getHost(name);
+  if (!host) {
+    res.sendStatus(204);
+    console.log(`No host found with the name ${name}`);
+    return;
+  }
+  res.json(host);
+  console.log(`Found and sent host ${host.name} details`);
 };
 
-const wakeUpHost = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
   const { name } = req.params;
   console.log(`Trying to wake up host with name ${name}`);
 
-  try {
-    if (!hostDb) {
-      res.status(500).json({ error: 'Database not initialized' });
-      return;
-    }
-    const host = await hostDb.getHost(name);
-    
-    if (!host) {
-      res.status(204).send();
-      console.log(`No host found with name ${name}`);
-      return;
-    }
+  if (!hostDb) {
+    res.status(500).json({ error: 'Database not initialized' });
+    return;
+  }
+  const host = await hostDb.getHost(name);
+  
+  if (!host) {
+    res.sendStatus(204);
+    console.log(`No host found with name ${name}`);
+    return;
+  }
 
+  // Promisify wol.wake for better async handling
+  await new Promise<void>((resolve, reject) => {
     wol.wake(host.mac, (error: Error | null) => {
       if (error) {
         console.error(`Error waking up host ${name}: ${error.stack}`);
-        res.status(500).json({ 
-          success: false, 
-          name: host.name, 
-          error: error.message 
-        });
-        return;
+        reject(error);
+      } else {
+        console.log(`Sent WoL magic packet to host ${name} (${host.mac})`);
+        resolve();
       }
-
-      console.log(`Sent WoL magic packet to host ${name} (${host.mac})`);
-      res.status(200).json({ 
-        success: true, 
-        name: host.name, 
-        mac: host.mac,
-        message: 'Wake-on-LAN packet sent' 
-      });
     });
-  } catch (error) {
-    console.error('Error waking up host:', error);
-    res.status(500).json({ error: 'Failed to wake up host' });
-  }
+  });
+
+  res.status(200).json({ 
+    success: true, 
+    name: host.name, 
+    mac: host.mac,
+    message: 'Wake-on-LAN packet sent' 
+  });
 };
 
 /**
  * Force a network scan and sync immediately
  */
-const scanNetwork = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    if (!hostDb) {
-      res.status(500).json({ error: 'Database not initialized' });
-      return;
-    }
-    console.log('Manual network scan requested');
-    await hostDb.syncWithNetwork();
-    
-    const hosts = await hostDb.getAllHosts();
-    res.status(200).json({ 
-      message: 'Network scan completed',
-      hostsCount: hosts.length,
-      hosts 
-    });
-  } catch (error) {
-    console.error('Network scan error:', error);
-    res.status(500).json({ error: 'Failed to scan network' });
+const scanNetwork = async (req: Request, res: Response): Promise<void> => {
+  if (!hostDb) {
+    res.status(500).json({ error: 'Database not initialized' });
+    return;
   }
+  console.log('Manual network scan requested');
+  await hostDb.syncWithNetwork();
+  
+  const hosts = await hostDb.getAllHosts();
+  res.status(200).json({ 
+    message: 'Network scan completed',
+    hostsCount: hosts.length,
+    hosts 
+  });
 };
 
 /**
  * Add a new host manually
  */
-const addHost = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+const addHost = async (req: Request, res: Response): Promise<void> => {
   const { name, mac, ip } = req.body;
 
   if (!name || !mac || !ip) {
@@ -138,23 +118,18 @@ const addHost = async (req: Request, res: Response, next: NextFunction): Promise
     return;
   }
 
-  try {
-    if (!hostDb) {
-      res.status(500).json({ error: 'Database not initialized' });
-      return;
-    }
-    const host = await hostDb.addHost(name, mac, ip);
-    res.status(201).json(host);
-  } catch (error) {
-    console.error('Error adding host:', error);
-    res.status(500).json({ error: 'Failed to add host' });
+  if (!hostDb) {
+    res.status(500).json({ error: 'Database not initialized' });
+    return;
   }
+  const host = await hostDb.addHost(name, mac, ip);
+  res.status(201).json(host);
 };
 
 /**
  * Get MAC address vendor information with caching and rate limiting
  */
-const getMacVendor = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+const getMacVendor = async (req: Request, res: Response): Promise<void> => {
   const { mac } = req.params;
   
   if (!mac) {
@@ -176,19 +151,19 @@ const getMacVendor = async (req: Request, res: Response, next: NextFunction): Pr
     return;
   }
 
+  // Rate limiting: ensure minimum interval between requests
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastMacVendorRequest;
+  
+  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+    const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+    console.log(`Throttling MAC vendor request for ${mac}, waiting ${waitTime}ms`);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  
+  lastMacVendorRequest = Date.now();
+  
   try {
-    // Rate limiting: ensure minimum interval between requests
-    const now = Date.now();
-    const timeSinceLastRequest = now - lastMacVendorRequest;
-    
-    if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-      const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
-      console.log(`Throttling MAC vendor request for ${mac}, waiting ${waitTime}ms`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-    
-    lastMacVendorRequest = Date.now();
-    
     // Use macvendors.com API (free, no API key required)
     const response = await axios.get(`https://api.macvendors.com/${encodeURIComponent(mac)}`, {
       timeout: 5000,
