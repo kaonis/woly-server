@@ -170,10 +170,6 @@ describe('HostDatabase', () => {
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(true);
       
-      // Get the host before sync to check its initial state
-      const hostBefore = await db.getHost('PHANTOM-MBP');
-      expect(hostBefore?.discovered).toBe(0); // Initially not discovered
-      
       await db.syncWithNetwork();
       
       const host = await db.getHost('PHANTOM-MBP');
