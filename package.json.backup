@@ -18,18 +18,18 @@
   "private": true,
   "dependencies": {
     "axios": "^1.13.2",
-    "express": "5.1.0",
+    "express": "4.17.1",
     "local-devices": "^4.0.0",
     "lru-cache": "^11.2.2",
     "ping": "^1.0.0",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "5.0.0",
     "wake_on_lan": "1.0.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.5",
     "@types/jest": "^29.5.14",
     "@types/node": "^24.10.1",
-    "@types/sqlite3": "5.1.0",
+    "@types/sqlite3": "^3.1.11",
     "@types/supertest": "^6.0.3",
     "eslint": "7.16.0",
     "eslint-config-airbnb": "18.2.1",
@@ -40,15 +40,11 @@
     "eslint-plugin-react": "7.21.5",
     "jest": "^29.7.0",
     "jest-mock-extended": "^3.0.7",
-    "nodemon": "^3.1.7",
+    "nodemon": "^2.0.6",
     "prettier": "2.2.1",
     "supertest": "^6.3.4",
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
-  },
-  "overrides": {
-    "ip": "^2.0.1",
-    "get-ip-range": "^4.0.1"
   }
 }
