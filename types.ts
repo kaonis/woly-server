@@ -9,6 +9,7 @@ export interface Host {
   status: 'awake' | 'asleep';
   lastSeen: string | null;
   discovered: number;
+  pingResponsive?: number;
 }
 
 export interface DiscoveredHost {

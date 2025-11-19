@@ -94,6 +94,13 @@ const options: swaggerJsdoc.Options = {
               description: 'Whether host was discovered automatically (1) or added manually (0)',
               example: 1,
             },
+            pingResponsive: {
+              type: 'integer',
+              description:
+                'ICMP ping responsiveness: 1 (responds), 0 (no response), null (not tested)',
+              example: 1,
+              nullable: true,
+            },
           },
           required: ['name', 'mac', 'ip', 'status'],
         },

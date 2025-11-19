@@ -231,7 +231,10 @@ describe('HostDatabase', () => {
       await db.syncWithNetwork();
 
       const host = await db.getHost('OfflineHost');
-      expect(host?.status).toBe('asleep');
+      // Host found via ARP is marked as awake even if ping fails
+      expect(host?.status).toBe('awake');
+      // But pingResponsive should be 0 (doesn't respond to ping)
+      expect(host?.pingResponsive).toBe(0);
     });
 
     it('should handle empty network scan results', async () => {
