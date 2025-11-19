@@ -1,5 +1,8 @@
-const sqlite3 = require('sqlite3').verbose();
-const networkDiscovery = require('./networkDiscovery');
+import sqlite3 from 'sqlite3';
+import * as networkDiscovery from './networkDiscovery';
+import { Host, DiscoveredHost } from '../types';
+
+const sqlite = sqlite3.verbose();
 
 /**
  * Database Service
@@ -7,23 +10,25 @@ const networkDiscovery = require('./networkDiscovery');
  */
 
 class HostDatabase {
-  constructor(dbPath = './db/woly.db') {
-    this.db = new sqlite3.Database(dbPath, (err) => {
+  private db: sqlite3.Database;
+  private initialized: boolean = false;
+  private syncInterval?: NodeJS.Timeout;
+
+  constructor(dbPath: string = './db/woly.db') {
+    this.db = new sqlite.Database(dbPath, (err) => {
       if (err) {
         console.error('Database connection error:', err.message);
       } else {
         console.log('Connected to the WoLy database.');
       }
     });
-    
-    this.initialized = false;
   }
 
   /**
    * Initialize database with table and seed data
    */
-  async initialize() {
-    return new Promise((resolve) => {
+  async initialize(): Promise<void> {
+    return new Promise<void>((resolve) => {
       this.createTable(() => {
         this.seedInitialHosts(() => {
           this.initialized = true;
@@ -36,7 +41,7 @@ class HostDatabase {
   /**
    * Create hosts table if not exists
    */
-  createTable(callback) {
+  createTable(callback: () => void): void {
     this.db.run(
       `CREATE TABLE IF NOT EXISTS hosts(
         name text PRIMARY KEY UNIQUE,
@@ -53,21 +58,21 @@ class HostDatabase {
   /**
    * Seed initial hosts if table is empty
    */
-  seedInitialHosts(callback) {
+  seedInitialHosts(callback: () => void): void {
     const hostTable = [
       ['PHANTOM-MBP', '80:6D:97:60:39:08', '192.168.1.147', 'asleep', null, 0],
       ['PHANTOM-NAS', 'BC:07:1D:DD:5B:9C', '192.168.1.5', 'asleep', null, 0],
       ['RASPBERRYPI', 'B8:27:EB:B9:EF:D7', '192.168.1.6', 'asleep', null, 0]
     ];
 
-    this.db.get('SELECT COUNT(*) as count FROM hosts', (err, row) => {
+    this.db.get('SELECT COUNT(*) as count FROM hosts', (err: Error | null, row: any) => {
       if (row && row.count === 0) {
         hostTable.forEach((host) => {
           this.db.run(
             `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered) 
              VALUES(?,?,?,?,?,?)`,
             host,
-            (error) => {
+            (error: Error | null) => {
               if (error) {
                 console.error('Seed error:', error.message);
               } else {
@@ -84,10 +89,10 @@ class HostDatabase {
   /**
    * Get all hosts from database
    */
-  getAllHosts() {
+  getAllHosts(): Promise<Host[]> {
     return new Promise((resolve, reject) => {
       const sql = 'SELECT name, mac, ip, status, lastSeen, discovered FROM hosts ORDER BY name';
-      this.db.all(sql, (err, rows) => {
+      this.db.all(sql, (err: Error | null, rows: any[]) => {
         if (err) {
           reject(err);
         } else {
@@ -100,10 +105,10 @@ class HostDatabase {
   /**
    * Get a single host by name
    */
-  getHost(name) {
+  getHost(name: string): Promise<Host | undefined> {
     return new Promise((resolve, reject) => {
       const sql = 'SELECT name, mac, ip, status, lastSeen, discovered FROM hosts WHERE name = ?';
-      this.db.get(sql, [name], (err, row) => {
+      this.db.get(sql, [name], (err: Error | null, row: any) => {
         if (err) {
           reject(err);
         } else {
@@ -116,11 +121,11 @@ class HostDatabase {
   /**
    * Add a new host to database
    */
-  addHost(name, mac, ip) {
+  addHost(name: string, mac: string, ip: string): Promise<Host> {
     return new Promise((resolve, reject) => {
       const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered) 
                    VALUES(?, ?, ?, ?, datetime('now'), 1)`;
-      this.db.run(sql, [name, mac, ip, 'asleep'], function(err) {
+      this.db.run(sql, [name, mac, ip, 'asleep'], function(this: any, err: Error | null) {
         if (err) {
           if (err.message.includes('UNIQUE constraint failed')) {
             console.log(`Host ${name} already exists`);
@@ -128,7 +133,14 @@ class HostDatabase {
           reject(err);
         } else {
           console.log(`Added host: ${name}`);
-          resolve({ name, mac, ip, status: 'asleep' });
+          resolve({ 
+            name, 
+            mac, 
+            ip, 
+            status: 'asleep', 
+            lastSeen: new Date().toISOString(),
+            discovered: 1
+          });
         }
       });
     });
@@ -138,10 +150,10 @@ class HostDatabase {
    * Update host's last seen time, status, and mark as discovered
    * Throws error if host not found
    */
-  updateHostSeen(mac, status = 'awake') {
+  updateHostSeen(mac: string, status: 'awake' | 'asleep' = 'awake'): Promise<void> {
     return new Promise((resolve, reject) => {
       const sql = `UPDATE hosts SET lastSeen = datetime('now'), discovered = 1, status = ? WHERE mac = ?`;
-      this.db.run(sql, [status, mac], function(err) {
+      this.db.run(sql, [status, mac], function(this: sqlite3.RunResult, err: Error | null) {
         if (err) {
           reject(err);
         } else if (this.changes === 0) {
@@ -157,10 +169,10 @@ class HostDatabase {
   /**
    * Update host status
    */
-  updateHostStatus(name, status) {
+  updateHostStatus(name: string, status: 'awake' | 'asleep'): Promise<void> {
     return new Promise((resolve, reject) => {
       const sql = 'UPDATE hosts SET status = ? WHERE name = ?';
-      this.db.run(sql, [status, name], function(err) {
+      this.db.run(sql, [status, name], function(this: any, err: Error | null) {
         if (err) {
           reject(err);
         } else {
@@ -223,13 +235,13 @@ class HostDatabase {
             newHostCount++;
           } catch (addErr) {
             // Silently skip if adding fails (might be duplicate MAC/IP)
-            console.debug(`Could not add discovered host ${formattedMac}:`, addErr.message);
+            console.debug(`Could not add discovered host ${formattedMac}:`, (addErr as Error).message);
           }
         }
       }
 
       console.log(`Network sync complete: ${updatedHostCount} updated, ${newHostCount} new hosts, ${awakeCount} awake`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Network sync error:', error.message);
     }
   }
@@ -239,7 +251,7 @@ class HostDatabase {
    * @param {number} intervalMs - Scan interval in milliseconds (default: 5 minutes)
    * @param {boolean} immediateSync - Whether to run initial sync (default: false for better startup)
    */
-  startPeriodicSync(intervalMs = 5 * 60 * 1000, immediateSync = false) {
+  startPeriodicSync(intervalMs: number = 5 * 60 * 1000, immediateSync: boolean = false): void {
     console.log(`Starting periodic network sync every ${intervalMs / 1000}s`);
     
     if (immediateSync) {
@@ -273,12 +285,12 @@ class HostDatabase {
   /**
    * Close database connection
    */
-  close() {
+  close(): Promise<void> {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
     }
-    return new Promise((resolve, reject) => {
-      this.db.close((err) => {
+    return new Promise<void>((resolve, reject) => {
+      this.db.close((err: Error | null) => {
         if (err) {
           reject(err);
         } else {
@@ -290,4 +302,4 @@ class HostDatabase {
   }
 }
 
-module.exports = HostDatabase;
+export default HostDatabase;

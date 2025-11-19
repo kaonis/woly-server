@@ -2,11 +2,13 @@
   "name": "woly-backend",
   "version": "0.0.1",
   "description": "WakeOnLan Application Server",
-  "main": "app.js",
+  "main": "dist/app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "nodemon": "nodemon ./app.js",
-    "start": "nodemon ./app.js"
+    "build": "tsc",
+    "start": "ts-node app.ts",
+    "dev": "nodemon --exec ts-node app.ts",
+    "prod": "npm run build && node dist/app.js"
   },
   "private": true,
   "dependencies": {
@@ -19,6 +21,9 @@
     "wake_on_lan": "1.0.0"
   },
   "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.10.1",
+    "@types/sqlite3": "^3.1.11",
     "eslint": "7.16.0",
     "eslint-config-airbnb": "18.2.1",
     "eslint-config-prettier": "7.1.0",
@@ -26,7 +31,9 @@
     "eslint-plugin-jsx-a11y": "6.4.1",
     "eslint-plugin-prettier": "3.3.0",
     "eslint-plugin-react": "7.21.5",
-    "nodemon": "2.0.6",
-    "prettier": "2.2.1"
+    "nodemon": "^2.0.6",
+    "prettier": "2.2.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }

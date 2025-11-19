@@ -1,6 +1,5 @@
-const express = require('express');
-
-const hostsController = require('../controllers/hosts');
+import express from 'express';
+import * as hostsController from '../controllers/hosts';
 
 const router = express.Router();
 
@@ -21,4 +20,4 @@ router.get('/:name', hostsController.getHost);
 // Wake up a specific host
 router.post('/wakeup/:name', hostsController.wakeUpHost);
 
-module.exports = router;
+export default router;

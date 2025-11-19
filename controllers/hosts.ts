@@ -1,21 +1,28 @@
-const wol = require('wake_on_lan');
-const axios = require('axios');
+import wol from 'wake_on_lan';
+import axios from 'axios';
+import { Request, Response, NextFunction } from 'express';
+import HostDatabase from '../services/hostDatabase';
+import { MacVendorCacheEntry, MacVendorResponse, ErrorResponse } from '../types';
 
 // Database service will be set by app.js
-let hostDb = null;
+let hostDb: HostDatabase | null = null;
 
 // Rate limiting for MAC vendor API - using simple Map instead of LRU
-const macVendorCache = new Map();
+const macVendorCache = new Map<string, MacVendorCacheEntry>();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 let lastMacVendorRequest = 0;
 const MIN_REQUEST_INTERVAL = 1000; // 1 second between requests
 
-function setHostDatabase(db) {
+function setHostDatabase(db: HostDatabase): void {
   hostDb = db;
 }
 
-exports.getAllHosts = async (req, res, next) => {
+const getAllHosts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    if (!hostDb) {
+      res.status(500).json({ error: 'Database not initialized' });
+      return;
+    }
     const hosts = await hostDb.getAllHosts();
     res.status(200).json({ hosts });
   } catch (error) {
@@ -24,37 +31,47 @@ exports.getAllHosts = async (req, res, next) => {
   }
 };
 
-exports.getHost = async (req, res, next) => {
+const getHost = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { name } = req.params;
   console.log(`Retrieving host with name ${name}`);
 
   try {
+    if (!hostDb) {
+      res.status(500).json({ error: 'Database not initialized' });
+      return;
+    }
     const host = await hostDb.getHost(name);
     if (!host) {
       res.status(204).send();
-      return console.log(`No host found with the name ${name}`);
+      console.log(`No host found with the name ${name}`);
+      return;
     }
     res.json(host);
-    return console.log(`Found and sent host ${host.name} details`);
+    console.log(`Found and sent host ${host.name} details`);
   } catch (error) {
     console.error('Error fetching host:', error);
     res.status(500).json({ error: 'Failed to fetch host' });
   }
 };
 
-exports.wakeUpHost = async (req, res, next) => {
+const wakeUpHost = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { name } = req.params;
   console.log(`Trying to wake up host with name ${name}`);
 
   try {
+    if (!hostDb) {
+      res.status(500).json({ error: 'Database not initialized' });
+      return;
+    }
     const host = await hostDb.getHost(name);
     
     if (!host) {
       res.status(204).send();
-      return console.log(`No host found with name ${name}`);
+      console.log(`No host found with name ${name}`);
+      return;
     }
 
-    wol.wake(host.mac, (error) => {
+    wol.wake(host.mac, (error: Error | null) => {
       if (error) {
         console.error(`Error waking up host ${name}: ${error.stack}`);
         res.status(500).json({ 
@@ -82,8 +99,12 @@ exports.wakeUpHost = async (req, res, next) => {
 /**
  * Force a network scan and sync immediately
  */
-exports.scanNetwork = async (req, res, next) => {
+const scanNetwork = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    if (!hostDb) {
+      res.status(500).json({ error: 'Database not initialized' });
+      return;
+    }
     console.log('Manual network scan requested');
     await hostDb.syncWithNetwork();
     
@@ -102,7 +123,7 @@ exports.scanNetwork = async (req, res, next) => {
 /**
  * Add a new host manually
  */
-exports.addHost = async (req, res, next) => {
+const addHost = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { name, mac, ip } = req.body;
 
   if (!name || !mac || !ip) {
@@ -111,6 +132,10 @@ exports.addHost = async (req, res, next) => {
   }
 
   try {
+    if (!hostDb) {
+      res.status(500).json({ error: 'Database not initialized' });
+      return;
+    }
     const host = await hostDb.addHost(name, mac, ip);
     res.status(201).json(host);
   } catch (error) {
@@ -122,11 +147,12 @@ exports.addHost = async (req, res, next) => {
 /**
  * Get MAC address vendor information with caching and rate limiting
  */
-exports.getMacVendor = async (req, res, next) => {
+const getMacVendor = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { mac } = req.params;
   
   if (!mac) {
-    return res.status(400).json({ error: 'MAC address is required' });
+    res.status(400).json({ error: 'MAC address is required' });
+    return;
   }
   // Normalize MAC address for cache key
   const normalizedMac = mac.toUpperCase().replace(/[:-]/g, '');
@@ -135,11 +161,12 @@ exports.getMacVendor = async (req, res, next) => {
   const cached = macVendorCache.get(normalizedMac);
   if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
     console.log(`MAC vendor cache hit for ${mac}`);
-    return res.status(200).json({ 
+    res.status(200).json({ 
       mac, 
       vendor: cached.vendor,
       source: 'macvendors.com (cached)'
     });
+    return;
   }
 
   try {
@@ -176,7 +203,7 @@ exports.getMacVendor = async (req, res, next) => {
       vendor,
       source: 'macvendors.com'
     });
-  } catch (error) {
+  } catch (error: any) {
     if (error.response && error.response.status === 404) {
       const vendor = 'Unknown Vendor';
       
@@ -204,4 +231,12 @@ exports.getMacVendor = async (req, res, next) => {
   }
 };
 
-module.exports.setHostDatabase = setHostDatabase;
+export {
+  setHostDatabase,
+  getAllHosts,
+  getHost,
+  wakeUpHost,
+  scanNetwork,
+  addHost,
+  getMacVendor
+};
