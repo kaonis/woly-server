@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  woly-backend:
+    build: .
+    container_name: woly-backend
+    ports:
+      - "8082:8082"
+    environment:
+      - NODE_ENV=production
+      - PORT=8082
+      - HOST=0.0.0.0
+      - DB_PATH=/data/woly.db
+      - SCAN_INTERVAL=300000
+      - SCAN_DELAY=5000
+      - PING_TIMEOUT=2000
+      - MAC_VENDOR_TTL=86400000
+      - MAC_VENDOR_RATE_LIMIT=1000
+      - LOG_LEVEL=info
+    volumes:
+      - ./db:/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - woly-network
+    # Required for network scanning - use host network for ARP access
+    network_mode: host
+
+networks:
+  woly-network:
+    driver: bridge
