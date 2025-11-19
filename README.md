@@ -16,7 +16,7 @@ Node.js backend for [WoLy](https://github.com/kaonis/woly) - A Wake-on-LAN appli
 - 🪵 **Structured Logging** - Winston-based logging with file rotation
 - ⚙️ **Configuration Management** - Environment-based configuration with `.env`
 - 🐳 **Docker Support** - Containerized deployment ready
-- ✅ **Testing** - 85 tests with 83% coverage (Jest + Supertest)
+- ✅ **Testing** - 195 tests with 90% coverage (Jest + Supertest)
 
 ## Quick Start
 
@@ -55,13 +55,15 @@ npm run dev
 
 ## Testing
 
-This project has comprehensive test coverage:
+This project has comprehensive test coverage with enforced thresholds:
 
-- **85 tests** across unit and integration test suites
-- **83.68%** statement coverage
-- **92.85%** function coverage
+- **195 tests** across unit and integration test suites
+- **90%** statement coverage (threshold: 80%)
+- **89.5%** line coverage (threshold: 80%)
+- **76.9%** branch coverage (threshold: 70%)
+- **94.2%** function coverage (threshold: 85%)
 
-Run tests with:
+### Running Tests
 
 ```bash
 npm test                # Run all tests
@@ -69,7 +71,32 @@ npm run test:coverage   # Run tests with coverage report
 npm run test:watch      # Run tests in watch mode
 npm run test:unit       # Run only unit tests
 npm run test:integration # Run only integration tests
+npm run test:ci         # Run tests in CI mode
 ```
+
+### Test Organization
+
+- **Unit Tests**: Located in `__tests__/` directories alongside source files
+  - Controllers, services, middleware, validators, utilities
+- **Integration Tests**: Located in `__tests__/` at project root
+  - End-to-end API testing with supertest
+
+### Coverage Enforcement
+
+Jest is configured to enforce coverage thresholds in `jest.config.js`:
+
+- CI pipeline fails if coverage drops below thresholds
+- Coverage reports uploaded to Codecov automatically
+- HTML coverage reports available in `coverage/` directory
+
+### Writing Tests
+
+When adding new features:
+
+1. Add unit tests for business logic and utilities
+2. Add integration tests for new API endpoints
+3. Run `npm run test:coverage` to verify coverage
+4. Ensure all thresholds are met before committing
 
 ## Host Status Fields
 
