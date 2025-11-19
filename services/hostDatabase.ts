@@ -202,6 +202,11 @@ class HostDatabase {
    * Synchronize database with discovered network hosts
    */
   async syncWithNetwork() {
+    // Prevent concurrent scans
+    if (this.scanInProgress) {
+      console.log('Scan already in progress, skipping...');
+      return;
+    }
     // Set scan flag at the start
     this.scanInProgress = true;
     
