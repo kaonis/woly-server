@@ -64,6 +64,9 @@ describe('HostDatabase', () => {
     });
 
     it('should retrieve single host by name', async () => {
+      // Wait for async seeding to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       const host = await db.getHost('PHANTOM-MBP');
 
       expect(host).toBeDefined();

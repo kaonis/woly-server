@@ -2,7 +2,7 @@ import sqlite3 from 'sqlite3';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import * as networkDiscovery from './networkDiscovery';
-import { Host, DiscoveredHost } from '../types';
+import { Host } from '../types';
 
 const sqlite = sqlite3.verbose();
 
@@ -93,25 +93,36 @@ class HostDatabase {
       ['RASPBERRYPI', 'B8:27:EB:B9:EF:D7', '192.168.1.6', 'asleep', null, 0],
     ];
 
-    this.db.get('SELECT COUNT(*) as count FROM hosts', (err: Error | null, row: any) => {
-      if (row && row.count === 0) {
-        hostTable.forEach((host) => {
-          this.db.run(
-            `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered)
+    this.db.get(
+      'SELECT COUNT(*) as count FROM hosts',
+      (err: Error | null, row: { count: number } | undefined) => {
+        if (row && row.count === 0) {
+          let completed = 0;
+          const total = hostTable.length;
+
+          hostTable.forEach((host) => {
+            this.db.run(
+              `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered)
              VALUES(?,?,?,?,?,?)`,
-            host,
-            (error: Error | null) => {
-              if (error) {
-                logger.error('Seed error:', { error: error.message });
-              } else {
-                logger.info(`Seeded host: ${host[0]}`);
+              host,
+              (error: Error | null) => {
+                if (error) {
+                  logger.error('Seed error:', { error: error.message });
+                } else {
+                  logger.info(`Seeded host: ${host[0]}`);
+                }
+                completed++;
+                if (completed === total) {
+                  callback();
+                }
               }
-            }
-          );
-        });
+            );
+          });
+        } else {
+          callback();
+        }
       }
-      callback();
-    });
+    );
   }
 
   /**
@@ -120,7 +131,7 @@ class HostDatabase {
   getAllHosts(): Promise<Host[]> {
     return new Promise((resolve, reject) => {
       const sql = 'SELECT name, mac, ip, status, lastSeen, discovered FROM hosts ORDER BY name';
-      this.db.all(sql, (err: Error | null, rows: any[]) => {
+      this.db.all(sql, (err: Error | null, rows: Host[]) => {
         if (err) {
           reject(err);
         } else {
@@ -150,7 +161,7 @@ class HostDatabase {
   getHost(name: string): Promise<Host | undefined> {
     return new Promise((resolve, reject) => {
       const sql = 'SELECT name, mac, ip, status, lastSeen, discovered FROM hosts WHERE name = ?';
-      this.db.get(sql, [name], (err: Error | null, row: any) => {
+      this.db.get(sql, [name], (err: Error | null, row: Host | undefined) => {
         if (err) {
           reject(err);
         } else {
@@ -167,24 +178,28 @@ class HostDatabase {
     return new Promise((resolve, reject) => {
       const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered)
                    VALUES(?, ?, ?, ?, datetime('now'), 1)`;
-      this.db.run(sql, [name, mac, ip, 'asleep'], function (this: any, err: Error | null) {
-        if (err) {
-          if (err.message.includes('UNIQUE constraint failed')) {
-            logger.warn(`Host ${name} already exists`);
+      this.db.run(
+        sql,
+        [name, mac, ip, 'asleep'],
+        function (this: sqlite3.RunResult, err: Error | null) {
+          if (err) {
+            if (err.message.includes('UNIQUE constraint failed')) {
+              logger.warn(`Host ${name} already exists`);
+            }
+            reject(err);
+          } else {
+            logger.info(`Added host: ${name}`);
+            resolve({
+              name,
+              mac,
+              ip,
+              status: 'asleep',
+              lastSeen: new Date().toISOString(),
+              discovered: 1,
+            });
           }
-          reject(err);
-        } else {
-          logger.info(`Added host: ${name}`);
-          resolve({
-            name,
-            mac,
-            ip,
-            status: 'asleep',
-            lastSeen: new Date().toISOString(),
-            discovered: 1,
-          });
         }
-      });
+      );
     });
   }
 
@@ -214,7 +229,7 @@ class HostDatabase {
   updateHostStatus(name: string, status: 'awake' | 'asleep'): Promise<void> {
     return new Promise((resolve, reject) => {
       const sql = 'UPDATE hosts SET status = ? WHERE name = ?';
-      this.db.run(sql, [status, name], function (this: any, err: Error | null) {
+      this.db.run(sql, [status, name], function (this: sqlite3.RunResult, err: Error | null) {
         if (err) {
           reject(err);
         } else {
@@ -295,8 +310,9 @@ class HostDatabase {
       logger.info(
         `Network sync complete: ${updatedHostCount} updated, ${newHostCount} new hosts, ${awakeCount} awake`
       );
-    } catch (error: any) {
-      logger.error('Network sync error:', { error: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Network sync error:', { error: message });
     } finally {
       // Always clear scan flag and update timestamp, even if scan failed
       this.scanInProgress = false;
