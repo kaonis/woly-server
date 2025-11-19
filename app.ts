@@ -1,7 +1,7 @@
-const express = require('express');
-const HostDatabase = require('./services/hostDatabase');
-const hostsController = require('./controllers/hosts');
-const hosts = require('./routes/hosts');
+import express, { Request, Response } from 'express';
+import HostDatabase from './services/hostDatabase';
+import * as hostsController from './controllers/hosts';
+import hosts from './routes/hosts';
 
 const app = express();
 
@@ -28,14 +28,19 @@ async function startServer() {
     app.use('/hosts', hosts);
     
     // Health check endpoint
-    app.get('/health', (req, res) => {
+    app.get('/health', (req: Request, res: Response) => {
       res.json({ status: 'ok', message: 'WoLy server is running' });
     });
     
     // Start listening
     const server = app.listen(8082, '0.0.0.0', () => {
-      const { address, port } = server.address();
-      console.log('WoLy listening at http://%s:%s', address, port);
+      const address = server.address();
+      if (typeof address === 'string') {
+        console.log('WoLy listening at %s', address);
+      } else if (address) {
+        const { address: host, port } = address;
+        console.log('WoLy listening at http://%s:%s', host, port);
+      }
     });
     
     // Graceful shutdown

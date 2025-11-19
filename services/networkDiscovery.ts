@@ -1,8 +1,9 @@
-const localDevices = require('local-devices');
-const dns = require('dns').promises;
-const { execSync } = require('child_process');
-const os = require('os');
-const ping = require('ping');
+import localDevices from 'local-devices';
+import { promises as dns } from 'dns';
+import { execSync } from 'child_process';
+import os from 'os';
+import ping from 'ping';
+import { DiscoveredHost } from '../types';
 
 /**
  * Network Discovery Service
@@ -15,7 +16,7 @@ const ping = require('ping');
  * @param {string} ip - IP address to lookup
  * @returns {Promise<string|null>} Hostname or null if lookup fails
  */
-async function reverseDNSLookup(ip) {
+async function reverseDNSLookup(ip: string): Promise<string | null> {
   try {
     const hostnames = await dns.reverse(ip);
     if (hostnames && hostnames.length > 0) {
@@ -34,7 +35,7 @@ async function reverseDNSLookup(ip) {
  * @param {string} ip - IP address to lookup
  * @returns {string|null} Hostname or null if lookup fails
  */
-function getHostnameViaNBT(ip) {
+function getHostnameViaNBT(ip: string): string | null {
   try {
     const platform = os.platform();
     
@@ -79,7 +80,7 @@ function getHostnameViaNBT(ip) {
  * Scan network using ARP protocol (via local-devices)
  * Returns array of { ip, mac, hostname }
  */
-async function scanNetworkARP() {
+async function scanNetworkARP(): Promise<DiscoveredHost[]> {
   try {
     console.log('Starting ARP network scan...');
     
@@ -127,7 +128,7 @@ async function scanNetworkARP() {
     const hostnamesFound = hosts.filter(h => h.hostname).length;
     console.log(`Network scan found ${hosts.length} devices (${hostnamesFound} with hostnames)`);
     return hosts;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Network scan error:', error.message);
     return [];
   }
@@ -137,12 +138,12 @@ async function scanNetworkARP() {
  * Get MAC address for a specific IP
  * Note: This requires scanning the entire network
  */
-async function getMACAddress(ip) {
+async function getMACAddress(ip: string): Promise<string | null> {
   try {
     const devices = await localDevices();
     const device = devices.find(d => d.ip === ip);
     return device ? formatMAC(device.mac) : null;
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Failed to get MAC for IP ${ip}:`, error.message);
     return null;
   }
@@ -151,7 +152,7 @@ async function getMACAddress(ip) {
 /**
  * Format MAC address to standard format
  */
-function formatMAC(mac) {
+function formatMAC(mac: string): string {
   return mac.toUpperCase().replace(/-/g, ':');
 }
 
@@ -160,20 +161,20 @@ function formatMAC(mac) {
  * @param {string} ip - IP address to ping
  * @returns {Promise<boolean>} True if host responds to ping
  */
-async function isHostAlive(ip) {
+async function isHostAlive(ip: string): Promise<boolean> {
   try {
     const result = await ping.promise.probe(ip, {
       timeout: 2,
       extra: ['-n', '1'] // Windows: 1 packet
     });
     return result.alive;
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Ping failed for ${ip}:`, error.message);
     return false;
   }
 }
 
-module.exports = {
+export {
   scanNetworkARP,
   getMACAddress,
   formatMAC,
