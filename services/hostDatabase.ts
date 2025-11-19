@@ -13,6 +13,8 @@ class HostDatabase {
   private db: sqlite3.Database;
   private initialized: boolean = false;
   private syncInterval?: NodeJS.Timeout;
+  private scanInProgress: boolean = false;
+  private lastScanTime: Date | null = null;
 
   constructor(dbPath: string = './db/woly.db') {
     this.db = new sqlite.Database(dbPath, (err) => {
@@ -103,6 +105,20 @@ class HostDatabase {
   }
 
   /**
+   * Check if a network scan is currently in progress
+   */
+  isScanInProgress(): boolean {
+    return this.scanInProgress;
+  }
+
+  /**
+   * Get the timestamp of the last completed network scan
+   */
+  getLastScanTime(): string | null {
+    return this.lastScanTime ? this.lastScanTime.toISOString() : null;
+  }
+
+  /**
    * Get a single host by name
    */
   getHost(name: string): Promise<Host | undefined> {
@@ -186,6 +202,9 @@ class HostDatabase {
    * Synchronize database with discovered network hosts
    */
   async syncWithNetwork() {
+    // Set scan flag at the start
+    this.scanInProgress = true;
+    
     try {
       console.log('Starting network scan...');
       const discoveredHosts = await networkDiscovery.scanNetworkARP();
@@ -243,6 +262,10 @@ class HostDatabase {
       console.log(`Network sync complete: ${updatedHostCount} updated, ${newHostCount} new hosts, ${awakeCount} awake`);
     } catch (error: any) {
       console.error('Network sync error:', error.message);
+    } finally {
+      // Always clear scan flag and update timestamp, even if scan failed
+      this.scanInProgress = false;
+      this.lastScanTime = new Date();
     }
   }
 
