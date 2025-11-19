@@ -27,7 +27,7 @@
   "devDependencies": {
     "@types/express": "^5.0.5",
     "@types/node": "^24.10.1",
-    "@types/sqlite3": "^3.1.11",
+    "@types/sqlite3": "^5.1.0",
     "eslint": "7.16.0",
     "eslint-config-airbnb": "18.2.1",
     "eslint-config-prettier": "7.1.0",
