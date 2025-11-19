@@ -7,7 +7,7 @@ import { logger } from '../utils/logger';
  */
 export const apiLimiter = rateLimit({
   windowMs: 2 * 60 * 1000, // 2 minutes
-  max: 20,
+  max: 50,
   message: {
     error: 'Too many requests from this IP, please try again later.',
     retryAfter: '2 minutes',
