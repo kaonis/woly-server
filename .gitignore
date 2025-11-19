@@ -49,6 +49,9 @@ coverage/
 # Environment variables
 .env
 
+# Logs
+logs/*.log
+
 # BUCK
 buck-out/
 \.buckd/
