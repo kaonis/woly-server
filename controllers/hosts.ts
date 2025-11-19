@@ -1,6 +1,8 @@
 import wol from 'wake_on_lan';
 import axios from 'axios';
 import { Request, Response } from 'express';
+import { config } from '../config';
+import { logger } from '../utils/logger';
 import HostDatabase from '../services/hostDatabase';
 import { MacVendorCacheEntry, MacVendorResponse, ErrorResponse } from '../types';
 
@@ -9,9 +11,7 @@ let hostDb: HostDatabase | null = null;
 
 // Rate limiting for MAC vendor API - using simple Map instead of LRU
 const macVendorCache = new Map<string, MacVendorCacheEntry>();
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 let lastMacVendorRequest = 0;
-const MIN_REQUEST_INTERVAL = 1000; // 1 second between requests
 
 function setHostDatabase(db: HostDatabase): void {
   hostDb = db;
@@ -35,7 +35,7 @@ const getAllHosts = async (req: Request, res: Response): Promise<void> => {
 
 const getHost = async (req: Request, res: Response): Promise<void> => {
   const { name } = req.params;
-  console.log(`Retrieving host with name ${name}`);
+  logger.info(`Retrieving host with name ${name}`);
 
   if (!hostDb) {
     res.status(500).json({ error: 'Database not initialized' });
@@ -44,16 +44,16 @@ const getHost = async (req: Request, res: Response): Promise<void> => {
   const host = await hostDb.getHost(name);
   if (!host) {
     res.sendStatus(204);
-    console.log(`No host found with the name ${name}`);
+    logger.info(`No host found with the name ${name}`);
     return;
   }
   res.json(host);
-  console.log(`Found and sent host ${host.name} details`);
+  logger.info(`Found and sent host ${host.name} details`);
 };
 
 const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
   const { name } = req.params;
-  console.log(`Trying to wake up host with name ${name}`);
+  logger.info(`Trying to wake up host with name ${name}`);
 
   if (!hostDb) {
     res.status(500).json({ error: 'Database not initialized' });
@@ -63,7 +63,7 @@ const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
   
   if (!host) {
     res.sendStatus(204);
-    console.log(`No host found with name ${name}`);
+    logger.info(`No host found with name ${name}`);
     return;
   }
 
@@ -71,10 +71,10 @@ const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
   await new Promise<void>((resolve, reject) => {
     wol.wake(host.mac, (error: Error | null) => {
       if (error) {
-        console.error(`Error waking up host ${name}: ${error.stack}`);
+        logger.error(`Error waking up host ${name}:`, { error: error.message, stack: error.stack });
         reject(error);
       } else {
-        console.log(`Sent WoL magic packet to host ${name} (${host.mac})`);
+        logger.info(`Sent WoL magic packet to host ${name} (${host.mac})`);
         resolve();
       }
     });
@@ -96,7 +96,7 @@ const scanNetwork = async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ error: 'Database not initialized' });
     return;
   }
-  console.log('Manual network scan requested');
+  logger.info('Manual network scan requested');
   await hostDb.syncWithNetwork();
   
   const hosts = await hostDb.getAllHosts();
@@ -141,8 +141,8 @@ const getMacVendor = async (req: Request, res: Response): Promise<void> => {
   
   // Check cache first
   const cached = macVendorCache.get(normalizedMac);
-  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
-    console.log(`MAC vendor cache hit for ${mac}`);
+  if (cached && (Date.now() - cached.timestamp < config.cache.macVendorTTL)) {
+    logger.debug(`MAC vendor cache hit for ${mac}`);
     res.status(200).json({ 
       mac, 
       vendor: cached.vendor,
@@ -155,9 +155,9 @@ const getMacVendor = async (req: Request, res: Response): Promise<void> => {
   const now = Date.now();
   const timeSinceLastRequest = now - lastMacVendorRequest;
   
-  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-    const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
-    console.log(`Throttling MAC vendor request for ${mac}, waiting ${waitTime}ms`);
+  if (timeSinceLastRequest < config.cache.macVendorRateLimit) {
+    const waitTime = config.cache.macVendorRateLimit - timeSinceLastRequest;
+    logger.debug(`Throttling MAC vendor request for ${mac}, waiting ${waitTime}ms`);
     await new Promise(resolve => setTimeout(resolve, waitTime));
   }
   
@@ -201,13 +201,13 @@ const getMacVendor = async (req: Request, res: Response): Promise<void> => {
         source: 'macvendors.com'
       });
     } else if (error.response && error.response.status === 429) {
-      console.error('MAC vendor API rate limit exceeded');
+      logger.warn('MAC vendor API rate limit exceeded', { mac });
       res.status(429).json({ 
         error: 'Rate limit exceeded, please try again later',
         mac
       });
     } else {
-      console.error('MAC vendor lookup error:', error.message);
+      logger.error('MAC vendor lookup error:', { mac, error: error.message });
       res.status(500).json({ error: 'Failed to lookup MAC vendor' });
     }
   }
