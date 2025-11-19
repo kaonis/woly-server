@@ -18,12 +18,16 @@
   "private": true,
   "dependencies": {
     "axios": "^1.13.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
     "express": "5.1.0",
+    "helmet": "^8.0.0",
     "local-devices": "^4.0.0",
     "lru-cache": "^11.2.2",
     "ping": "^1.0.0",
     "sqlite3": "^5.1.7",
-    "wake_on_lan": "1.0.0"
+    "wake_on_lan": "1.0.0",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.5",
