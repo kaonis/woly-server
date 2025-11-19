@@ -12,18 +12,39 @@ const sqlite = sqlite3.verbose();
  */
 
 class HostDatabase {
-  private db: sqlite3.Database;
+  private db!: sqlite3.Database; // Definite assignment assertion - assigned in connectWithRetry
   private initialized: boolean = false;
   private syncInterval?: NodeJS.Timeout;
   private scanInProgress: boolean = false;
   private lastScanTime: Date | null = null;
+  private connectionRetries: number = 0;
+  private maxRetries: number = 3;
+  private retryDelay: number = 1000; // 1 second
 
   constructor(dbPath: string = './db/woly.db') {
+    this.connectWithRetry(dbPath);
+  }
+
+  /**
+   * Connect to database with retry logic
+   */
+  private connectWithRetry(dbPath: string, attempt: number = 1): void {
     this.db = new sqlite.Database(dbPath, (err) => {
       if (err) {
-        logger.error('Database connection error:', { error: err.message });
+        logger.error(`Database connection error (attempt ${attempt}/${this.maxRetries}):`, { error: err.message });
+        
+        if (attempt < this.maxRetries) {
+          logger.info(`Retrying database connection in ${this.retryDelay}ms...`);
+          setTimeout(() => {
+            this.connectWithRetry(dbPath, attempt + 1);
+          }, this.retryDelay * attempt); // Exponential backoff
+        } else {
+          logger.error('Max database connection retries reached. Application may be unstable.');
+          throw new Error('Failed to connect to database after multiple attempts');
+        }
       } else {
         logger.info('Connected to the WoLy database.');
+        this.connectionRetries = 0;
       }
     });
   }
