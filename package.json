@@ -13,6 +13,7 @@
     "axios": "^1.13.2",
     "express": "4.17.1",
     "local-devices": "^4.0.0",
+    "lru-cache": "^11.2.2",
     "ping": "^1.0.0",
     "sqlite3": "5.0.0",
     "wake_on_lan": "1.0.0"
