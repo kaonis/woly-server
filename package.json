@@ -13,12 +13,16 @@
   "private": true,
   "dependencies": {
     "axios": "^1.13.2",
-    "express": "4.17.1",
+    "express": "^4.21.2",
     "local-devices": "^4.0.0",
     "lru-cache": "^11.2.2",
     "ping": "^1.0.0",
-    "sqlite3": "5.0.0",
+    "sqlite3": "^5.1.7",
     "wake_on_lan": "1.0.0"
+  },
+  "overrides": {
+    "ip": "^2.0.1",
+    "get-ip-range": "^4.0.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.5",
@@ -31,7 +35,7 @@
     "eslint-plugin-jsx-a11y": "6.4.1",
     "eslint-plugin-prettier": "3.3.0",
     "eslint-plugin-react": "7.21.5",
-    "nodemon": "^2.0.6",
+    "nodemon": "^3.1.7",
     "prettier": "2.2.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
