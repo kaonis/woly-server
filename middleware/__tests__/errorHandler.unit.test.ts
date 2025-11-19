@@ -148,8 +148,11 @@ describe('errorHandler middleware', () => {
 
   describe('notFoundHandler', () => {
     it('should return 404 for non-existent routes', () => {
-      mockReq.method = 'POST';
-      mockReq.path = '/api/nonexistent';
+      mockReq = {
+        ...mockReq,
+        method: 'POST',
+        path: '/api/nonexistent',
+      };
 
       notFoundHandler(mockReq as Request, mockRes as Response);
 
@@ -166,8 +169,11 @@ describe('errorHandler middleware', () => {
     });
 
     it('should log warning for not found routes', () => {
-      mockReq.method = 'DELETE';
-      mockReq.path = '/api/unknown';
+      mockReq = {
+        ...mockReq,
+        method: 'DELETE',
+        path: '/api/unknown',
+      };
 
       notFoundHandler(mockReq as Request, mockRes as Response);
 

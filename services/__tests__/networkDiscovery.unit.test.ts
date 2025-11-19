@@ -3,15 +3,17 @@ import localDevices from 'local-devices';
 import ping from 'ping';
 import { execSync } from 'child_process';
 import { promises as dns } from 'dns';
+import os from 'os';
 
 // Mock all external dependencies
 jest.mock('local-devices');
 jest.mock('ping');
 jest.mock('child_process');
+jest.mock('os');
 jest.mock('dns', () => ({
   promises: {
-    reverse: jest.fn()
-  }
+    reverse: jest.fn(),
+  },
 }));
 
 describe('networkDiscovery', () => {
@@ -21,9 +23,7 @@ describe('networkDiscovery', () => {
 
   describe('scanNetworkARP', () => {
     it('should discover hosts on local network', async () => {
-      const mockDevices = [
-        { name: 'TestHost', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' }
-      ];
+      const mockDevices = [{ name: 'TestHost', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' }];
       (localDevices as jest.MockedFunction<typeof localDevices>).mockResolvedValue(mockDevices);
 
       const hosts = await networkDiscovery.scanNetworkARP();
@@ -53,11 +53,11 @@ describe('networkDiscovery', () => {
     });
 
     it('should fallback to DNS lookup when hostname is invalid', async () => {
-      const mockDevices = [
-        { name: '?', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' }
-      ];
+      const mockDevices = [{ name: '?', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' }];
       (localDevices as jest.MockedFunction<typeof localDevices>).mockResolvedValue(mockDevices);
-      (dns.reverse as jest.MockedFunction<typeof dns.reverse>).mockResolvedValue(['testhost.local']);
+      (dns.reverse as jest.MockedFunction<typeof dns.reverse>).mockResolvedValue([
+        'testhost.local',
+      ]);
 
       const hosts = await networkDiscovery.scanNetworkARP();
 
@@ -67,13 +67,12 @@ describe('networkDiscovery', () => {
     });
 
     it('should fallback to NetBIOS lookup when DNS fails', async () => {
-      const mockDevices = [
-        { name: 'unknown', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' }
-      ];
+      const mockDevices = [{ name: '?', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' }];
       (localDevices as jest.MockedFunction<typeof localDevices>).mockResolvedValue(mockDevices);
       (dns.reverse as jest.MockedFunction<typeof dns.reverse>).mockRejectedValue(
         new Error('DNS lookup failed')
       );
+      (os.platform as jest.MockedFunction<typeof os.platform>).mockReturnValue('win32');
       (execSync as jest.MockedFunction<typeof execSync>).mockReturnValue(
         '   TESTPC       <00>  UNIQUE\n' as any
       );
@@ -86,7 +85,7 @@ describe('networkDiscovery', () => {
 
     it('should handle hostname as IP address', async () => {
       const mockDevices = [
-        { name: '192.168.1.100', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' }
+        { name: '192.168.1.100', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' },
       ];
       (localDevices as jest.MockedFunction<typeof localDevices>).mockResolvedValue(mockDevices);
       (dns.reverse as jest.MockedFunction<typeof dns.reverse>).mockRejectedValue(
@@ -107,7 +106,7 @@ describe('networkDiscovery', () => {
   describe('reverseDNSLookup', () => {
     it('should perform reverse DNS lookup successfully', async () => {
       (dns.reverse as jest.MockedFunction<typeof dns.reverse>).mockResolvedValue([
-        'testhost.example.com'
+        'testhost.example.com',
       ]);
 
       const hostname = await networkDiscovery.reverseDNSLookup('192.168.1.100');
@@ -136,7 +135,7 @@ describe('networkDiscovery', () => {
 
     it('should strip domain suffix from hostname', async () => {
       (dns.reverse as jest.MockedFunction<typeof dns.reverse>).mockResolvedValue([
-        'mycomputer.local.network.com'
+        'mycomputer.local.network.com',
       ]);
 
       const hostname = await networkDiscovery.reverseDNSLookup('192.168.1.100');
@@ -166,7 +165,7 @@ describe('networkDiscovery', () => {
     it('should get MAC address for specific IP', async () => {
       const mockDevices = [
         { name: 'Host1', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' },
-        { name: 'Host2', ip: '192.168.1.101', mac: '11:22:33:44:55:66' }
+        { name: 'Host2', ip: '192.168.1.101', mac: '11:22:33:44:55:66' },
       ];
       (localDevices as jest.MockedFunction<typeof localDevices>).mockResolvedValue(mockDevices);
 
@@ -176,9 +175,7 @@ describe('networkDiscovery', () => {
     });
 
     it('should return null for non-existent IP', async () => {
-      const mockDevices = [
-        { name: 'Host1', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' }
-      ];
+      const mockDevices = [{ name: 'Host1', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' }];
       (localDevices as jest.MockedFunction<typeof localDevices>).mockResolvedValue(mockDevices);
 
       const mac = await networkDiscovery.getMACAddress('192.168.1.200');
@@ -206,7 +203,7 @@ describe('networkDiscovery', () => {
       expect(isAlive).toBe(true);
       expect(ping.promise.probe).toHaveBeenCalledWith('192.168.1.100', {
         timeout: 2,
-        extra: ['-n', '1']
+        extra: ['-n', '1'],
       });
     });
 

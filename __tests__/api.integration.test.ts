@@ -6,6 +6,7 @@ import * as hostsController from '../controllers/hosts';
 import * as networkDiscovery from '../services/networkDiscovery';
 import wol from 'wake_on_lan';
 import axios from 'axios';
+import { errorHandler, notFoundHandler } from '../middleware/errorHandler';
 
 // Mock external dependencies
 jest.mock('../services/networkDiscovery');
@@ -35,6 +36,10 @@ describe('API Integration Tests', () => {
     app.get('/health', (req, res) => {
       res.json({ status: 'ok', message: 'Test server running' });
     });
+
+    // Error handling middleware (must be last)
+    app.use(notFoundHandler);
+    app.use(errorHandler);
   });
 
   afterAll(async () => {
@@ -92,9 +97,7 @@ describe('API Integration Tests', () => {
   });
 
   describe('POST /hosts', () => {
-    // NOTE: Skipping due to mismatch between master's validation schema and controller
-    // The validation expects 'macAddress' but controller expects 'mac'
-    it.skip('should create new host with valid data', async () => {
+    it('should create new host with valid data', async () => {
       const newHost = {
         name: 'TestHost',
         mac: 'FF:EE:DD:CC:BB:AA',
@@ -122,11 +125,11 @@ describe('API Integration Tests', () => {
       const response = await request(app).post('/hosts').send(invalidHost).expect(400);
 
       expect(response.body).toHaveProperty('error');
-      expect(response.body.error).toContain('Missing required fields');
+      expect(response.body.error.message).toContain('required');
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
     });
 
-    // NOTE: Skipping due to mismatch between master's validation schema and controller
-    it.skip('should return 500 for duplicate MAC address', async () => {
+    it('should return 500 for duplicate MAC address', async () => {
       const host1 = {
         name: 'Host1',
         mac: 'AA:BB:CC:DD:EE:11',
@@ -167,8 +170,7 @@ describe('API Integration Tests', () => {
       await request(app).post('/hosts/wakeup/NONEXISTENT').expect(204);
     });
 
-    // NOTE: Skipping - WoL errors don't return proper error response in integration test
-    it.skip('should handle WoL errors', async () => {
+    it('should handle WoL errors', async () => {
       // Mock WoL failure
       (wol.wake as jest.Mock).mockImplementation(
         (mac: string, callback: (err: Error | null) => void) => {
@@ -261,11 +263,11 @@ describe('API Integration Tests', () => {
       const response = await request(app)
         .post('/hosts')
         .set('Content-Type', 'application/json')
-        .send('{ invalid json }')
-        .expect(400);
+        .send('{ invalid json }');
 
-      // Express automatically handles malformed JSON
-      expect(response.status).toBe(400);
+      // Error handler catches JSON syntax errors
+      expect(response.status).toBe(500);
+      expect(response.body).toHaveProperty('error');
     });
 
     it('should handle invalid routes', async () => {
