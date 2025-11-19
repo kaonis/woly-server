@@ -1,4 +1,6 @@
 import sqlite3 from 'sqlite3';
+import { config } from '../config';
+import { logger } from '../utils/logger';
 import * as networkDiscovery from './networkDiscovery';
 import { Host, DiscoveredHost } from '../types';
 
@@ -19,9 +21,9 @@ class HostDatabase {
   constructor(dbPath: string = './db/woly.db') {
     this.db = new sqlite.Database(dbPath, (err) => {
       if (err) {
-        console.error('Database connection error:', err.message);
+        logger.error('Database connection error:', { error: err.message });
       } else {
-        console.log('Connected to the WoLy database.');
+        logger.info('Connected to the WoLy database.');
       }
     });
   }
@@ -76,9 +78,9 @@ class HostDatabase {
             host,
             (error: Error | null) => {
               if (error) {
-                console.error('Seed error:', error.message);
+                logger.error('Seed error:', { error: error.message });
               } else {
-                console.log(`Seeded host: ${host[0]}`);
+                logger.info(`Seeded host: ${host[0]}`);
               }
             }
           );
@@ -144,11 +146,11 @@ class HostDatabase {
       this.db.run(sql, [name, mac, ip, 'asleep'], function(this: any, err: Error | null) {
         if (err) {
           if (err.message.includes('UNIQUE constraint failed')) {
-            console.log(`Host ${name} already exists`);
+            logger.warn(`Host ${name} already exists`);
           }
           reject(err);
         } else {
-          console.log(`Added host: ${name}`);
+          logger.info(`Added host: ${name}`);
           resolve({ 
             name, 
             mac, 
@@ -204,22 +206,22 @@ class HostDatabase {
   async syncWithNetwork() {
     // Prevent concurrent scans
     if (this.scanInProgress) {
-      console.log('Scan already in progress, skipping...');
+      logger.info('Scan already in progress, skipping...');
       return;
     }
     // Set scan flag at the start
     this.scanInProgress = true;
     
     try {
-      console.log('Starting network scan...');
+      logger.info('Starting network scan...');
       const discoveredHosts = await networkDiscovery.scanNetworkARP();
       
       if (discoveredHosts.length === 0) {
-        console.log('No hosts discovered in network scan');
+        logger.info('No hosts discovered in network scan');
         return;
       }
 
-      console.log(`Discovered ${discoveredHosts.length} hosts on network`);
+      logger.info(`Discovered ${discoveredHosts.length} hosts on network`);
 
       let newHostCount = 0;
       let updatedHostCount = 0;
@@ -259,14 +261,14 @@ class HostDatabase {
             newHostCount++;
           } catch (addErr) {
             // Silently skip if adding fails (might be duplicate MAC/IP)
-            console.debug(`Could not add discovered host ${formattedMac}:`, (addErr as Error).message);
+            logger.debug(`Could not add discovered host ${formattedMac}:`, { error: (addErr as Error).message });
           }
         }
       }
 
-      console.log(`Network sync complete: ${updatedHostCount} updated, ${newHostCount} new hosts, ${awakeCount} awake`);
+      logger.info(`Network sync complete: ${updatedHostCount} updated, ${newHostCount} new hosts, ${awakeCount} awake`);
     } catch (error: any) {
-      console.error('Network sync error:', error.message);
+      logger.error('Network sync error:', { error: error.message });
     } finally {
       // Always clear scan flag and update timestamp, even if scan failed
       this.scanInProgress = false;
@@ -280,18 +282,18 @@ class HostDatabase {
    * @param {boolean} immediateSync - Whether to run initial sync (default: false for better startup)
    */
   startPeriodicSync(intervalMs: number = 5 * 60 * 1000, immediateSync: boolean = false): void {
-    console.log(`Starting periodic network sync every ${intervalMs / 1000}s`);
+    logger.info(`Starting periodic network sync every ${intervalMs / 1000}s`);
     
     if (immediateSync) {
       // Initial scan (blocks startup)
       this.syncWithNetwork();
     } else {
       // Run initial scan in background after short delay
-      console.log('Deferring initial network scan to background (5 seconds)');
+      logger.info(`Deferring initial network scan to background (${config.network.scanDelay / 1000} seconds)`);
       setTimeout(() => {
-        console.log('Running deferred initial network scan...');
+        logger.info('Running deferred initial network scan...');
         this.syncWithNetwork();
-      }, 5000);
+      }, config.network.scanDelay);
     }
     
     // Recurring scans
@@ -306,7 +308,7 @@ class HostDatabase {
   stopPeriodicSync() {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
-      console.log('Stopped periodic network sync');
+      logger.info('Stopped periodic network sync');
     }
   }
 
@@ -322,7 +324,7 @@ class HostDatabase {
         if (err) {
           reject(err);
         } else {
-          console.log('Database connection closed');
+          logger.info('Database connection closed');
           resolve();
         }
       });

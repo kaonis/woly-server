@@ -3,6 +3,8 @@ import { promises as dns } from 'dns';
 import { execSync } from 'child_process';
 import os from 'os';
 import ping from 'ping';
+import { config } from '../config';
+import { logger } from '../utils/logger';
 import { DiscoveredHost } from '../types';
 
 /**
@@ -82,13 +84,13 @@ function getHostnameViaNBT(ip: string): string | null {
  */
 async function scanNetworkARP(): Promise<DiscoveredHost[]> {
   try {
-    console.log('Starting ARP network scan...');
+    logger.info('Starting ARP network scan...');
     
     // local-devices returns an array of { name, ip, mac }
     const devices = await localDevices();
     
     if (!devices || devices.length === 0) {
-      console.warn('No devices found on network');
+      logger.warn('No devices found on network');
       return [];
     }
 
@@ -126,10 +128,10 @@ async function scanNetworkARP(): Promise<DiscoveredHost[]> {
     const hosts = await Promise.all(hostsPromises);
     
     const hostnamesFound = hosts.filter(h => h.hostname).length;
-    console.log(`Network scan found ${hosts.length} devices (${hostnamesFound} with hostnames)`);
+    logger.info(`Network scan found ${hosts.length} devices (${hostnamesFound} with hostnames)`);
     return hosts;
   } catch (error: any) {
-    console.error('Network scan error:', error.message);
+    logger.error('Network scan error:', { error: error.message });
     return [];
   }
 }
@@ -144,7 +146,7 @@ async function getMACAddress(ip: string): Promise<string | null> {
     const device = devices.find(d => d.ip === ip);
     return device ? formatMAC(device.mac) : null;
   } catch (error: any) {
-    console.error(`Failed to get MAC for IP ${ip}:`, error.message);
+    logger.error(`Failed to get MAC for IP ${ip}:`, { error: error.message });
     return null;
   }
 }
@@ -164,12 +166,12 @@ function formatMAC(mac: string): string {
 async function isHostAlive(ip: string): Promise<boolean> {
   try {
     const result = await ping.promise.probe(ip, {
-      timeout: 2,
+      timeout: config.network.pingTimeout / 1000, // Convert ms to seconds
       extra: ['-n', '1'] // Windows: 1 packet
     });
     return result.alive;
   } catch (error: any) {
-    console.error(`Ping failed for ${ip}:`, error.message);
+    logger.error(`Ping failed for ${ip}:`, { error: error.message });
     return false;
   }
 }
