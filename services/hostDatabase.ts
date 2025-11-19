@@ -13,6 +13,7 @@ class HostDatabase {
   private db: sqlite3.Database;
   private initialized: boolean = false;
   private syncInterval?: NodeJS.Timeout;
+  private deferredSyncTimeout?: NodeJS.Timeout;
 
   constructor(dbPath: string = './db/woly.db') {
     this.db = new sqlite.Database(dbPath, (err) => {
@@ -260,7 +261,7 @@ class HostDatabase {
     } else {
       // Run initial scan in background after short delay
       console.log('Deferring initial network scan to background (5 seconds)');
-      setTimeout(() => {
+      this.deferredSyncTimeout = setTimeout(() => {
         console.log('Running deferred initial network scan...');
         this.syncWithNetwork();
       }, 5000);
@@ -276,8 +277,13 @@ class HostDatabase {
    * Stop periodic network scanning
    */
   stopPeriodicSync() {
+    if (this.deferredSyncTimeout) {
+      clearTimeout(this.deferredSyncTimeout);
+      this.deferredSyncTimeout = undefined;
+    }
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
+      this.syncInterval = undefined;
       console.log('Stopped periodic network sync');
     }
   }
@@ -286,8 +292,13 @@ class HostDatabase {
    * Close database connection
    */
   close(): Promise<void> {
+    if (this.deferredSyncTimeout) {
+      clearTimeout(this.deferredSyncTimeout);
+      this.deferredSyncTimeout = undefined;
+    }
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
+      this.syncInterval = undefined;
     }
     return new Promise<void>((resolve, reject) => {
       this.db.close((err: Error | null) => {

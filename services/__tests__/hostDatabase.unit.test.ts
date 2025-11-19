@@ -276,11 +276,16 @@ describe('HostDatabase', () => {
   });
 
   describe('Periodic scanning', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
     afterEach(() => {
       // Always stop periodic sync after each test to avoid timer leaks
       if (db) {
         db.stopPeriodicSync();
       }
+      jest.useRealTimers();
     });
 
     it('should start periodic sync with correct interval', async () => {
@@ -288,12 +293,12 @@ describe('HostDatabase', () => {
       
       db.startPeriodicSync(1000, false);
       
-      // Wait for deferred initial scan (5 seconds + buffer)
-      await new Promise(resolve => setTimeout(resolve, 5100));
+      // Fast-forward time by 5 seconds for deferred initial scan
+      jest.advanceTimersByTime(5000);
       
       // Verify sync was called
       expect(networkDiscovery.scanNetworkARP).toHaveBeenCalled();
-    }, 15000);
+    });
 
     it('should defer initial scan in background mode', () => {
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue([]);
@@ -304,18 +309,16 @@ describe('HostDatabase', () => {
       expect(networkDiscovery.scanNetworkARP).not.toHaveBeenCalled();
     });
 
-    it('should run immediate scan when requested', async () => {
+    it('should run immediate scan when requested', () => {
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue([]);
       
       db.startPeriodicSync(5000, true);
       
-      // Wait a bit for async call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      // With immediateSync=true, should call immediately (no timeout needed)
       expect(networkDiscovery.scanNetworkARP).toHaveBeenCalled();
-    }, 15000);
+    });
 
-    it('should stop periodic sync on close', async () => {
+    it('should stop periodic sync on close', () => {
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue([]);
       
       db.startPeriodicSync(1000, false);
@@ -326,12 +329,11 @@ describe('HostDatabase', () => {
       // Should not have called scan yet (deferred to 5 seconds)
       expect(networkDiscovery.scanNetworkARP).not.toHaveBeenCalled();
       
-      // Close the database (will be reopened in afterEach)
-      await db.close();
+      // Fast-forward time - should still not call because we stopped it
+      jest.advanceTimersByTime(5000);
       
-      // Create a new instance for cleanup since we closed early
-      db = new HostDatabase(':memory:');
-      await db.initialize();
+      // Verify it was never called even after timeout
+      expect(networkDiscovery.scanNetworkARP).not.toHaveBeenCalled();
     });
   });
 
