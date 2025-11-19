@@ -2,7 +2,7 @@ import sqlite3 from 'sqlite3';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import * as networkDiscovery from './networkDiscovery';
-import { Host, DiscoveredHost } from '../types';
+import { Host } from '../types';
 
 const sqlite = sqlite3.verbose();
 
@@ -15,6 +15,7 @@ class HostDatabase {
   private db!: sqlite3.Database; // Definite assignment assertion - assigned in connectWithRetry
   private initialized: boolean = false;
   private syncInterval?: NodeJS.Timeout;
+  private deferredSyncTimeout?: NodeJS.Timeout;
   private scanInProgress: boolean = false;
   private lastScanTime: Date | null = null;
   private connectionRetries: number = 0;
@@ -31,8 +32,10 @@ class HostDatabase {
   private connectWithRetry(dbPath: string, attempt: number = 1): void {
     this.db = new sqlite.Database(dbPath, (err) => {
       if (err) {
-        logger.error(`Database connection error (attempt ${attempt}/${this.maxRetries}):`, { error: err.message });
-        
+        logger.error(`Database connection error (attempt ${attempt}/${this.maxRetries}):`, {
+          error: err.message,
+        });
+
         if (attempt < this.maxRetries) {
           logger.info(`Retrying database connection in ${this.retryDelay}ms...`);
           setTimeout(() => {
@@ -87,28 +90,39 @@ class HostDatabase {
     const hostTable = [
       ['PHANTOM-MBP', '80:6D:97:60:39:08', '192.168.1.147', 'asleep', null, 0],
       ['PHANTOM-NAS', 'BC:07:1D:DD:5B:9C', '192.168.1.5', 'asleep', null, 0],
-      ['RASPBERRYPI', 'B8:27:EB:B9:EF:D7', '192.168.1.6', 'asleep', null, 0]
+      ['RASPBERRYPI', 'B8:27:EB:B9:EF:D7', '192.168.1.6', 'asleep', null, 0],
     ];
 
-    this.db.get('SELECT COUNT(*) as count FROM hosts', (err: Error | null, row: any) => {
-      if (row && row.count === 0) {
-        hostTable.forEach((host) => {
-          this.db.run(
-            `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered) 
+    this.db.get(
+      'SELECT COUNT(*) as count FROM hosts',
+      (err: Error | null, row: { count: number } | undefined) => {
+        if (row && row.count === 0) {
+          let completed = 0;
+          const total = hostTable.length;
+
+          hostTable.forEach((host) => {
+            this.db.run(
+              `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered)
              VALUES(?,?,?,?,?,?)`,
-            host,
-            (error: Error | null) => {
-              if (error) {
-                logger.error('Seed error:', { error: error.message });
-              } else {
-                logger.info(`Seeded host: ${host[0]}`);
+              host,
+              (error: Error | null) => {
+                if (error) {
+                  logger.error('Seed error:', { error: error.message });
+                } else {
+                  logger.info(`Seeded host: ${host[0]}`);
+                }
+                completed++;
+                if (completed === total) {
+                  callback();
+                }
               }
-            }
-          );
-        });
+            );
+          });
+        } else {
+          callback();
+        }
       }
-      callback();
-    });
+    );
   }
 
   /**
@@ -117,7 +131,7 @@ class HostDatabase {
   getAllHosts(): Promise<Host[]> {
     return new Promise((resolve, reject) => {
       const sql = 'SELECT name, mac, ip, status, lastSeen, discovered FROM hosts ORDER BY name';
-      this.db.all(sql, (err: Error | null, rows: any[]) => {
+      this.db.all(sql, (err: Error | null, rows: Host[]) => {
         if (err) {
           reject(err);
         } else {
@@ -147,7 +161,7 @@ class HostDatabase {
   getHost(name: string): Promise<Host | undefined> {
     return new Promise((resolve, reject) => {
       const sql = 'SELECT name, mac, ip, status, lastSeen, discovered FROM hosts WHERE name = ?';
-      this.db.get(sql, [name], (err: Error | null, row: any) => {
+      this.db.get(sql, [name], (err: Error | null, row: Host | undefined) => {
         if (err) {
           reject(err);
         } else {
@@ -162,26 +176,30 @@ class HostDatabase {
    */
   addHost(name: string, mac: string, ip: string): Promise<Host> {
     return new Promise((resolve, reject) => {
-      const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered) 
+      const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered)
                    VALUES(?, ?, ?, ?, datetime('now'), 1)`;
-      this.db.run(sql, [name, mac, ip, 'asleep'], function(this: any, err: Error | null) {
-        if (err) {
-          if (err.message.includes('UNIQUE constraint failed')) {
-            logger.warn(`Host ${name} already exists`);
+      this.db.run(
+        sql,
+        [name, mac, ip, 'asleep'],
+        function (this: sqlite3.RunResult, err: Error | null) {
+          if (err) {
+            if (err.message.includes('UNIQUE constraint failed')) {
+              logger.warn(`Host ${name} already exists`);
+            }
+            reject(err);
+          } else {
+            logger.info(`Added host: ${name}`);
+            resolve({
+              name,
+              mac,
+              ip,
+              status: 'asleep',
+              lastSeen: new Date().toISOString(),
+              discovered: 1,
+            });
           }
-          reject(err);
-        } else {
-          logger.info(`Added host: ${name}`);
-          resolve({ 
-            name, 
-            mac, 
-            ip, 
-            status: 'asleep', 
-            lastSeen: new Date().toISOString(),
-            discovered: 1
-          });
         }
-      });
+      );
     });
   }
 
@@ -192,7 +210,7 @@ class HostDatabase {
   updateHostSeen(mac: string, status: 'awake' | 'asleep' = 'awake'): Promise<void> {
     return new Promise((resolve, reject) => {
       const sql = `UPDATE hosts SET lastSeen = datetime('now'), discovered = 1, status = ? WHERE mac = ?`;
-      this.db.run(sql, [status, mac], function(this: sqlite3.RunResult, err: Error | null) {
+      this.db.run(sql, [status, mac], function (this: sqlite3.RunResult, err: Error | null) {
         if (err) {
           reject(err);
         } else if (this.changes === 0) {
@@ -211,7 +229,7 @@ class HostDatabase {
   updateHostStatus(name: string, status: 'awake' | 'asleep'): Promise<void> {
     return new Promise((resolve, reject) => {
       const sql = 'UPDATE hosts SET status = ? WHERE name = ?';
-      this.db.run(sql, [status, name], function(this: any, err: Error | null) {
+      this.db.run(sql, [status, name], function (this: sqlite3.RunResult, err: Error | null) {
         if (err) {
           reject(err);
         } else {
@@ -232,11 +250,11 @@ class HostDatabase {
     }
     // Set scan flag at the start
     this.scanInProgress = true;
-    
+
     try {
       logger.info('Starting network scan...');
       const discoveredHosts = await networkDiscovery.scanNetworkARP();
-      
+
       if (discoveredHosts.length === 0) {
         logger.info('No hosts discovered in network scan');
         return;
@@ -251,13 +269,13 @@ class HostDatabase {
       // Process each discovered host with ping check
       for (const host of discoveredHosts) {
         const formattedMac = networkDiscovery.formatMAC(host.mac);
-        
+
         // Check if host is alive via ICMP ping
         const isAlive = await networkDiscovery.isHostAlive(host.ip);
         const status = isAlive ? 'awake' : 'asleep';
-        
+
         if (isAlive) awakeCount++;
-        
+
         try {
           // Try to update existing host with status
           await this.updateHostSeen(formattedMac, status);
@@ -267,7 +285,7 @@ class HostDatabase {
           try {
             // Generate hostname: prefer actual hostname, fallback to IP-based name
             let hostName;
-            
+
             if (host.hostname) {
               // Use actual network hostname if available
               hostName = host.hostname;
@@ -275,21 +293,26 @@ class HostDatabase {
               // Generate from IP address (e.g., "device-192-168-1-115")
               hostName = `device-${host.ip.replace(/\./g, '-')}`;
             }
-            
+
             await this.addHost(hostName, formattedMac, host.ip);
             // Update status for newly added host
             await this.updateHostStatus(hostName, status);
             newHostCount++;
           } catch (addErr) {
             // Silently skip if adding fails (might be duplicate MAC/IP)
-            logger.debug(`Could not add discovered host ${formattedMac}:`, { error: (addErr as Error).message });
+            logger.debug(`Could not add discovered host ${formattedMac}:`, {
+              error: (addErr as Error).message,
+            });
           }
         }
       }
 
-      logger.info(`Network sync complete: ${updatedHostCount} updated, ${newHostCount} new hosts, ${awakeCount} awake`);
-    } catch (error: any) {
-      logger.error('Network sync error:', { error: error.message });
+      logger.info(
+        `Network sync complete: ${updatedHostCount} updated, ${newHostCount} new hosts, ${awakeCount} awake`
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Network sync error:', { error: message });
     } finally {
       // Always clear scan flag and update timestamp, even if scan failed
       this.scanInProgress = false;
@@ -304,19 +327,21 @@ class HostDatabase {
    */
   startPeriodicSync(intervalMs: number = 5 * 60 * 1000, immediateSync: boolean = false): void {
     logger.info(`Starting periodic network sync every ${intervalMs / 1000}s`);
-    
+
     if (immediateSync) {
       // Initial scan (blocks startup)
       this.syncWithNetwork();
     } else {
       // Run initial scan in background after short delay
-      logger.info(`Deferring initial network scan to background (${config.network.scanDelay / 1000} seconds)`);
-      setTimeout(() => {
+      logger.info(
+        `Deferring initial network scan to background (${config.network.scanDelay / 1000} seconds)`
+      );
+      this.deferredSyncTimeout = setTimeout(() => {
         logger.info('Running deferred initial network scan...');
         this.syncWithNetwork();
       }, config.network.scanDelay);
     }
-    
+
     // Recurring scans
     this.syncInterval = setInterval(() => {
       this.syncWithNetwork();
@@ -327,8 +352,13 @@ class HostDatabase {
    * Stop periodic network scanning
    */
   stopPeriodicSync() {
+    if (this.deferredSyncTimeout) {
+      clearTimeout(this.deferredSyncTimeout);
+      this.deferredSyncTimeout = undefined;
+    }
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
+      this.syncInterval = undefined;
       logger.info('Stopped periodic network sync');
     }
   }
@@ -337,8 +367,13 @@ class HostDatabase {
    * Close database connection
    */
   close(): Promise<void> {
+    if (this.deferredSyncTimeout) {
+      clearTimeout(this.deferredSyncTimeout);
+      this.deferredSyncTimeout = undefined;
+    }
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
+      this.syncInterval = undefined;
     }
     return new Promise<void>((resolve, reject) => {
       this.db.close((err: Error | null) => {

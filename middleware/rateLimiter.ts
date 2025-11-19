@@ -10,7 +10,7 @@ export const apiLimiter = rateLimit({
   max: 100,
   message: {
     error: 'Too many requests from this IP, please try again later.',
-    retryAfter: '15 minutes'
+    retryAfter: '15 minutes',
   },
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
@@ -18,9 +18,9 @@ export const apiLimiter = rateLimit({
     logger.warn(`Rate limit exceeded for IP: ${req.ip} on path: ${req.path}`);
     res.status(429).json({
       error: 'Too many requests from this IP, please try again later.',
-      retryAfter: '15 minutes'
+      retryAfter: '15 minutes',
     });
-  }
+  },
 });
 
 /**
@@ -33,7 +33,7 @@ export const scanLimiter = rateLimit({
   max: 5,
   message: {
     error: 'Too many scan requests. Network scanning is resource-intensive.',
-    retryAfter: '1 minute'
+    retryAfter: '1 minute',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -42,11 +42,11 @@ export const scanLimiter = rateLimit({
     res.status(429).json({
       error: 'Too many scan requests. Network scanning is resource-intensive.',
       retryAfter: '1 minute',
-      hint: 'Use GET /hosts to retrieve cached results instead'
+      hint: 'Use GET /hosts to retrieve cached results instead',
     });
   },
   // Skip rate limiting for successful GET requests (reading cached data)
-  skip: (req) => req.method === 'GET'
+  skip: (req) => req.method === 'GET',
 });
 
 /**
@@ -58,7 +58,7 @@ export const wakeLimiter = rateLimit({
   max: 20,
   message: {
     error: 'Too many wake requests. Please wait before trying again.',
-    retryAfter: '1 minute'
+    retryAfter: '1 minute',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -66,7 +66,7 @@ export const wakeLimiter = rateLimit({
     logger.warn(`Wake rate limit exceeded for IP: ${req.ip}`);
     res.status(429).json({
       error: 'Too many wake requests. Please wait before trying again.',
-      retryAfter: '1 minute'
+      retryAfter: '1 minute',
     });
-  }
+  },
 });

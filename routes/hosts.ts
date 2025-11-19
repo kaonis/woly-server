@@ -19,7 +19,11 @@ router.post('/scan', scanLimiter, hostsController.scanNetwork);
 router.post('/', validateRequest(updateHostSchema, 'body'), hostsController.addHost);
 
 // Get MAC address vendor information (with validation)
-router.get('/mac-vendor/:mac', validateRequest(macAddressSchema, 'params'), hostsController.getMacVendor);
+router.get(
+  '/mac-vendor/:mac',
+  validateRequest(macAddressSchema, 'params'),
+  hostsController.getMacVendor
+);
 
 // Get a specific host by name
 router.get('/:name', hostsController.getHost);

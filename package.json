@@ -4,21 +4,30 @@
   "description": "WakeOnLan Application Server",
   "main": "dist/app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --maxWorkers=2",
+    "test:unit": "jest --testPathPattern='.unit.test.ts'",
+    "test:integration": "jest --testPathPattern='.integration.test.ts'",
     "build": "tsc",
     "start": "ts-node app.ts",
     "dev": "nodemon --exec ts-node app.ts",
     "prod": "npm run build && node dist/app.js",
-    "prepare": "husky"
+    "prepare": "husky",
+    "lint": "eslint .",
+    "lint-fix": "eslint --fix .",
+    "format": "prettier --write ."
   },
   "private": true,
   "dependencies": {
     "axios": "^1.13.2",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "express-rate-limit": "^8.2.1",
-    "helmet": "^8.1.0",
+    "dotenv": "^16.4.7",
+    "express": "5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.0.0",
     "joi": "^18.0.1",
     "local-devices": "^4.0.0",
     "lru-cache": "^11.2.2",
@@ -27,11 +36,8 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "wake_on_lan": "1.0.0",
-    "winston": "^3.18.3"
-  },
-  "overrides": {
-    "ip": "^2.0.1",
-    "get-ip-range": "^4.0.1"
+    "winston": "^3.17.0",
+    "zod": "^3.24.1"
   },
   "lint-staged": {
     "*.ts": [
@@ -46,19 +52,29 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.5",
     "@types/express-rate-limit": "^5.1.3",
+    "@types/jest": "^29.5.14",
     "@types/node": "^24.10.1",
-    "@types/sqlite3": "^5.1.0",
+    "@types/sqlite3": "5.1.0",
+    "@types/supertest": "^6.0.3",
     "@types/swagger-jsdoc": "^6.0.4",
-    "@types/swagger-ui-express": "^4.1.8",
+    "@types/swagger-ui-express": "^4.1.6",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.2",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.6",
+    "jest": "^29.7.0",
+    "jest-mock-extended": "^3.0.7",
+    "lint-staged": "^15.2.11",
     "nodemon": "^3.1.7",
     "prettier": "2.2.1",
+    "supertest": "^6.3.4",
+    "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "ip": "^2.0.1",
+    "get-ip-range": "^4.0.1"
   }
 }
