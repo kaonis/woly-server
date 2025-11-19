@@ -25,7 +25,7 @@ export const errorHandler = (
   const statusCode = err instanceof AppError ? err.statusCode : 500;
   const errorCode = err instanceof AppError ? err.code : 'INTERNAL_ERROR';
   const message = err.message || 'Internal server error';
-  
+
   // Log error with context
   logger.error('Error occurred', {
     statusCode,
@@ -44,7 +44,7 @@ export const errorHandler = (
       message,
       statusCode,
       timestamp: new Date().toISOString(),
-      path: req.path
+      path: req.path,
     },
     ...(config.server.env === 'development' && { stack: err.stack }),
   });
@@ -58,7 +58,7 @@ export const notFoundHandler = (req: Request, res: Response) => {
       message: 'Route not found',
       statusCode: 404,
       timestamp: new Date().toISOString(),
-      path: req.path
-    }
+      path: req.path,
+    },
   });
 };

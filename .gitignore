@@ -39,8 +39,12 @@ node_modules/
 npm-debug.log
 yarn-error.log
 
-# TypeScript
+# TypeScript build output
 dist/
+
+# Test coverage
+coverage/
+.nyc_output/
 
 # Environment variables
 .env

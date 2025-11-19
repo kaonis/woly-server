@@ -1,4 +1,7 @@
-# WoLy Backend
+# woly-backend
+
+[![Tests](https://github.com/kaonis/woly-backend/actions/workflows/test.yml/badge.svg)](https://github.com/kaonis/woly-backend/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/kaonis/woly-backend/branch/master/graph/badge.svg)](https://codecov.io/gh/kaonis/woly-backend)
 
 Node.js backend for [WoLy](https://github.com/kaonis/woly) - A Wake-on-LAN application with automatic network discovery.
 
@@ -12,6 +15,7 @@ Node.js backend for [WoLy](https://github.com/kaonis/woly) - A Wake-on-LAN appli
 - 🪵 **Structured Logging** - Winston-based logging with file rotation
 - ⚙️ **Configuration Management** - Environment-based configuration with `.env`
 - 🐳 **Docker Support** - Containerized deployment ready
+- ✅ **Testing** - 85 tests with 83% coverage (Jest + Supertest)
 
 ## Quick Start
 
@@ -46,6 +50,24 @@ npm start
 ```bash
 # Run in development mode with auto-reload
 npm run dev
+```
+
+## Testing
+
+This project has comprehensive test coverage:
+
+- **85 tests** across unit and integration test suites
+- **83.68%** statement coverage
+- **92.85%** function coverage
+
+Run tests with:
+
+```bash
+npm test                # Run all tests
+npm run test:coverage   # Run tests with coverage report
+npm run test:watch      # Run tests in watch mode
+npm run test:unit       # Run only unit tests
+npm run test:integration # Run only integration tests
 ```
 
 ## API Documentation
