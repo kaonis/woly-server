@@ -3,12 +3,14 @@ import cors from 'cors';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { config } from './config';
+import { agentConfig } from './config/agent';
 import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { specs } from './swagger';
 import HostDatabase from './services/hostDatabase';
 import * as hostsController from './controllers/hosts';
 import hosts from './routes/hosts';
+import { agentService } from './services/agentService';
 
 const app = express();
 
@@ -66,6 +68,23 @@ async function startServer() {
 
     // Pass database instance to controller
     hostsController.setHostDatabase(hostDb);
+
+    // Initialize agent service if in agent mode
+    if (agentConfig.mode === 'agent') {
+      logger.info('Starting in AGENT mode', {
+        nodeId: agentConfig.nodeId,
+        location: agentConfig.location,
+        cncUrl: agentConfig.cncUrl,
+      });
+
+      // Pass database instance to agent service
+      agentService.setHostDatabase(hostDb);
+
+      // Start agent service (connects to C&C)
+      await agentService.start();
+    } else {
+      logger.info('Starting in STANDALONE mode');
+    }
 
     // Start periodic network scanning
     // Initial scan runs in background after configured delay for faster API availability
@@ -154,6 +173,10 @@ async function startServer() {
     process.on('SIGINT', async () => {
       logger.info('Received SIGINT, shutting down gracefully...');
       try {
+        // Stop agent service if running
+        if (agentConfig.mode === 'agent') {
+          agentService.stop();
+        }
         await hostDb.close();
         logger.info('Database closed successfully');
         process.exit(0);
@@ -166,6 +189,10 @@ async function startServer() {
     process.on('SIGTERM', async () => {
       logger.info('Received SIGTERM, shutting down gracefully...');
       try {
+        // Stop agent service if running
+        if (agentConfig.mode === 'agent') {
+          agentService.stop();
+        }
         await hostDb.close();
         logger.info('Database closed successfully');
         process.exit(0);

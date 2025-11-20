@@ -1,4 +1,5 @@
 import sqlite3 from 'sqlite3';
+import { EventEmitter } from 'events';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import * as networkDiscovery from './networkDiscovery';
@@ -11,7 +12,7 @@ const sqlite = sqlite3.verbose();
  * Manages host synchronization and updates
  */
 
-class HostDatabase {
+class HostDatabase extends EventEmitter {
   private db!: sqlite3.Database; // Definite assignment assertion - assigned in connectWithRetry
   private initialized: boolean = false;
   private syncInterval?: NodeJS.Timeout;
@@ -23,6 +24,7 @@ class HostDatabase {
   private retryDelay: number = 1000; // 1 second
 
   constructor(dbPath: string = './db/woly.db') {
+    super();
     this.connectWithRetry(dbPath);
   }
 
@@ -182,6 +184,23 @@ class HostDatabase {
   }
 
   /**
+   * Get a single host by MAC address
+   */
+  getHostByMAC(mac: string): Promise<Host | undefined> {
+    return new Promise((resolve, reject) => {
+      const sql =
+        'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts WHERE mac = ?';
+      this.db.get(sql, [mac], (err: Error | null, row: Host | undefined) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+  }
+
+  /**
    * Add a new host to database
    */
   addHost(name: string, mac: string, ip: string): Promise<Host> {
@@ -320,6 +339,14 @@ class HostDatabase {
           // Try to update existing host with status and ping responsiveness
           await this.updateHostSeen(formattedMac, status, pingResponsive);
           updatedHostCount++;
+
+          // Emit host-updated event for agent mode
+          const updatedHost = await this.getHost(''); // Will be fetched by MAC in next line
+          // Get host by MAC to emit event
+          const hostByMac = await this.getHostByMAC(formattedMac);
+          if (hostByMac) {
+            this.emit('host-updated', hostByMac);
+          }
         } catch (err) {
           // Host not in DB yet, try to add it
           try {
@@ -339,6 +366,12 @@ class HostDatabase {
             await this.updateHostStatus(hostName, status);
             await this.updateHostSeen(formattedMac, status, pingResponsive);
             newHostCount++;
+
+            // Emit host-discovered event for agent mode
+            const newHost = await this.getHost(hostName);
+            if (newHost) {
+              this.emit('host-discovered', newHost);
+            }
           } catch (addErr) {
             // Silently skip if adding fails (might be duplicate MAC/IP)
             logger.debug(`Could not add discovered host ${formattedMac}:`, {
@@ -351,6 +384,10 @@ class HostDatabase {
       logger.info(
         `Network sync complete: ${updatedHostCount} updated, ${newHostCount} new hosts, ${awakeCount} awake`
       );
+
+      // Emit scan-complete event for agent mode
+      const allHosts = await this.getAllHosts();
+      this.emit('scan-complete', allHosts.length);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Network sync error:', { error: message });
