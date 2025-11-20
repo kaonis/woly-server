@@ -247,9 +247,11 @@ export class AgentService extends EventEmitter {
       cncClient.send({
         type: 'command-result',
         data: {
+          nodeId: agentConfig.nodeId,
           commandId,
           success: false,
           error: 'Host database not initialized',
+          timestamp: new Date(),
         },
       });
       return;
@@ -279,9 +281,11 @@ export class AgentService extends EventEmitter {
       cncClient.send({
         type: 'command-result',
         data: {
+          nodeId: agentConfig.nodeId,
           commandId,
           success: true,
           message: `Wake-on-LAN packet sent to ${hostName} (${host.mac})`,
+          timestamp: new Date(),
         },
       });
 
@@ -292,9 +296,11 @@ export class AgentService extends EventEmitter {
       cncClient.send({
         type: 'command-result',
         data: {
+          nodeId: agentConfig.nodeId,
           commandId,
           success: false,
           error: error.message,
+          timestamp: new Date(),
         },
       });
     }
@@ -314,9 +320,11 @@ export class AgentService extends EventEmitter {
       cncClient.send({
         type: 'command-result',
         data: {
+          nodeId: agentConfig.nodeId,
           commandId,
           success: false,
           error: 'Host database not initialized',
+          timestamp: new Date(),
         },
       });
       return;
@@ -333,9 +341,11 @@ export class AgentService extends EventEmitter {
       cncClient.send({
         type: 'command-result',
         data: {
+          nodeId: agentConfig.nodeId,
           commandId,
           success: true,
           message: `Scan completed, found ${hosts.length} hosts`,
+          timestamp: new Date(),
         },
       });
 
@@ -346,9 +356,11 @@ export class AgentService extends EventEmitter {
       cncClient.send({
         type: 'command-result',
         data: {
+          nodeId: agentConfig.nodeId,
           commandId,
           success: false,
           error: error.message,
+          timestamp: new Date(),
         },
       });
     }
@@ -367,9 +379,11 @@ export class AgentService extends EventEmitter {
       cncClient.send({
         type: 'command-result',
         data: {
+          nodeId: agentConfig.nodeId,
           commandId,
           success: false,
           error: 'Host database not initialized',
+          timestamp: new Date(),
         },
       });
       return;
@@ -384,9 +398,11 @@ export class AgentService extends EventEmitter {
       cncClient.send({
         type: 'command-result',
         data: {
+          nodeId: agentConfig.nodeId,
           commandId,
           success: false,
           message: 'Update-host command not implemented yet',
+          timestamp: new Date(),
         },
       });
     } catch (error: any) {
@@ -395,9 +411,11 @@ export class AgentService extends EventEmitter {
       cncClient.send({
         type: 'command-result',
         data: {
+          nodeId: agentConfig.nodeId,
           commandId,
           success: false,
           error: error.message,
+          timestamp: new Date(),
         },
       });
     }
@@ -417,9 +435,11 @@ export class AgentService extends EventEmitter {
       cncClient.send({
         type: 'command-result',
         data: {
+          nodeId: agentConfig.nodeId,
           commandId,
           success: false,
           error: 'Host database not initialized',
+          timestamp: new Date(),
         },
       });
       return;
@@ -434,9 +454,11 @@ export class AgentService extends EventEmitter {
       cncClient.send({
         type: 'command-result',
         data: {
+          nodeId: agentConfig.nodeId,
           commandId,
           success: false,
           message: 'Delete-host command not implemented yet',
+          timestamp: new Date(),
         },
       });
     } catch (error: any) {
@@ -445,9 +467,11 @@ export class AgentService extends EventEmitter {
       cncClient.send({
         type: 'command-result',
         data: {
+          nodeId: agentConfig.nodeId,
           commandId,
           success: false,
           error: error.message,
+          timestamp: new Date(),
         },
       });
     }
