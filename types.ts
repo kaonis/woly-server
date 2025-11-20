@@ -89,7 +89,14 @@ export type NodeMessage =
   | { type: 'scan-complete'; data: { nodeId: string; hostCount: number } }
   | {
       type: 'command-result';
-      data: { commandId: string; success: boolean; message?: string; error?: string };
+      data: {
+        nodeId: string;
+        commandId: string;
+        success: boolean;
+        message?: string;
+        error?: string;
+        timestamp: Date;
+      };
     };
 
 // Commands sent from C&C Backend → Node Agent
