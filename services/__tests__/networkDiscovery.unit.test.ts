@@ -9,7 +9,16 @@ import os from 'os';
 jest.mock('local-devices');
 jest.mock('ping');
 jest.mock('child_process');
-jest.mock('os');
+jest.mock('os', () => ({
+  platform: jest.fn(() => 'linux'),
+  release: jest.fn(() => '5.10.0'),
+  type: jest.fn(() => 'Linux'),
+  arch: jest.fn(() => 'x64'),
+  cpus: jest.fn(() => []),
+  totalmem: jest.fn(() => 8589934592),
+  freemem: jest.fn(() => 4294967296),
+  networkInterfaces: jest.fn(() => ({})),
+}));
 jest.mock('dns', () => ({
   promises: {
     reverse: jest.fn(),
@@ -19,6 +28,8 @@ jest.mock('dns', () => ({
 describe('networkDiscovery', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Reset os.platform mock to default
+    (os.platform as jest.MockedFunction<typeof os.platform>).mockReturnValue('linux');
   });
 
   describe('scanNetworkARP', () => {
