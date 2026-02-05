@@ -1,6 +1,7 @@
 import wol from 'wake_on_lan';
 import axios from 'axios';
 import { Request, Response } from 'express';
+import { LRUCache } from 'lru-cache';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import HostDatabase from '../services/hostDatabase';
@@ -9,8 +10,11 @@ import { MacVendorCacheEntry, MacVendorResponse, ErrorResponse } from '../types'
 // Database service will be set by app.js
 let hostDb: HostDatabase | null = null;
 
-// Rate limiting for MAC vendor API - using simple Map instead of LRU
-const macVendorCache = new Map<string, MacVendorCacheEntry>();
+// MAC vendor cache with automatic TTL and size limit
+const macVendorCache = new LRUCache<string, MacVendorCacheEntry>({
+  max: 1000,
+  ttl: config.cache.macVendorTTL,
+});
 let lastMacVendorRequest = 0;
 
 function setHostDatabase(db: HostDatabase): void {
@@ -355,9 +359,9 @@ const getMacVendor = async (req: Request, res: Response): Promise<void> => {
   // Normalize MAC address for cache key
   const normalizedMac = mac.toUpperCase().replace(/[:-]/g, '');
 
-  // Check cache first
+  // Check cache first (LRUCache handles TTL automatically)
   const cached = macVendorCache.get(normalizedMac);
-  if (cached && Date.now() - cached.timestamp < config.cache.macVendorTTL) {
+  if (cached) {
     logger.debug(`MAC vendor cache hit for ${mac}`);
     res.status(200).json({
       mac,

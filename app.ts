@@ -5,7 +5,7 @@ import swaggerUi from 'swagger-ui-express';
 import { config } from './config';
 import { agentConfig } from './config/agent';
 import { logger } from './utils/logger';
-import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { AppError, errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { specs } from './swagger';
 import HostDatabase from './services/hostDatabase';
 import * as hostsController from './controllers/hosts';
@@ -46,8 +46,13 @@ app.use(
         return callback(null, true);
       }
 
-      logger.error(`CORS: Rejected origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      logger.warn(`CORS: Rejected origin: ${origin}`);
+      const error = new AppError(
+        `Origin ${origin} is not allowed by CORS policy`,
+        403,
+        'FORBIDDEN'
+      );
+      callback(error);
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
