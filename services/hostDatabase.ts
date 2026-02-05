@@ -22,9 +22,16 @@ class HostDatabase extends EventEmitter {
   private connectionRetries: number = 0;
   private maxRetries: number = 3;
   private retryDelay: number = 1000; // 1 second
+  private ready: Promise<void>;
+  private readyResolve!: () => void;
+  private readyReject!: (error: Error) => void;
 
   constructor(dbPath: string = './db/woly.db') {
     super();
+    this.ready = new Promise((resolve, reject) => {
+      this.readyResolve = resolve;
+      this.readyReject = reject;
+    });
     this.connectWithRetry(dbPath);
   }
 
@@ -44,12 +51,14 @@ class HostDatabase extends EventEmitter {
             this.connectWithRetry(dbPath, attempt + 1);
           }, this.retryDelay * attempt); // Exponential backoff
         } else {
-          logger.error('Max database connection retries reached. Application may be unstable.');
-          throw new Error('Failed to connect to database after multiple attempts');
+          const fatalError = new Error('Failed to connect to database after multiple attempts');
+          logger.error('Max database connection retries reached.');
+          this.readyReject(fatalError);
         }
       } else {
         logger.info('Connected to the WoLy database.');
         this.connectionRetries = 0;
+        this.readyResolve();
       }
     });
   }
@@ -58,6 +67,9 @@ class HostDatabase extends EventEmitter {
    * Initialize database with table and seed data
    */
   async initialize(): Promise<void> {
+    // Wait for database connection to be ready
+    await this.ready;
+
     return new Promise<void>((resolve) => {
       this.createTable(() => {
         this.seedInitialHosts(() => {
