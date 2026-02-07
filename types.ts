@@ -4,7 +4,7 @@
 
 /**
  * Local host representation used internally by the backend.
- * Matches the HostPayload from @kaonis/protocol for consistency.
+ * Matches the HostPayload from @kaonis/woly-protocol for consistency.
  */
 export interface Host {
   name: string;
@@ -66,4 +66,4 @@ export type {
   NodeMetadata,
   NodeRegistration,
   RegisteredCommandData,
-} from '@kaonis/protocol';
+} from '@kaonis/woly-protocol';
