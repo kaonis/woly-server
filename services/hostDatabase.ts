@@ -1,11 +1,9 @@
-import sqlite3 from 'sqlite3';
+import Database from 'better-sqlite3';
 import { EventEmitter } from 'events';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import * as networkDiscovery from './networkDiscovery';
 import { Host } from '../types';
-
-const sqlite = sqlite3.verbose();
 
 /**
  * Database Service
@@ -13,7 +11,7 @@ const sqlite = sqlite3.verbose();
  */
 
 class HostDatabase extends EventEmitter {
-  private db!: sqlite3.Database; // Definite assignment assertion - assigned in connectWithRetry
+  private db!: Database.Database; // Definite assignment assertion - assigned in connectWithRetry
   private initialized: boolean = false;
   private syncInterval?: NodeJS.Timeout;
   private deferredSyncTimeout?: NodeJS.Timeout;
@@ -39,28 +37,28 @@ class HostDatabase extends EventEmitter {
    * Connect to database with retry logic
    */
   private connectWithRetry(dbPath: string, attempt: number = 1): void {
-    this.db = new sqlite.Database(dbPath, (err) => {
-      if (err) {
-        logger.error(`Database connection error (attempt ${attempt}/${this.maxRetries}):`, {
-          error: err.message,
-        });
+    try {
+      this.db = new Database(dbPath);
+      logger.info('Connected to the WoLy database.');
+      this.connectionRetries = 0;
+      this.readyResolve();
+    } catch (err) {
+      const error = err as Error;
+      logger.error(`Database connection error (attempt ${attempt}/${this.maxRetries}):`, {
+        error: error.message,
+      });
 
-        if (attempt < this.maxRetries) {
-          logger.info(`Retrying database connection in ${this.retryDelay}ms...`);
-          setTimeout(() => {
-            this.connectWithRetry(dbPath, attempt + 1);
-          }, this.retryDelay * attempt); // Exponential backoff
-        } else {
-          const fatalError = new Error('Failed to connect to database after multiple attempts');
-          logger.error('Max database connection retries reached.');
-          this.readyReject(fatalError);
-        }
+      if (attempt < this.maxRetries) {
+        logger.info(`Retrying database connection in ${this.retryDelay}ms...`);
+        setTimeout(() => {
+          this.connectWithRetry(dbPath, attempt + 1);
+        }, this.retryDelay * attempt); // Exponential backoff
       } else {
-        logger.info('Connected to the WoLy database.');
-        this.connectionRetries = 0;
-        this.readyResolve();
+        const fatalError = new Error('Failed to connect to database after multiple attempts');
+        logger.error('Max database connection retries reached.');
+        this.readyReject(fatalError);
       }
-    });
+    }
   }
 
   /**
@@ -70,98 +68,78 @@ class HostDatabase extends EventEmitter {
     // Wait for database connection to be ready
     await this.ready;
 
-    return new Promise<void>((resolve) => {
-      this.createTable(() => {
-        this.seedInitialHosts(() => {
-          this.initialized = true;
-          resolve();
-        });
-      });
-    });
+    this.createTable();
+    this.seedInitialHosts();
+    this.initialized = true;
   }
 
   /**
    * Create hosts table if not exists
    */
-  createTable(callback: () => void): void {
-    this.db.run(
-      `CREATE TABLE IF NOT EXISTS hosts(
-        name text PRIMARY KEY UNIQUE,
-        mac text NOT NULL UNIQUE,
-        ip text NOT NULL UNIQUE,
-        status text NOT NULL,
-        lastSeen datetime,
-        discovered integer DEFAULT 0,
-        pingResponsive integer
-      )`,
-      () => {
-        this.db.run(`ALTER TABLE hosts ADD COLUMN pingResponsive integer`, (err) => {
-          if (err && !err.message.includes('duplicate column')) {
-            logger.warn('Could not add pingResponsive column:', { error: err.message });
-          }
-          callback();
-        });
+  createTable(): void {
+    this.db.exec(`CREATE TABLE IF NOT EXISTS hosts(
+      name text PRIMARY KEY UNIQUE,
+      mac text NOT NULL UNIQUE,
+      ip text NOT NULL UNIQUE,
+      status text NOT NULL,
+      lastSeen datetime,
+      discovered integer DEFAULT 0,
+      pingResponsive integer
+    )`);
+
+    // Try to add pingResponsive column if it doesn't exist
+    try {
+      this.db.exec(`ALTER TABLE hosts ADD COLUMN pingResponsive integer`);
+    } catch (err) {
+      const error = err as Error;
+      if (!error.message.includes('duplicate column')) {
+        logger.warn('Could not add pingResponsive column:', { error: error.message });
       }
-    );
+    }
   }
 
   /**
    * Seed initial hosts if table is empty
    */
-  seedInitialHosts(callback: () => void): void {
+  seedInitialHosts(): void {
     const hostTable = [
       ['PHANTOM-MBP', '80:6D:97:60:39:08', '192.168.1.147', 'asleep', null, 0, null],
       ['PHANTOM-NAS', 'BC:07:1D:DD:5B:9C', '192.168.1.5', 'asleep', null, 0, null],
       ['RASPBERRYPI', 'B8:27:EB:B9:EF:D7', '192.168.1.6', 'asleep', null, 0, null],
     ];
 
-    this.db.get(
-      'SELECT COUNT(*) as count FROM hosts',
-      (err: Error | null, row: { count: number } | undefined) => {
-        if (row && row.count === 0) {
-          let completed = 0;
-          const total = hostTable.length;
+    const countRow = this.db.prepare('SELECT COUNT(*) as count FROM hosts').get() as {
+      count: number;
+    };
 
-          hostTable.forEach((host) => {
-            this.db.run(
-              `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered, pingResponsive)
-             VALUES(?,?,?,?,?,?,?)`,
-              host,
-              (error: Error | null) => {
-                if (error) {
-                  logger.error('Seed error:', { error: error.message });
-                } else {
-                  logger.info(`Seeded host: ${host[0]}`);
-                }
-                completed++;
-                if (completed === total) {
-                  callback();
-                }
-              }
-            );
-          });
-        } else {
-          callback();
+    if (countRow.count === 0) {
+      const insert = this.db.prepare(
+        `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered, pingResponsive)
+         VALUES(?,?,?,?,?,?,?)`
+      );
+
+      for (const host of hostTable) {
+        try {
+          insert.run(host);
+          logger.info(`Seeded host: ${host[0]}`);
+        } catch (error) {
+          logger.error('Seed error:', { error: (error as Error).message });
         }
       }
-    );
+    }
   }
 
   /**
    * Get all hosts from database
    */
   getAllHosts(): Promise<Host[]> {
-    return new Promise((resolve, reject) => {
-      const sql =
-        'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts ORDER BY name';
-      this.db.all(sql, (err: Error | null, rows: Host[]) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(rows || []);
-        }
-      });
-    });
+    return Promise.resolve(
+      this.db
+        .prepare(
+          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts ORDER BY name'
+        )
+        .all() as Host[]
+    );
   }
 
   /**
@@ -182,34 +160,26 @@ class HostDatabase extends EventEmitter {
    * Get a single host by name
    */
   getHost(name: string): Promise<Host | undefined> {
-    return new Promise((resolve, reject) => {
-      const sql =
-        'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts WHERE name = ?';
-      this.db.get(sql, [name], (err: Error | null, row: Host | undefined) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row);
-        }
-      });
-    });
+    return Promise.resolve(
+      this.db
+        .prepare(
+          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts WHERE name = ?'
+        )
+        .get(name) as Host | undefined
+    );
   }
 
   /**
    * Get a single host by MAC address
    */
   getHostByMAC(mac: string): Promise<Host | undefined> {
-    return new Promise((resolve, reject) => {
-      const sql =
-        'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts WHERE mac = ?';
-      this.db.get(sql, [mac], (err: Error | null, row: Host | undefined) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row);
-        }
-      });
-    });
+    return Promise.resolve(
+      this.db
+        .prepare(
+          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts WHERE mac = ?'
+        )
+        .get(mac) as Host | undefined
+    );
   }
 
   /**
@@ -219,29 +189,25 @@ class HostDatabase extends EventEmitter {
     return new Promise((resolve, reject) => {
       const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered, pingResponsive)
                    VALUES(?, ?, ?, ?, datetime('now'), 1, NULL)`;
-      this.db.run(
-        sql,
-        [name, mac, ip, 'asleep'],
-        function (this: sqlite3.RunResult, err: Error | null) {
-          if (err) {
-            if (err.message.includes('UNIQUE constraint failed')) {
-              logger.warn(`Host ${name} already exists`);
-            }
-            reject(err);
-          } else {
-            logger.info(`Added host: ${name}`);
-            resolve({
-              name,
-              mac,
-              ip,
-              status: 'asleep',
-              lastSeen: new Date().toISOString(),
-              discovered: 1,
-              pingResponsive: undefined,
-            });
-          }
+      try {
+        this.db.prepare(sql).run(name, mac, ip, 'asleep');
+        logger.info(`Added host: ${name}`);
+        resolve({
+          name,
+          mac,
+          ip,
+          status: 'asleep',
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: undefined,
+        });
+      } catch (err) {
+        const error = err as Error;
+        if (error.message.includes('UNIQUE constraint failed')) {
+          logger.warn(`Host ${name} already exists`);
         }
-      );
+        reject(error);
+      }
     });
   }
 
@@ -256,20 +222,17 @@ class HostDatabase extends EventEmitter {
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const sql = `UPDATE hosts SET lastSeen = datetime('now'), discovered = 1, status = ?, pingResponsive = ? WHERE mac = ?`;
-      this.db.run(
-        sql,
-        [status, pingResponsive, mac],
-        function (this: sqlite3.RunResult, err: Error | null) {
-          if (err) {
-            reject(err);
-          } else if (this.changes === 0) {
-            // No rows were updated - MAC doesn't exist
-            reject(new Error(`Host with MAC ${mac} not found in database`));
-          } else {
-            resolve();
-          }
+      try {
+        const info = this.db.prepare(sql).run(status, pingResponsive, mac);
+        if (info.changes === 0) {
+          // No rows were updated - MAC doesn't exist
+          reject(new Error(`Host with MAC ${mac} not found in database`));
+        } else {
+          resolve();
         }
-      );
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 
@@ -309,28 +272,22 @@ class HostDatabase extends EventEmitter {
       values.push(name);
 
       const sql = `UPDATE hosts SET ${fields.join(', ')} WHERE name = ?`;
-      const db = this.db;
-      db.run(sql, values, function (this: sqlite3.RunResult, err: Error | null) {
-        if (err) {
-          reject(err);
-        } else if (this.changes === 0) {
-          db.get(
-            'SELECT 1 FROM hosts WHERE name = ?',
-            [name],
-            (selectErr: Error | null, row: unknown) => {
-              if (selectErr) {
-                reject(selectErr);
-              } else if (row) {
-                resolve();
-              } else {
-                reject(new Error(`Host ${name} not found`));
-              }
-            }
-          );
+      try {
+        const info = this.db.prepare(sql).run(values);
+        if (info.changes === 0) {
+          // Check if host exists
+          const exists = this.db.prepare('SELECT 1 FROM hosts WHERE name = ?').get(name);
+          if (exists) {
+            resolve(); // Host exists but no changes needed
+          } else {
+            reject(new Error(`Host ${name} not found`));
+          }
         } else {
           resolve();
         }
-      });
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 
@@ -340,15 +297,16 @@ class HostDatabase extends EventEmitter {
   deleteHost(name: string): Promise<void> {
     return new Promise((resolve, reject) => {
       const sql = 'DELETE FROM hosts WHERE name = ?';
-      this.db.run(sql, [name], function (this: sqlite3.RunResult, err: Error | null) {
-        if (err) {
-          reject(err);
-        } else if (this.changes === 0) {
+      try {
+        const info = this.db.prepare(sql).run(name);
+        if (info.changes === 0) {
           reject(new Error(`Host ${name} not found`));
         } else {
           resolve();
         }
-      });
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 
@@ -358,13 +316,12 @@ class HostDatabase extends EventEmitter {
   updateHostStatus(name: string, status: 'awake' | 'asleep'): Promise<void> {
     return new Promise((resolve, reject) => {
       const sql = 'UPDATE hosts SET status = ? WHERE name = ?';
-      this.db.run(sql, [status, name], function (this: sqlite3.RunResult, err: Error | null) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
+      try {
+        this.db.prepare(sql).run(status, name);
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 
@@ -543,15 +500,10 @@ class HostDatabase extends EventEmitter {
       clearInterval(this.syncInterval);
       this.syncInterval = undefined;
     }
-    return new Promise<void>((resolve, reject) => {
-      this.db.close((err: Error | null) => {
-        if (err) {
-          reject(err);
-        } else {
-          logger.info('Database connection closed');
-          resolve();
-        }
-      });
+    return new Promise<void>((resolve) => {
+      this.db.close();
+      logger.info('Database connection closed');
+      resolve();
     });
   }
 }
