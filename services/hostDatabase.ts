@@ -274,6 +274,72 @@ class HostDatabase extends EventEmitter {
   }
 
   /**
+   * Update host properties by name
+   */
+  updateHost(
+    name: string,
+    updates: Partial<Pick<Host, 'name' | 'mac' | 'ip' | 'status'>>
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const fields: string[] = [];
+      const values: Array<string> = [];
+
+      if (updates.name !== undefined) {
+        fields.push('name = ?');
+        values.push(updates.name);
+      }
+      if (updates.mac !== undefined) {
+        fields.push('mac = ?');
+        values.push(updates.mac);
+      }
+      if (updates.ip !== undefined) {
+        fields.push('ip = ?');
+        values.push(updates.ip);
+      }
+      if (updates.status !== undefined) {
+        fields.push('status = ?');
+        values.push(updates.status);
+      }
+
+      if (fields.length === 0) {
+        resolve();
+        return;
+      }
+
+      values.push(name);
+
+      const sql = `UPDATE hosts SET ${fields.join(', ')} WHERE name = ?`;
+      this.db.run(sql, values, function (this: sqlite3.RunResult, err: Error | null) {
+        if (err) {
+          reject(err);
+        } else if (this.changes === 0) {
+          reject(new Error(`Host ${name} not found`));
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * Delete host by name
+   */
+  deleteHost(name: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const sql = 'DELETE FROM hosts WHERE name = ?';
+      this.db.run(sql, [name], function (this: sqlite3.RunResult, err: Error | null) {
+        if (err) {
+          reject(err);
+        } else if (this.changes === 0) {
+          reject(new Error(`Host ${name} not found`));
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
    * Update host status
    */
   updateHostStatus(name: string, status: 'awake' | 'asleep'): Promise<void> {
@@ -353,7 +419,6 @@ class HostDatabase extends EventEmitter {
           updatedHostCount++;
 
           // Emit host-updated event for agent mode
-          const updatedHost = await this.getHost(''); // Will be fetched by MAC in next line
           // Get host by MAC to emit event
           const hostByMac = await this.getHostByMAC(formattedMac);
           if (hostByMac) {
