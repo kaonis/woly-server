@@ -88,7 +88,7 @@ npm run test:ci
 
 ## Runtime Prerequisites
 
-- Node.js v20+ is supported.
+- Node.js v22+ is supported.
 - `.nvmrc` provides a baseline local version for consistency, but newer Node versions are supported.
 - Test preflight verifies that local socket bind is allowed because Supertest-based suites require it.
 - If preflight fails on socket bind, run tests outside restricted/sandboxed execution environments.
