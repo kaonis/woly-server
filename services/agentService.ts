@@ -329,18 +329,33 @@ export class AgentService extends EventEmitter {
     }
 
     try {
-      // Trigger network scan
-      await this.hostDb.syncWithNetwork();
+      if (immediate) {
+        await this.hostDb.syncWithNetwork();
+        const hosts = await this.hostDb.getAllHosts();
 
-      // Get updated host list
-      const hosts = await this.hostDb.getAllHosts();
+        this.sendCommandResult(commandId, {
+          success: true,
+          message: `Scan completed, found ${hosts.length} hosts`,
+        });
 
-      this.sendCommandResult(commandId, {
-        success: true,
-        message: `Scan completed, found ${hosts.length} hosts`,
-      });
+        logger.info('Scan command completed', { commandId, hostCount: hosts.length });
+      } else {
+        const hostDb = this.hostDb;
+        setTimeout(() => {
+          hostDb.syncWithNetwork().catch((backgroundError: unknown) => {
+            const message =
+              backgroundError instanceof Error ? backgroundError.message : 'Unknown error';
+            logger.error('Background scan command failed', { commandId, error: message });
+          });
+        }, 0);
 
-      logger.info('Scan command completed', { commandId, hostCount: hosts.length });
+        this.sendCommandResult(commandId, {
+          success: true,
+          message: 'Background scan scheduled',
+        });
+
+        logger.info('Scan command scheduled in background', { commandId });
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Scan command failed', { commandId, error: message });
@@ -357,8 +372,13 @@ export class AgentService extends EventEmitter {
    */
   private async handleUpdateHostCommand(command: UpdateHostCommand): Promise<void> {
     const { commandId, data } = command;
+    const currentName = data.currentName ?? data.name;
 
-    logger.info('Received update-host command from C&C', { commandId, host: data.name });
+    logger.info('Received update-host command from C&C', {
+      commandId,
+      currentName,
+      targetName: data.name,
+    });
 
     if (!this.hostDb) {
       logger.error('Host database not initialized');
@@ -370,12 +390,12 @@ export class AgentService extends EventEmitter {
     }
 
     try {
-      const existing = await this.hostDb.getHost(data.name);
+      const existing = await this.hostDb.getHost(currentName);
       if (!existing) {
-        throw new Error(`Host ${data.name} not found`);
+        throw new Error(`Host ${currentName} not found`);
       }
 
-      await this.hostDb.updateHost(data.name, {
+      await this.hostDb.updateHost(currentName, {
         name: data.name,
         mac: data.mac,
         ip: data.ip,
@@ -389,7 +409,10 @@ export class AgentService extends EventEmitter {
 
       this.sendCommandResult(commandId, {
         success: true,
-        message: `Host ${data.name} updated successfully`,
+        message:
+          currentName === data.name
+            ? `Host ${data.name} updated successfully`
+            : `Host ${currentName} renamed to ${data.name} and updated successfully`,
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
