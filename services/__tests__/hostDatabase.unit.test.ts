@@ -36,7 +36,7 @@ describe('HostDatabase', () => {
       expect(Array.isArray(hosts)).toBe(true);
     });
 
-    it('should create database directory if it does not exist', () => {
+    it('should create database directory if it does not exist', async () => {
       // Create a unique temp path that doesn't exist yet
       const tempDir = path.join(os.tmpdir(), `woly-test-${Date.now()}-${Math.random()}`);
       const dbPath = path.join(tempDir, 'test.db');
@@ -54,15 +54,15 @@ describe('HostDatabase', () => {
       expect(logger.info).toHaveBeenCalledWith(`Created database directory: ${tempDir}`);
 
       // Clean up
-      testDb.close();
+      await testDb.close();
       if (fs.existsSync(tempDir)) {
         fs.rmSync(tempDir, { recursive: true });
       }
     });
 
-    it('should not log directory creation if it already exists', () => {
-      // Use an existing directory (current working directory)
-      const existingDir = process.cwd();
+    it('should not log directory creation if it already exists', async () => {
+      // Use a temp directory and pre-create it
+      const existingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'woly-test-'));
       const dbPath = path.join(existingDir, `test-${Date.now()}.db`);
 
       // Clear logger mock calls
@@ -77,9 +77,9 @@ describe('HostDatabase', () => {
       );
 
       // Clean up
-      testDb.close();
-      if (fs.existsSync(dbPath)) {
-        fs.unlinkSync(dbPath);
+      await testDb.close();
+      if (fs.existsSync(existingDir)) {
+        fs.rmSync(existingDir, { recursive: true });
       }
     });
 

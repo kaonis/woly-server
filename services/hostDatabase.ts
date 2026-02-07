@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { EventEmitter } from 'events';
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { config } from '../config';
 import { logger } from '../utils/logger';
@@ -42,8 +42,8 @@ class HostDatabase extends EventEmitter {
     try {
       // Ensure parent directory exists
       const dir = dirname(dbPath);
-      if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
+      const created = mkdirSync(dir, { recursive: true });
+      if (created) {
         logger.info(`Created database directory: ${dir}`);
       }
 
