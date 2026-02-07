@@ -5,7 +5,7 @@ import { LRUCache } from 'lru-cache';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import HostDatabase from '../services/hostDatabase';
-import { MacVendorCacheEntry, MacVendorResponse, ErrorResponse } from '../types';
+import { MacVendorCacheEntry } from '../types';
 
 // Database service will be set by app.js
 let hostDb: HostDatabase | null = null;
@@ -405,8 +405,10 @@ const getMacVendor = async (req: Request, res: Response): Promise<void> => {
       vendor,
       source: 'macvendors.com',
     });
-  } catch (error: any) {
-    if (error.response && error.response.status === 404) {
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { status?: number }; message?: string };
+
+    if (axiosError.response && axiosError.response.status === 404) {
       const vendor = 'Unknown Vendor';
 
       // Cache unknown vendors too
@@ -420,14 +422,17 @@ const getMacVendor = async (req: Request, res: Response): Promise<void> => {
         vendor,
         source: 'macvendors.com',
       });
-    } else if (error.response && error.response.status === 429) {
+    } else if (axiosError.response && axiosError.response.status === 429) {
       logger.warn('MAC vendor API rate limit exceeded', { mac });
       res.status(429).json({
         error: 'Rate limit exceeded, please try again later',
         mac,
       });
     } else {
-      logger.error('MAC vendor lookup error:', { mac, error: error.message });
+      logger.error('MAC vendor lookup error:', {
+        mac,
+        error: axiosError.message || 'Unknown error',
+      });
       res.status(500).json({ error: 'Failed to lookup MAC vendor' });
     }
   }
