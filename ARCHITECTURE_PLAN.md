@@ -71,11 +71,11 @@ Acceptance:
 
 Work:
 
-1. Replace local protocol type duplicates with `@woly/protocol`.
+1. Replace local protocol type duplicates with `@kaonis/protocol`.
 2. Remove local fallback type declarations once adoption is complete.
 3. Add contract tests that assert encode/decode compatibility with C&C.
 4. Introduce explicit protocol version negotiation at connection start.
-5. Publish `@woly/protocol` to shared registry and migrate both repos from local `file:` dependency to pinned semver dependency.
+5. Publish `@kaonis/protocol` to shared registry and migrate both repos from local `file:` dependency to pinned semver dependency.
 
 Acceptance:
 

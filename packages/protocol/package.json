@@ -1,5 +1,5 @@
 {
-  "name": "@woly/protocol",
+  "name": "@kaonis/protocol",
   "version": "1.0.0",
   "description": "Shared WoLy node <-> C&C protocol types and runtime schemas",
   "license": "MIT",

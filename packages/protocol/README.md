@@ -1,4 +1,4 @@
-# @woly/protocol
+# @kaonis/protocol
 
 Shared protocol types and runtime schemas for communication between `woly-backend` (node agent) and `woly-cnc-backend` (C&C).
 
