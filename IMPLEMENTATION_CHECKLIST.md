@@ -8,6 +8,7 @@ Owner: Platform Team
 - [x] Phase 1 implementation completed on branch `feat/phase1-node-auth-lifecycle` (PR #66).
 - [x] Phase 2 implementation completed on branch `feat/phase2-runtime-validation-v2` (stacked on Phase 1 branch).
 - [x] Ran `npm audit` + `npm audit fix` on branch `feat/phase2-runtime-validation-v2`; safe lockfile updates applied.
+- [~] Phase 3 implementation started on branch `feat/phase3-shared-protocol-adoption`.
 
 ## Dependency Security Follow-up (2026-02-07)
 
@@ -57,9 +58,9 @@ Definition of done:
 
 ## Phase 3 - Shared Protocol Package
 
-- [ ] Replace local protocol types with `@woly/protocol`.
-- [ ] Remove duplicate protocol declarations.
-- [ ] Add protocol version negotiation at connect.
+- [x] Replace local protocol types with `@woly/protocol`.
+- [x] Remove duplicate protocol declarations.
+- [x] Add protocol version negotiation at connect.
 - [ ] Add cross-repo contract tests.
 
 Definition of done:

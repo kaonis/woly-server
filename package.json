@@ -33,6 +33,7 @@
     "npm": ">=10.0.0"
   },
   "dependencies": {
+    "@woly/protocol": "file:packages/protocol",
     "axios": "^1.13.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

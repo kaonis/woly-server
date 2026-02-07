@@ -1,0 +1,10 @@
+{
+  "name": "@woly/protocol",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "dependencies": {
+    "zod": "^3.24.1"
+  }
+}
