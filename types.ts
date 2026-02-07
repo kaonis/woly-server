@@ -2,6 +2,10 @@
  * Type definitions for WoLy backend
  */
 
+/**
+ * Local host representation used internally by the backend.
+ * Matches the HostPayload from @kaonis/protocol for consistency.
+ */
 export interface Host {
   name: string;
   mac: string;
@@ -9,7 +13,7 @@ export interface Host {
   status: 'awake' | 'asleep';
   lastSeen: string | null;
   discovered: number;
-  pingResponsive?: number;
+  pingResponsive?: number | null;
 }
 
 export interface DiscoveredHost {
