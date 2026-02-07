@@ -22,7 +22,7 @@ Node.js backend for [WoLy](https://github.com/kaonis/woly) - A Wake-on-LAN appli
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - npm or yarn
 - SQLite3
 
