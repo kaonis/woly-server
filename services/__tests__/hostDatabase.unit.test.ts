@@ -129,6 +129,24 @@ describe('HostDatabase', () => {
       expect(updated?.status).toBe('awake');
     });
 
+    it('should treat idempotent update as success', async () => {
+      await db.addHost('NoOpHost', 'AA:BB:CC:DD:EE:12', '192.168.1.213');
+
+      await expect(
+        db.updateHost('NoOpHost', {
+          ip: '192.168.1.213',
+        })
+      ).resolves.toBeUndefined();
+    });
+
+    it('should reject update for missing host', async () => {
+      await expect(
+        db.updateHost('MissingHost', {
+          ip: '192.168.1.250',
+        })
+      ).rejects.toThrow('Host MissingHost not found');
+    });
+
     it('should delete host by name', async () => {
       await db.addHost('ToDelete', 'AA:BB:CC:DD:EE:11', '192.168.1.212');
       await db.deleteHost('ToDelete');
