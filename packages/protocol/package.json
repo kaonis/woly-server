@@ -1,6 +1,6 @@
 {
   "name": "@kaonis/woly-protocol",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Shared WoLy node <-> C&C protocol types and runtime schemas",
   "license": "MIT",
   "main": "index.js",
