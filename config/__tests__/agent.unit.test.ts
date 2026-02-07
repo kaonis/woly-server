@@ -11,11 +11,11 @@ describe('agent config', () => {
   });
 
   it('defaults to standalone mode and does not throw validation', async () => {
-    delete process.env.NODE_MODE;
+    process.env.NODE_MODE = 'standalone';
     delete process.env.CNC_URL;
     delete process.env.NODE_ID;
     delete process.env.NODE_LOCATION;
-    delete process.env.NODE_AUTH_TOKEN;
+    process.env.NODE_AUTH_TOKEN = '';
 
     const { agentConfig, validateAgentConfig } = await import('../agent');
 
@@ -25,10 +25,10 @@ describe('agent config', () => {
 
   it('throws when agent mode is enabled with missing required vars', async () => {
     process.env.NODE_MODE = 'agent';
-    delete process.env.CNC_URL;
-    delete process.env.NODE_ID;
-    delete process.env.NODE_LOCATION;
-    delete process.env.NODE_AUTH_TOKEN;
+    process.env.CNC_URL = '';
+    process.env.NODE_ID = '';
+    process.env.NODE_LOCATION = '';
+    process.env.NODE_AUTH_TOKEN = '';
 
     const { validateAgentConfig } = await import('../agent');
 

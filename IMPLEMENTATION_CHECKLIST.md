@@ -17,16 +17,16 @@ Definition of done:
 
 ## Phase 1 - Node Session Auth and Reconnect
 
-- [ ] Implement short-lived session token acquire/refresh flow.
-- [ ] Move WS auth to header or subprotocol.
-- [ ] Disable query-token auth in production mode.
-- [ ] Add reconnect logic with token refresh.
-- [ ] Add tests for expired, revoked, and unavailable auth scenarios.
+- [x] Implement short-lived session token acquire/refresh flow.
+- [x] Move WS auth to header or subprotocol.
+- [x] Disable query-token auth in production mode.
+- [x] Add reconnect logic with token refresh.
+- [x] Add tests for expired, revoked, and unavailable auth scenarios.
 
 Definition of done:
 
-- [ ] Token rotation works without manual intervention.
-- [ ] Query-token usage blocked in production.
+- [x] Token rotation works without manual intervention.
+- [x] Query-token usage blocked in production.
 
 ## Phase 2 - Runtime Schema Validation
 
