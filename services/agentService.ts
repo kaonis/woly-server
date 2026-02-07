@@ -131,6 +131,18 @@ export class AgentService extends EventEmitter {
       this.stop();
     });
 
+    cncClient.on('auth-expired', () => {
+      logger.warn('C&C authentication expired, attempting token refresh on reconnect');
+    });
+
+    cncClient.on('auth-revoked', () => {
+      logger.error('C&C authentication revoked, reconnect attempts will likely fail');
+    });
+
+    cncClient.on('auth-unavailable', () => {
+      logger.warn('C&C session token service unavailable, reconnect will retry');
+    });
+
     // C&C command handlers
     cncClient.on('command:wake', async (command: WakeCommand) => {
       await this.handleWakeCommand(command);
