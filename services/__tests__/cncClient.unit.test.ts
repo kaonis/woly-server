@@ -72,7 +72,7 @@ jest.mock('ws', () => ({
 
 import { CncClient } from '../cncClient';
 import { logger } from '../../utils/logger';
-import { PROTOCOL_VERSION } from '@kaonis/protocol';
+import { PROTOCOL_VERSION } from '@kaonis/woly-protocol';
 
 describe('CncClient Phase 1 auth lifecycle', () => {
   let client: CncClient;
