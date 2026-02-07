@@ -14,11 +14,18 @@
     "typecheck": "tsc --noEmit",
     "start": "ts-node app.ts",
     "dev": "nodemon --exec ts-node app.ts",
-    "prod": "npm run build && node dist/app.js",
+    "prod": "npm run build && npm run pm2:start",
     "prepare": "husky",
     "lint": "eslint .",
     "lint-fix": "eslint --fix .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop woly-node",
+    "pm2:restart": "pm2 restart woly-node",
+    "pm2:logs": "pm2 logs woly-node",
+    "pm2:monit": "pm2 monit",
+    "pm2:delete": "pm2 delete woly-node",
+    "typecheck": "tsc --noEmit"
   },
   "private": true,
   "dependencies": {

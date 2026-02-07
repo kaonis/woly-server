@@ -1,0 +1,84 @@
+# WoLy Node Backend Implementation Checklist
+
+Date: 2026-02-07
+Owner: Platform Team
+
+## Phase 0 - Baseline and Safety Rails
+
+- [x] Create and approve ADRs for token transport, shared protocol package, and command reliability.
+- [x] Maintain `docs/compatibility.md` with every release.
+- [x] Enforce CI gates for lint, tests, build, and typecheck.
+- [ ] Add contract-test placeholder in CI for shared protocol adoption.
+
+Definition of done:
+
+- [ ] All docs merged and linked from README.
+- [ ] CI blocks PRs when lint/test/build/typecheck fail.
+
+## Phase 1 - Node Session Auth and Reconnect
+
+- [ ] Implement short-lived session token acquire/refresh flow.
+- [ ] Move WS auth to header or subprotocol.
+- [ ] Disable query-token auth in production mode.
+- [ ] Add reconnect logic with token refresh.
+- [ ] Add tests for expired, revoked, and unavailable auth scenarios.
+
+Definition of done:
+
+- [ ] Token rotation works without manual intervention.
+- [ ] Query-token usage blocked in production.
+
+## Phase 2 - Runtime Schema Validation
+
+- [ ] Validate all inbound commands before dispatch.
+- [ ] Validate outbound telemetry/events before send.
+- [ ] Add strict unknown-command handling.
+- [ ] Add structured error logging with correlation IDs.
+
+Definition of done:
+
+- [ ] Invalid payload paths have deterministic test coverage.
+
+## Phase 3 - Shared Protocol Package
+
+- [ ] Replace local protocol types with `@woly/protocol`.
+- [ ] Remove duplicate protocol declarations.
+- [ ] Add protocol version negotiation at connect.
+- [ ] Add cross-repo contract tests.
+
+Definition of done:
+
+- [ ] Protocol compatibility is enforced in CI.
+
+## Phase 4 - Command Execution Reliability
+
+- [ ] Add idempotency guard for duplicate command delivery.
+- [ ] Track local command lifecycle for diagnostics.
+- [ ] Add timeout and bounded retry policies.
+- [ ] Ensure acknowledgment retry semantics are safe.
+
+Definition of done:
+
+- [ ] Duplicate deliveries do not cause duplicate side effects.
+
+## Phase 5 - Host Data and Backpressure
+
+- [ ] Add event sampling/debounce strategy.
+- [ ] Add payload size caps/chunking strategy.
+- [ ] Define queue-and-flush policy during C&C outage.
+- [ ] Add stale-host data detection.
+
+Definition of done:
+
+- [ ] Node remains stable under event spikes and reconnect storms.
+
+## Phase 6 - Observability and Rollout
+
+- [ ] Emit reconnect/auth/schema/latency metrics.
+- [ ] Add startup diagnostics with build and protocol version.
+- [ ] Publish incident runbooks.
+- [ ] Execute canary to staged rollout policy.
+
+Definition of done:
+
+- [ ] On-call can isolate auth, protocol, command, or network failures quickly.
