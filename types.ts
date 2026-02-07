@@ -62,4 +62,4 @@ export type {
   NodeMetadata,
   NodeRegistration,
   RegisteredCommandData,
-} from '@woly/protocol';
+} from '@kaonis/protocol';

@@ -10,13 +10,13 @@ import type {
   NodeMessage,
   NodeRegistration,
   RegisteredCommandData,
-} from '@woly/protocol';
+} from '@kaonis/protocol';
 import {
   inboundCncCommandSchema,
   outboundNodeMessageSchema,
   PROTOCOL_VERSION,
   SUPPORTED_PROTOCOL_VERSIONS,
-} from '@woly/protocol';
+} from '@kaonis/protocol';
 import { logger } from '../utils/logger';
 
 /**
