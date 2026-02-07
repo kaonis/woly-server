@@ -2,6 +2,8 @@ import { EventEmitter } from 'events';
 import { AgentService } from '../agentService';
 import { cncClient } from '../cncClient';
 import { Host } from '../../types';
+import { validateAgentConfig } from '../../config/agent';
+import * as wakeOnLan from 'wake_on_lan';
 
 type MockCncClient = {
   send: jest.Mock;
@@ -31,6 +33,10 @@ jest.mock('../../config/agent', () => ({
   validateAgentConfig: jest.fn(),
 }));
 
+jest.mock('wake_on_lan', () => ({
+  wake: jest.fn(),
+}));
+
 describe('AgentService command handlers', () => {
   let service: AgentService;
   let mockCncClient: MockCncClient;
@@ -56,8 +62,8 @@ describe('AgentService command handlers', () => {
     jest.clearAllMocks();
     jest.useRealTimers();
     mockCncClient = (cncClient as unknown) as MockCncClient;
+    mockCncClient.removeAllListeners();
     service = new AgentService();
-    ((service as unknown) as { isRunning: boolean }).isRunning = true;
     hostDbMock = {
       syncWithNetwork: jest.fn().mockResolvedValue(undefined),
       getAllHosts: jest.fn().mockResolvedValue([sampleHost]),
@@ -66,6 +72,194 @@ describe('AgentService command handlers', () => {
       deleteHost: jest.fn().mockResolvedValue(undefined),
     };
     ((service as unknown) as { hostDb: unknown }).hostDb = hostDbMock;
+    ((wakeOnLan.wake as unknown) as jest.Mock).mockImplementation(
+      (_mac: string, callback: (error: Error | null) => void) => callback(null)
+    );
+  });
+
+  it('starts and stops agent service lifecycle', async () => {
+    await service.start();
+
+    expect(validateAgentConfig).toHaveBeenCalledTimes(1);
+    expect(mockCncClient.connect).toHaveBeenCalledTimes(1);
+    expect(service.isActive()).toBe(true);
+
+    service.stop();
+    expect(mockCncClient.disconnect).toHaveBeenCalledTimes(1);
+    expect(service.isActive()).toBe(false);
+  });
+
+  it('does not reconnect when already running', async () => {
+    await service.start();
+    await service.start();
+
+    expect(mockCncClient.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws on start when config validation fails', async () => {
+    ((validateAgentConfig as unknown) as jest.Mock).mockImplementationOnce(() => {
+      throw new Error('bad config');
+    });
+
+    await expect(service.start()).rejects.toThrow('bad config');
+    expect(mockCncClient.connect).not.toHaveBeenCalled();
+  });
+
+  it('does nothing on stop when service is not running', () => {
+    service.stop();
+    expect(mockCncClient.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('handles successful wake command', async () => {
+    hostDbMock.getHost.mockResolvedValueOnce(sampleHost);
+
+    await ((service as unknown) as {
+      handleWakeCommand: (command: unknown) => Promise<void>;
+    }).handleWakeCommand({
+      type: 'wake',
+      commandId: 'cmd-wake-ok',
+      data: { hostName: sampleHost.name, mac: sampleHost.mac },
+    });
+
+    expect(wakeOnLan.wake).toHaveBeenCalledWith(sampleHost.mac, expect.any(Function));
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-wake-ok',
+          success: true,
+          message: `Wake-on-LAN packet sent to ${sampleHost.name} (${sampleHost.mac})`,
+        }),
+      })
+    );
+  });
+
+  it('sends failure result for wake when host is missing', async () => {
+    hostDbMock.getHost.mockResolvedValueOnce(undefined);
+
+    await ((service as unknown) as {
+      handleWakeCommand: (command: unknown) => Promise<void>;
+    }).handleWakeCommand({
+      type: 'wake',
+      commandId: 'cmd-wake-missing',
+      data: { hostName: 'UNKNOWN', mac: 'AA:BB:CC:DD:EE:FF' },
+    });
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-wake-missing',
+          success: false,
+          error: 'Host UNKNOWN not found',
+        }),
+      })
+    );
+  });
+
+  it('sends failure result for wake when wake-on-lan fails', async () => {
+    hostDbMock.getHost.mockResolvedValueOnce(sampleHost);
+    ((wakeOnLan.wake as unknown) as jest.Mock).mockImplementation(
+      (_mac: string, callback: (error: Error | null) => void) =>
+        callback(new Error('WOL send failed'))
+    );
+
+    await ((service as unknown) as {
+      handleWakeCommand: (command: unknown) => Promise<void>;
+    }).handleWakeCommand({
+      type: 'wake',
+      commandId: 'cmd-wake-error',
+      data: { hostName: sampleHost.name, mac: sampleHost.mac },
+    });
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-wake-error',
+          success: false,
+          error: 'WOL send failed',
+        }),
+      })
+    );
+  });
+
+  it('returns missing-db error for commands that require host database', async () => {
+    ((service as unknown) as { hostDb: unknown }).hostDb = null;
+
+    await ((service as unknown) as {
+      handleWakeCommand: (command: unknown) => Promise<void>;
+    }).handleWakeCommand({
+      type: 'wake',
+      commandId: 'cmd-wake-no-db',
+      data: { hostName: 'PHANTOM-MBP', mac: 'AA:BB:CC:DD:EE:FF' },
+    });
+
+    await ((service as unknown) as {
+      handleScanCommand: (command: unknown) => Promise<void>;
+    }).handleScanCommand({
+      type: 'scan',
+      commandId: 'cmd-scan-no-db',
+      data: { immediate: true },
+    });
+
+    await ((service as unknown) as {
+      handleUpdateHostCommand: (command: unknown) => Promise<void>;
+    }).handleUpdateHostCommand({
+      type: 'update-host',
+      commandId: 'cmd-update-no-db',
+      data: { name: 'PHANTOM-MBP' },
+    });
+
+    await ((service as unknown) as {
+      handleDeleteHostCommand: (command: unknown) => Promise<void>;
+    }).handleDeleteHostCommand({
+      type: 'delete-host',
+      commandId: 'cmd-delete-no-db',
+      data: { name: 'PHANTOM-MBP' },
+    });
+
+    expect(mockCncClient.send).toHaveBeenCalledTimes(4);
+    expect(mockCncClient.send).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          commandId: 'cmd-wake-no-db',
+          success: false,
+          error: 'Host database not initialized',
+        }),
+      })
+    );
+    expect(mockCncClient.send).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          commandId: 'cmd-scan-no-db',
+          success: false,
+          error: 'Host database not initialized',
+        }),
+      })
+    );
+    expect(mockCncClient.send).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          commandId: 'cmd-update-no-db',
+          success: false,
+          error: 'Host database not initialized',
+        }),
+      })
+    );
+    expect(mockCncClient.send).toHaveBeenNthCalledWith(
+      4,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          commandId: 'cmd-delete-no-db',
+          success: false,
+          error: 'Host database not initialized',
+        }),
+      })
+    );
   });
 
   it('runs scan immediately when immediate=true', async () => {
@@ -119,6 +313,29 @@ describe('AgentService command handlers', () => {
     expect(hostDbMock.syncWithNetwork).toHaveBeenCalledTimes(1);
   });
 
+  it('sends scan failure when immediate scan throws', async () => {
+    hostDbMock.syncWithNetwork.mockRejectedValueOnce(new Error('scan failed'));
+
+    await ((service as unknown) as {
+      handleScanCommand: (command: unknown) => Promise<void>;
+    }).handleScanCommand({
+      type: 'scan',
+      commandId: 'cmd-scan-fail',
+      data: { immediate: true },
+    });
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-scan-fail',
+          success: false,
+          error: 'scan failed',
+        }),
+      })
+    );
+  });
+
   it('supports rename-safe update-host using currentName', async () => {
     const updatedHost: Host = { ...sampleHost, name: 'RENAMED-HOST', ip: '192.168.1.101' };
     hostDbMock.getHost.mockResolvedValueOnce(sampleHost).mockResolvedValueOnce(updatedHost);
@@ -155,6 +372,122 @@ describe('AgentService command handlers', () => {
           success: true,
           message: 'Host PHANTOM-MBP renamed to RENAMED-HOST and updated successfully',
         }),
+      })
+    );
+  });
+
+  it('returns update failure when host does not exist', async () => {
+    hostDbMock.getHost.mockResolvedValueOnce(undefined);
+
+    await ((service as unknown) as {
+      handleUpdateHostCommand: (command: unknown) => Promise<void>;
+    }).handleUpdateHostCommand({
+      type: 'update-host',
+      commandId: 'cmd-update-missing',
+      data: { name: 'MISSING-HOST' },
+    });
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-update-missing',
+          success: false,
+          error: 'Host MISSING-HOST not found',
+        }),
+      })
+    );
+  });
+
+  it('deletes host and sends removal event', async () => {
+    const sendHostRemovedSpy = jest
+      .spyOn((service as unknown) as { sendHostRemoved: (name: string) => void }, 'sendHostRemoved')
+      .mockImplementation(() => {});
+
+    await ((service as unknown) as {
+      handleDeleteHostCommand: (command: unknown) => Promise<void>;
+    }).handleDeleteHostCommand({
+      type: 'delete-host',
+      commandId: 'cmd-delete-ok',
+      data: { name: 'PHANTOM-MBP' },
+    });
+
+    expect(hostDbMock.deleteHost).toHaveBeenCalledWith('PHANTOM-MBP');
+    expect(sendHostRemovedSpy).toHaveBeenCalledWith('PHANTOM-MBP');
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-delete-ok',
+          success: true,
+          message: 'Host PHANTOM-MBP deleted successfully',
+        }),
+      })
+    );
+  });
+
+  it('returns delete failure when deletion throws', async () => {
+    hostDbMock.deleteHost.mockRejectedValueOnce(new Error('delete failed'));
+
+    await ((service as unknown) as {
+      handleDeleteHostCommand: (command: unknown) => Promise<void>;
+    }).handleDeleteHostCommand({
+      type: 'delete-host',
+      commandId: 'cmd-delete-fail',
+      data: { name: 'PHANTOM-MBP' },
+    });
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-delete-fail',
+          success: false,
+          error: 'delete failed',
+        }),
+      })
+    );
+  });
+
+  it('forwards host database events when active', async () => {
+    await service.start();
+    const dbEmitter = Object.assign(new EventEmitter(), {
+      getAllHosts: jest.fn().mockResolvedValue([]),
+    });
+
+    service.setHostDatabase((dbEmitter as unknown) as any);
+    dbEmitter.emit('host-discovered', sampleHost);
+    dbEmitter.emit('host-updated', sampleHost);
+    dbEmitter.emit('scan-complete', 9);
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'host-discovered' })
+    );
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'host-updated' })
+    );
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'scan-complete',
+        data: expect.objectContaining({ hostCount: 9 }),
+      })
+    );
+  });
+
+  it('sends initial hosts on connected event', async () => {
+    await service.start();
+    const dbEmitter = Object.assign(new EventEmitter(), {
+      getAllHosts: jest.fn().mockResolvedValue([sampleHost]),
+    });
+    service.setHostDatabase((dbEmitter as unknown) as any);
+
+    mockCncClient.emit('connected');
+    await Promise.resolve();
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'host-discovered',
+        data: expect.objectContaining({ name: sampleHost.name }),
       })
     );
   });
