@@ -13,13 +13,18 @@ Running `npm audit` reports:
 
 ## Resolved Vulnerabilities (2026-02-07)
 
-✅ **Fixed: tar Package Vulnerabilities**
+✅ **Fixed: tar Package Vulnerabilities (via sqlite3 → better-sqlite3 Migration)**
 
 - **CVE-2025-XXXXX**: node-tar Arbitrary File Overwrite (≤7.5.2)
 - **CVE-2025-XXXXX**: node-tar Race Condition on macOS APFS (≤7.5.3)
 - **CVE-2025-XXXXX**: node-tar Hardlink Path Traversal (<7.5.7)
-- **Resolution**: Added `package.json` override to force `tar@7.5.7` (latest patched version)
-- **Impact**: Eliminated 5 high severity vulnerabilities in the `sqlite3` → `node-gyp` → `tar` dependency chain
+- **Resolution**: Migrated from `sqlite3@5.1.7` to `better-sqlite3@12.6.2`
+- **Impact**: Eliminated 5 high severity vulnerabilities by removing the `sqlite3` → `node-gyp` → `tar` dependency chain entirely
+- **Additional Benefits**:
+  - Better performance (synchronous API, faster queries)
+  - Simpler code (no callback hell)
+  - Improved type safety
+  - No native build dependency on tar
 
 ## Known Vulnerabilities (Accepted Risk)
 
