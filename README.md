@@ -72,6 +72,7 @@ npm run test:watch      # Run tests in watch mode
 npm run test:unit       # Run only unit tests
 npm run test:integration # Run only integration tests
 npm run test:ci         # Run tests in CI mode
+npm run typecheck       # TypeScript checks without emitting build output
 ```
 
 ### Test Organization
@@ -119,6 +120,10 @@ Hosts have two separate status indicators:
 - **Note**: Many devices block ping for security, so `pingResponsive: 0` doesn't mean the host is asleep
 
 **Recommended interpretation**: Use `status` for determining if a device is awake. Use `pingResponsive` for network diagnostics and troubleshooting.
+
+## Security
+
+Dependency/security tracking notes and mitigation strategy are documented in [`SECURITY.md`](./SECURITY.md).
 
 ## API Documentation
 
