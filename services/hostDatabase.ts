@@ -309,11 +309,24 @@ class HostDatabase extends EventEmitter {
       values.push(name);
 
       const sql = `UPDATE hosts SET ${fields.join(', ')} WHERE name = ?`;
-      this.db.run(sql, values, function (this: sqlite3.RunResult, err: Error | null) {
+      const db = this.db;
+      db.run(sql, values, function (this: sqlite3.RunResult, err: Error | null) {
         if (err) {
           reject(err);
         } else if (this.changes === 0) {
-          reject(new Error(`Host ${name} not found`));
+          db.get(
+            'SELECT 1 FROM hosts WHERE name = ?',
+            [name],
+            (selectErr: Error | null, row: unknown) => {
+              if (selectErr) {
+                reject(selectErr);
+              } else if (row) {
+                resolve();
+              } else {
+                reject(new Error(`Host ${name} not found`));
+              }
+            }
+          );
         } else {
           resolve();
         }
