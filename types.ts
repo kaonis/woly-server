@@ -108,9 +108,7 @@ export type CncCommand =
       type: 'update-host';
       commandId: string;
       data: {
-        // Optional stable identifier for rename-safe updates
         currentName?: string;
-        // Target host name after update (or current name when not renaming)
         name: string;
         mac?: string;
         ip?: string;
