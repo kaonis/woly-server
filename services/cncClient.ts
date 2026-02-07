@@ -32,6 +32,7 @@ export class CncClient extends EventEmitter {
   private isRegistered = false;
   private activeConnectionToken: string | null = null;
   private sessionToken: { token: string; expiresAtMs: number | null } | null = null;
+  private shouldReconnect = true;
 
   constructor() {
     super();
@@ -47,6 +48,8 @@ export class CncClient extends EventEmitter {
     }
 
     this.isConnecting = true;
+    // Reset shouldReconnect flag on explicit connect attempts
+    this.shouldReconnect = true;
 
     try {
       const token = await this.resolveConnectionToken();
@@ -259,6 +262,9 @@ export class CncClient extends EventEmitter {
         receivedProtocolVersion: data.protocolVersion,
         supportedProtocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
       });
+
+      // Disable reconnection for protocol mismatch to prevent infinite loop
+      this.shouldReconnect = false;
       this.ws?.close(4406, 'unsupported protocol version');
       return;
     }
@@ -344,8 +350,14 @@ export class CncClient extends EventEmitter {
 
     this.emit('disconnected');
 
-    // Schedule reconnection
-    this.scheduleReconnect();
+    // Only schedule reconnection if shouldReconnect flag is true
+    // (e.g., not set to false due to protocol version mismatch)
+    if (this.shouldReconnect) {
+      this.scheduleReconnect();
+    } else {
+      logger.info('Reconnection disabled (e.g., protocol version mismatch)');
+      this.emit('reconnect-disabled');
+    }
   }
 
   /**

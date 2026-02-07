@@ -334,6 +334,45 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     expect(client.isConnected()).toBe(false);
   });
 
+  it('disables reconnection after protocol version mismatch to prevent infinite loop', async () => {
+    await client.connect();
+    mockSockets[0].emit('open');
+
+    const onReconnectDisabled = jest.fn();
+    client.on('reconnect-disabled', onReconnectDisabled);
+
+    // Send unsupported protocol version
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'registered',
+          data: {
+            nodeId: 'node-1',
+            heartbeatInterval: 30000,
+            protocolVersion: '9.9.9',
+          },
+        })
+      )
+    );
+
+    // Trigger close event
+    await flushPromises();
+
+    // Verify reconnection is disabled
+    expect(onReconnectDisabled).toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith(
+      'Reconnection disabled (e.g., protocol version mismatch)'
+    );
+
+    // Advance timers to verify no reconnection attempt
+    jest.advanceTimersByTime(mockedAgentConfig.reconnectInterval + 1000);
+    await flushPromises();
+
+    // Should still have only one socket (no reconnection)
+    expect(mockSockets).toHaveLength(1);
+  });
+
   it('handles C&C protocol error frames', async () => {
     await client.connect();
     const onProtocolError = jest.fn();
