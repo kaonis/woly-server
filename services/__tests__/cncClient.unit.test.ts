@@ -333,4 +333,32 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     );
     expect(client.isConnected()).toBe(false);
   });
+
+  it('handles C&C protocol error frames', async () => {
+    await client.connect();
+    const onProtocolError = jest.fn();
+    client.on('protocol-error', onProtocolError);
+
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'error',
+          message: 'Invalid protocol payload',
+        })
+      )
+    );
+
+    expect(onProtocolError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Invalid protocol payload',
+      })
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Received protocol error from C&C',
+      expect.objectContaining({
+        message: 'Invalid protocol payload',
+      })
+    );
+  });
 });

@@ -75,7 +75,8 @@ export type CncCommand =
       };
     }
   | { type: 'delete-host'; commandId: string; data: { name: string } }
-  | { type: 'ping'; data: { timestamp: Date } };
+  | { type: 'ping'; data: { timestamp: Date } }
+  | { type: 'error'; message: string };
 
 export const inboundCncCommandSchema: z.ZodType<CncCommand>;
 export const outboundNodeMessageSchema: z.ZodType<NodeMessage>;
