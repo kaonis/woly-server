@@ -399,6 +399,58 @@ describe('AgentService command handlers', () => {
     );
   });
 
+  it('rejects update-host payload with invalid status', async () => {
+    await ((service as unknown) as {
+      handleUpdateHostCommand: (command: unknown) => Promise<void>;
+    }).handleUpdateHostCommand({
+      type: 'update-host',
+      commandId: 'cmd-update-invalid-status',
+      data: {
+        name: 'PHANTOM-MBP',
+        status: 'offline',
+      },
+    });
+
+    expect(hostDbMock.getHost).not.toHaveBeenCalled();
+    expect(hostDbMock.updateHost).not.toHaveBeenCalled();
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-update-invalid-status',
+          success: false,
+          error: 'Invalid update-host payload: status must be awake or asleep',
+        }),
+      })
+    );
+  });
+
+  it('rejects update-host payload with invalid ip format', async () => {
+    await ((service as unknown) as {
+      handleUpdateHostCommand: (command: unknown) => Promise<void>;
+    }).handleUpdateHostCommand({
+      type: 'update-host',
+      commandId: 'cmd-update-invalid-ip',
+      data: {
+        name: 'PHANTOM-MBP',
+        ip: 'not-an-ip',
+      },
+    });
+
+    expect(hostDbMock.getHost).not.toHaveBeenCalled();
+    expect(hostDbMock.updateHost).not.toHaveBeenCalled();
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-update-invalid-ip',
+          success: false,
+          error: 'Invalid update-host payload: ip must be a valid IPv4 address',
+        }),
+      })
+    );
+  });
+
   it('deletes host and sends removal event', async () => {
     const sendHostRemovedSpy = jest
       .spyOn((service as unknown) as { sendHostRemoved: (name: string) => void }, 'sendHostRemoved')

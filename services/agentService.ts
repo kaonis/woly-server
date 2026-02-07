@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { isIP } from 'node:net';
 import { cncClient } from './cncClient';
 import { agentConfig, validateAgentConfig } from '../config/agent';
 import { logger } from '../utils/logger';
@@ -9,6 +10,16 @@ type WakeCommand = Extract<CncCommand, { type: 'wake' }>;
 type ScanCommand = Extract<CncCommand, { type: 'scan' }>;
 type UpdateHostCommand = Extract<CncCommand, { type: 'update-host' }>;
 type DeleteHostCommand = Extract<CncCommand, { type: 'delete-host' }>;
+
+type ValidatedUpdateHostData = {
+  currentName?: string;
+  name: string;
+  mac?: string;
+  ip?: string;
+  status?: Host['status'];
+};
+
+const MAC_ADDRESS_REGEX = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^([0-9A-Fa-f]{12})$/;
 
 /**
  * Agent Service
@@ -371,14 +382,7 @@ export class AgentService extends EventEmitter {
    * Handle update-host command from C&C
    */
   private async handleUpdateHostCommand(command: UpdateHostCommand): Promise<void> {
-    const { commandId, data } = command;
-    const currentName = data.currentName ?? data.name;
-
-    logger.info('Received update-host command from C&C', {
-      commandId,
-      currentName,
-      targetName: data.name,
-    });
+    const { commandId } = command;
 
     if (!this.hostDb) {
       logger.error('Host database not initialized');
@@ -390,6 +394,15 @@ export class AgentService extends EventEmitter {
     }
 
     try {
+      const data = this.validateUpdateHostData(command.data);
+      const currentName = data.currentName ?? data.name;
+
+      logger.info('Received update-host command from C&C', {
+        commandId,
+        currentName,
+        targetName: data.name,
+      });
+
       const existing = await this.hostDb.getHost(currentName);
       if (!existing) {
         throw new Error(`Host ${currentName} not found`);
@@ -460,6 +473,72 @@ export class AgentService extends EventEmitter {
         error: message,
       });
     }
+  }
+
+  private validateUpdateHostData(data: unknown): ValidatedUpdateHostData {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid update-host payload: data must be an object');
+    }
+
+    const payload = data as Record<string, unknown>;
+    const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+    const currentNameRaw = payload.currentName;
+
+    if (!name) {
+      throw new Error('Invalid update-host payload: name is required');
+    }
+
+    if (name.length > 255) {
+      throw new Error('Invalid update-host payload: name must be at most 255 characters');
+    }
+
+    let currentName: string | undefined;
+    if (currentNameRaw !== undefined) {
+      if (typeof currentNameRaw !== 'string' || !currentNameRaw.trim()) {
+        throw new Error('Invalid update-host payload: currentName must be a non-empty string');
+      }
+      currentName = currentNameRaw.trim();
+    }
+
+    let mac: string | undefined;
+    if (payload.mac !== undefined) {
+      if (typeof payload.mac !== 'string') {
+        throw new Error('Invalid update-host payload: mac must be a string');
+      }
+      const normalizedMac = payload.mac.trim();
+      if (!MAC_ADDRESS_REGEX.test(normalizedMac)) {
+        throw new Error('Invalid update-host payload: mac has invalid format');
+      }
+      mac = normalizedMac.includes('-') ? normalizedMac.replace(/-/g, ':') : normalizedMac;
+    }
+
+    let ip: string | undefined;
+    if (payload.ip !== undefined) {
+      if (typeof payload.ip !== 'string') {
+        throw new Error('Invalid update-host payload: ip must be a string');
+      }
+      const normalizedIp = payload.ip.trim();
+      if (isIP(normalizedIp) !== 4) {
+        throw new Error('Invalid update-host payload: ip must be a valid IPv4 address');
+      }
+      ip = normalizedIp;
+    }
+
+    let status: Host['status'] | undefined;
+    if (payload.status !== undefined) {
+      if (payload.status !== 'awake' && payload.status !== 'asleep') {
+        throw new Error('Invalid update-host payload: status must be awake or asleep');
+      }
+      status = payload.status;
+    }
+
+    return {
+      currentName,
+      name,
+      mac,
+      ip,
+      status,
+    };
   }
 }
 
