@@ -44,6 +44,7 @@ describe('AgentService command handlers', () => {
     syncWithNetwork: jest.Mock;
     getAllHosts: jest.Mock;
     getHost: jest.Mock;
+    getHostByMAC: jest.Mock;
     updateHost: jest.Mock;
     deleteHost: jest.Mock;
   };
@@ -68,6 +69,7 @@ describe('AgentService command handlers', () => {
       syncWithNetwork: jest.fn().mockResolvedValue(undefined),
       getAllHosts: jest.fn().mockResolvedValue([sampleHost]),
       getHost: jest.fn(),
+      getHostByMAC: jest.fn(),
       updateHost: jest.fn().mockResolvedValue(undefined),
       deleteHost: jest.fn().mockResolvedValue(undefined),
     };
@@ -134,15 +136,20 @@ describe('AgentService command handlers', () => {
     );
   });
 
-  it('sends failure result for wake when host is missing', async () => {
+  it('sends failure result for wake when wake-on-lan fails', async () => {
     hostDbMock.getHost.mockResolvedValueOnce(undefined);
+    hostDbMock.getHostByMAC.mockResolvedValueOnce(undefined);
+    ((wakeOnLan.wake as unknown) as jest.Mock).mockImplementation(
+      (_mac: string, callback: (error: Error | null) => void) =>
+        callback(new Error('WOL send failed'))
+    );
 
     await ((service as unknown) as {
       handleWakeCommand: (command: unknown) => Promise<void>;
     }).handleWakeCommand({
       type: 'wake',
       commandId: 'cmd-wake-missing',
-      data: { hostName: 'UNKNOWN', mac: 'AA:BB:CC:DD:EE:FF' },
+      data: { hostName: 'UNKNOWN', mac: 'INVALID-MAC' },
     });
 
     expect(mockCncClient.send).toHaveBeenCalledWith(
@@ -151,13 +158,13 @@ describe('AgentService command handlers', () => {
         data: expect.objectContaining({
           commandId: 'cmd-wake-missing',
           success: false,
-          error: 'Host UNKNOWN not found',
+          error: 'WOL send failed',
         }),
       })
     );
   });
 
-  it('sends failure result for wake when wake-on-lan fails', async () => {
+  it('sends failure result for wake when wake-on-lan fails for known host', async () => {
     hostDbMock.getHost.mockResolvedValueOnce(sampleHost);
     ((wakeOnLan.wake as unknown) as jest.Mock).mockImplementation(
       (_mac: string, callback: (error: Error | null) => void) =>
@@ -179,6 +186,33 @@ describe('AgentService command handlers', () => {
           commandId: 'cmd-wake-error',
           success: false,
           error: 'WOL send failed',
+        }),
+      })
+    );
+  });
+
+  it('falls back to command MAC when hostname lookup fails', async () => {
+    hostDbMock.getHost.mockResolvedValueOnce(undefined);
+    hostDbMock.getHostByMAC.mockResolvedValueOnce(sampleHost);
+
+    await ((service as unknown) as {
+      handleWakeCommand: (command: unknown) => Promise<void>;
+    }).handleWakeCommand({
+      type: 'wake',
+      commandId: 'cmd-wake-fallback-mac',
+      data: { hostName: 'STALE-NAME', mac: sampleHost.mac },
+    });
+
+    expect(hostDbMock.getHost).toHaveBeenCalledWith('STALE-NAME');
+    expect(hostDbMock.getHostByMAC).toHaveBeenCalledWith(sampleHost.mac);
+    expect(wakeOnLan.wake).toHaveBeenCalledWith(sampleHost.mac, expect.any(Function));
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-wake-fallback-mac',
+          success: true,
+          message: `Wake-on-LAN packet sent to ${sampleHost.name} (${sampleHost.mac})`,
         }),
       })
     );

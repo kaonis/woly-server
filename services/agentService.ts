@@ -271,9 +271,9 @@ export class AgentService extends EventEmitter {
    */
   private async handleWakeCommand(command: WakeCommand): Promise<void> {
     const { commandId, data } = command;
-    const { hostName } = data;
+    const { hostName, mac } = data;
 
-    logger.info('Received wake command from C&C', { commandId, hostName });
+    logger.info('Received wake command from C&C', { commandId, hostName, mac });
 
     if (!this.hostDb) {
       logger.error('Host database not initialized');
@@ -285,17 +285,21 @@ export class AgentService extends EventEmitter {
     }
 
     try {
-      // Get host from database to verify it exists
-      const host = await this.hostDb.getHost(hostName);
-
+      // Prefer hostname lookup, but fall back to MAC for stale/missing hostnames.
+      let host = await this.hostDb.getHost(hostName);
       if (!host) {
+        host = await this.hostDb.getHostByMAC(mac);
+      }
+
+      const targetMac = host?.mac ?? mac;
+      if (!targetMac) {
         throw new Error(`Host ${hostName} not found`);
       }
 
       // Send Wake-on-LAN packet
       const wol = await import('wake_on_lan');
       await new Promise<void>((resolve, reject) => {
-        wol.wake(host.mac, (error: Error | null) => {
+        wol.wake(targetMac, (error: Error | null) => {
           if (error) {
             reject(error);
           } else {
@@ -306,7 +310,7 @@ export class AgentService extends EventEmitter {
 
       this.sendCommandResult(commandId, {
         success: true,
-        message: `Wake-on-LAN packet sent to ${hostName} (${host.mac})`,
+        message: `Wake-on-LAN packet sent to ${host?.name || hostName} (${targetMac})`,
       });
 
       logger.info('Wake command completed', { commandId, hostName });
