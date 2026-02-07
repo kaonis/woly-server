@@ -132,14 +132,18 @@ class HostDatabase extends EventEmitter {
   /**
    * Get all hosts from database
    */
-  getAllHosts(): Promise<Host[]> {
-    return Promise.resolve(
-      this.db
+  async getAllHosts(): Promise<Host[]> {
+    try {
+      return this.db
         .prepare(
           'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts ORDER BY name'
         )
-        .all() as Host[]
-    );
+        .all() as Host[];
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to get all hosts:', { error: message });
+      throw error;
+    }
   }
 
   /**
@@ -159,27 +163,35 @@ class HostDatabase extends EventEmitter {
   /**
    * Get a single host by name
    */
-  getHost(name: string): Promise<Host | undefined> {
-    return Promise.resolve(
-      this.db
+  async getHost(name: string): Promise<Host | undefined> {
+    try {
+      return this.db
         .prepare(
           'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts WHERE name = ?'
         )
-        .get(name) as Host | undefined
-    );
+        .get(name) as Host | undefined;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error(`Failed to get host ${name}:`, { error: message });
+      throw error;
+    }
   }
 
   /**
    * Get a single host by MAC address
    */
-  getHostByMAC(mac: string): Promise<Host | undefined> {
-    return Promise.resolve(
-      this.db
+  async getHostByMAC(mac: string): Promise<Host | undefined> {
+    try {
+      return this.db
         .prepare(
           'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts WHERE mac = ?'
         )
-        .get(mac) as Host | undefined
-    );
+        .get(mac) as Host | undefined;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error(`Failed to get host by MAC ${mac}:`, { error: message });
+      throw error;
+    }
   }
 
   /**
@@ -500,10 +512,16 @@ class HostDatabase extends EventEmitter {
       clearInterval(this.syncInterval);
       this.syncInterval = undefined;
     }
-    return new Promise<void>((resolve) => {
-      this.db.close();
-      logger.info('Database connection closed');
-      resolve();
+    return new Promise<void>((resolve, reject) => {
+      try {
+        this.db.close();
+        logger.info('Database connection closed');
+        resolve();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        logger.error('Failed to close database connection:', { error: message });
+        reject(error);
+      }
     });
   }
 }
