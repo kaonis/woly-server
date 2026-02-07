@@ -406,9 +406,7 @@ const getMacVendor = async (req: Request, res: Response): Promise<void> => {
       source: 'macvendors.com',
     });
   } catch (error: unknown) {
-    const axiosError = error as { response?: { status?: number }; message?: string };
-
-    if (axiosError.response && axiosError.response.status === 404) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
       const vendor = 'Unknown Vendor';
 
       // Cache unknown vendors too
@@ -422,7 +420,7 @@ const getMacVendor = async (req: Request, res: Response): Promise<void> => {
         vendor,
         source: 'macvendors.com',
       });
-    } else if (axiosError.response && axiosError.response.status === 429) {
+    } else if (axios.isAxiosError(error) && error.response?.status === 429) {
       logger.warn('MAC vendor API rate limit exceeded', { mac });
       res.status(429).json({
         error: 'Rate limit exceeded, please try again later',
@@ -431,7 +429,7 @@ const getMacVendor = async (req: Request, res: Response): Promise<void> => {
     } else {
       logger.error('MAC vendor lookup error:', {
         mac,
-        error: axiosError.message || 'Unknown error',
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       res.status(500).json({ error: 'Failed to lookup MAC vendor' });
     }
