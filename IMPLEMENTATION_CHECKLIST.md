@@ -6,7 +6,7 @@ Owner: Platform Team
 ## Progress Update (2026-02-07)
 
 - [x] Phase 1 implementation completed on branch `feat/phase1-node-auth-lifecycle` (PR #66).
-- [ ] Phase 2 implementation not started yet.
+- [x] Phase 2 implementation completed on branch `feat/phase2-runtime-validation-v2` (stacked on Phase 1 branch).
 
 ## Phase 0 - Baseline and Safety Rails
 
@@ -35,14 +35,14 @@ Definition of done:
 
 ## Phase 2 - Runtime Schema Validation
 
-- [ ] Validate all inbound commands before dispatch.
-- [ ] Validate outbound telemetry/events before send.
-- [ ] Add strict unknown-command handling.
-- [ ] Add structured error logging with correlation IDs.
+- [x] Validate all inbound commands before dispatch.
+- [x] Validate outbound telemetry/events before send.
+- [x] Add strict unknown-command handling.
+- [x] Add structured error logging with correlation IDs.
 
 Definition of done:
 
-- [ ] Invalid payload paths have deterministic test coverage.
+- [x] Invalid payload paths have deterministic test coverage.
 
 ## Phase 3 - Shared Protocol Package
 

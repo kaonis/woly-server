@@ -2,9 +2,11 @@ import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 import os from 'os';
 import axios from 'axios';
+import { randomUUID } from 'crypto';
 import { agentConfig } from '../config/agent';
 import { NodeMessage, CncCommand, NodeRegistration } from '../types';
 import { logger } from '../utils/logger';
+import { inboundCncCommandSchema, outboundNodeMessageSchema } from './protocolSchemas';
 
 /**
  * C&C Client Service
@@ -95,6 +97,18 @@ export class CncClient extends EventEmitter {
     }
 
     try {
+      const validation = outboundNodeMessageSchema.safeParse(message);
+      if (!validation.success) {
+        this.logProtocolValidationError({
+          direction: 'outbound',
+          correlationId: this.extractCorrelationId(message),
+          messageType: message.type,
+          rawData: message,
+          error: validation.error,
+        });
+        return;
+      }
+
       this.ws.send(JSON.stringify(message));
       logger.debug('Sent message to C&C', { type: message.type });
     } catch (error) {
@@ -149,8 +163,35 @@ export class CncClient extends EventEmitter {
    * Handle incoming messages from C&C
    */
   private handleMessage(data: WebSocket.Data): void {
+    let parsedPayload: unknown;
+
     try {
-      const message = JSON.parse(data.toString()) as CncCommand;
+      parsedPayload = JSON.parse(data.toString());
+    } catch (error) {
+      this.logProtocolValidationError({
+        direction: 'inbound',
+        correlationId: randomUUID(),
+        messageType: 'malformed-json',
+        rawData: data.toString(),
+        error,
+      });
+      return;
+    }
+
+    try {
+      const parsedCommand = inboundCncCommandSchema.safeParse(parsedPayload);
+      if (!parsedCommand.success) {
+        this.logProtocolValidationError({
+          direction: 'inbound',
+          correlationId: this.extractCorrelationId(parsedPayload),
+          messageType: this.extractMessageType(parsedPayload),
+          rawData: parsedPayload,
+          error: parsedCommand.error,
+        });
+        return;
+      }
+
+      const message = parsedCommand.data as CncCommand;
       logger.debug('Received message from C&C', { type: message.type });
 
       switch (message.type) {
@@ -172,11 +213,15 @@ export class CncClient extends EventEmitter {
         case 'ping':
           this.handlePing(message.data);
           break;
-        default:
-          logger.warn('Unknown message type from C&C', { message });
       }
     } catch (error) {
-      logger.error('Failed to parse message from C&C', { error, data: data.toString() });
+      this.logProtocolValidationError({
+        direction: 'inbound',
+        correlationId: this.extractCorrelationId(parsedPayload),
+        messageType: this.extractMessageType(parsedPayload),
+        rawData: parsedPayload,
+        error,
+      });
     }
   }
 
@@ -423,6 +468,54 @@ export class CncClient extends EventEmitter {
 
   private invalidateSessionToken(): void {
     this.sessionToken = null;
+  }
+
+  private extractMessageType(payload: unknown): string {
+    if (!payload || typeof payload !== 'object') {
+      return 'unknown';
+    }
+
+    const maybeType = (payload as { type?: unknown }).type;
+    return typeof maybeType === 'string' ? maybeType : 'unknown';
+  }
+
+  private extractCorrelationId(payload: unknown): string {
+    if (!payload || typeof payload !== 'object') {
+      return randomUUID();
+    }
+
+    const topLevelCommandId = (payload as { commandId?: unknown }).commandId;
+    if (typeof topLevelCommandId === 'string' && topLevelCommandId.length > 0) {
+      return topLevelCommandId;
+    }
+
+    const data = (payload as { data?: unknown }).data;
+    if (data && typeof data === 'object') {
+      const nestedCommandId = (data as { commandId?: unknown }).commandId;
+      if (typeof nestedCommandId === 'string' && nestedCommandId.length > 0) {
+        return nestedCommandId;
+      }
+    }
+
+    return randomUUID();
+  }
+
+  private logProtocolValidationError(params: {
+    direction: 'inbound' | 'outbound';
+    correlationId: string;
+    messageType: string;
+    rawData: unknown;
+    error: unknown;
+  }): void {
+    const { direction, correlationId, messageType, rawData, error } = params;
+
+    logger.error('Protocol validation failed', {
+      direction,
+      correlationId,
+      messageType,
+      error: error instanceof Error ? error.message : String(error),
+      rawData,
+    });
   }
 }
 

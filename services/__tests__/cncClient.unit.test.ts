@@ -71,6 +71,7 @@ jest.mock('ws', () => ({
 }));
 
 import { CncClient } from '../cncClient';
+import { logger } from '../../utils/logger';
 
 describe('CncClient Phase 1 auth lifecycle', () => {
   let client: CncClient;
@@ -159,5 +160,80 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     expect(onUnavailable).toHaveBeenCalledTimes(1);
     expect(mockSockets).toHaveLength(0);
     expect(jest.getTimerCount()).toBeGreaterThan(0);
+  });
+
+  it('rejects malformed inbound command payloads with structured validation logs', async () => {
+    await client.connect();
+
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'wake',
+          data: { hostName: 'PC-01', mac: 'AA:BB:CC:DD:EE:FF' },
+        })
+      )
+    );
+
+    expect(logger.error).toHaveBeenCalledWith(
+      'Protocol validation failed',
+      expect.objectContaining({
+        direction: 'inbound',
+        messageType: 'wake',
+      })
+    );
+  });
+
+  it('rejects unknown inbound command types without crashing the dispatcher loop', async () => {
+    await client.connect();
+
+    const onWake = jest.fn();
+    client.on('command:wake', onWake);
+
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'power-cycle',
+          commandId: 'cmd-unknown',
+          data: {},
+        })
+      )
+    );
+
+    expect(onWake).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      'Protocol validation failed',
+      expect.objectContaining({
+        direction: 'inbound',
+        messageType: 'power-cycle',
+      })
+    );
+  });
+
+  it('rejects malformed outbound node messages and logs validation errors', async () => {
+    await client.connect();
+
+    client.send({
+      type: 'host-discovered',
+      data: {
+        nodeId: 'node-1',
+        name: 'Host-01',
+        mac: 'AA:BB:CC:DD:EE:FF',
+        ip: '192.168.1.50',
+        status: ('invalid-status' as unknown) as 'awake',
+        lastSeen: null,
+        discovered: 1,
+      },
+    });
+
+    expect(mockSockets[0].sentMessages).toHaveLength(0);
+    expect(logger.error).toHaveBeenCalledWith(
+      'Protocol validation failed',
+      expect.objectContaining({
+        direction: 'outbound',
+        messageType: 'host-discovered',
+      })
+    );
   });
 });
