@@ -5,9 +5,19 @@ import axios from 'axios';
 import { randomUUID } from 'crypto';
 import { ZodError } from 'zod';
 import { agentConfig } from '../config/agent';
-import { NodeMessage, CncCommand, NodeRegistration } from '../types';
+import type {
+  CncCommand,
+  NodeMessage,
+  NodeRegistration,
+  RegisteredCommandData,
+} from '@kaonis/woly-protocol';
+import {
+  inboundCncCommandSchema,
+  outboundNodeMessageSchema,
+  PROTOCOL_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
+} from '@kaonis/woly-protocol';
 import { logger } from '../utils/logger';
-import { inboundCncCommandSchema, outboundNodeMessageSchema } from './protocolSchemas';
 
 /**
  * C&C Client Service
@@ -22,6 +32,7 @@ export class CncClient extends EventEmitter {
   private isRegistered = false;
   private activeConnectionToken: string | null = null;
   private sessionToken: { token: string; expiresAtMs: number | null } | null = null;
+  private shouldReconnect = true;
 
   constructor() {
     super();
@@ -37,6 +48,8 @@ export class CncClient extends EventEmitter {
     }
 
     this.isConnecting = true;
+    // Reset shouldReconnect flag on explicit connect attempts
+    this.shouldReconnect = true;
 
     try {
       const token = await this.resolveConnectionToken();
@@ -149,6 +162,7 @@ export class CncClient extends EventEmitter {
       metadata: {
         version: '1.0.0', // TODO: Get from package.json
         platform: os.platform(),
+        protocolVersion: PROTOCOL_VERSION,
         networkInfo: {
           subnet: '0.0.0.0/0', // TODO: Get actual subnet
           gateway: '0.0.0.0', // TODO: Get actual gateway
@@ -214,6 +228,9 @@ export class CncClient extends EventEmitter {
         case 'ping':
           this.handlePing(message.data);
           break;
+        case 'error':
+          this.handleProtocolError(message.message);
+          break;
       }
     } catch (error) {
       this.logProtocolValidationError({
@@ -229,7 +246,29 @@ export class CncClient extends EventEmitter {
   /**
    * Handle registration confirmation
    */
-  private handleRegistered(data: { nodeId: string; heartbeatInterval: number }): void {
+  private handleRegistered(data: RegisteredCommandData): void {
+    if (!data.protocolVersion) {
+      logger.warn('Registration missing protocolVersion; assuming compatibility fallback', {
+        supportedProtocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
+      });
+    }
+
+    if (data.protocolVersion && !SUPPORTED_PROTOCOL_VERSIONS.includes(data.protocolVersion)) {
+      logger.error('Protocol version mismatch during registration', {
+        receivedProtocolVersion: data.protocolVersion,
+        supportedProtocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
+      });
+      this.emit('protocol-unsupported', {
+        receivedProtocolVersion: data.protocolVersion,
+        supportedProtocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
+      });
+
+      // Disable reconnection for protocol mismatch to prevent infinite loop
+      this.shouldReconnect = false;
+      this.ws?.close(4406, 'unsupported protocol version');
+      return;
+    }
+
     logger.info('Registration confirmed by C&C', data);
     this.isRegistered = true;
 
@@ -246,6 +285,11 @@ export class CncClient extends EventEmitter {
   private handlePing(data: { timestamp: Date }): void {
     logger.debug('Received ping from C&C', data);
     // Ping doesn't require a response, heartbeat serves that purpose
+  }
+
+  private handleProtocolError(message: string): void {
+    logger.warn('Received protocol error from C&C', { message });
+    this.emit('protocol-error', { message });
   }
 
   /**
@@ -306,8 +350,14 @@ export class CncClient extends EventEmitter {
 
     this.emit('disconnected');
 
-    // Schedule reconnection
-    this.scheduleReconnect();
+    // Only schedule reconnection if shouldReconnect flag is true
+    // (e.g., not set to false due to protocol version mismatch)
+    if (this.shouldReconnect) {
+      this.scheduleReconnect();
+    } else {
+      logger.info('Reconnection disabled (e.g., protocol version mismatch)');
+      this.emit('reconnect-disabled');
+    }
   }
 
   /**

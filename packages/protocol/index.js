@@ -1,4 +1,7 @@
-import { z } from 'zod';
+const { z } = require('zod');
+
+const PROTOCOL_VERSION = '1.0.0';
+const SUPPORTED_PROTOCOL_VERSIONS = [PROTOCOL_VERSION];
 
 const hostStatusSchema = z.enum(['awake', 'asleep']);
 
@@ -15,6 +18,7 @@ const hostPayloadSchema = z.object({
 const nodeMetadataSchema = z.object({
   version: z.string().min(1),
   platform: z.string().min(1),
+  protocolVersion: z.string().min(1),
   networkInfo: z.object({
     subnet: z.string().min(1),
     gateway: z.string().min(1),
@@ -30,7 +34,7 @@ const commandResultPayloadSchema = z.object({
   timestamp: z.coerce.date(),
 });
 
-export const outboundNodeMessageSchema = z.discriminatedUnion('type', [
+const outboundNodeMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('register'),
     data: z.object({
@@ -85,12 +89,13 @@ export const outboundNodeMessageSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
-export const inboundCncCommandSchema = z.discriminatedUnion('type', [
+const inboundCncCommandSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('registered'),
     data: z.object({
       nodeId: z.string().min(1),
       heartbeatInterval: z.number().int().positive(),
+      protocolVersion: z.string().min(1).optional(),
     }),
   }),
   z.object({
@@ -132,4 +137,15 @@ export const inboundCncCommandSchema = z.discriminatedUnion('type', [
       timestamp: z.coerce.date(),
     }),
   }),
+  z.object({
+    type: z.literal('error'),
+    message: z.string().min(1),
+  }),
 ]);
+
+module.exports = {
+  PROTOCOL_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
+  inboundCncCommandSchema,
+  outboundNodeMessageSchema,
+};
