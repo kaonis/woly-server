@@ -3,6 +3,21 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+function getEnvNumber(key: string, defaultValue: number): number {
+  const rawValue = process.env[key];
+  const parsedValue = rawValue ? parseInt(rawValue, 10) : defaultValue;
+  return Number.isNaN(parsedValue) ? defaultValue : parsedValue;
+}
+
+function getEnvBoolean(key: string, defaultValue: boolean): boolean {
+  const rawValue = process.env[key];
+  if (rawValue === undefined) {
+    return defaultValue;
+  }
+
+  return ['1', 'true', 'yes', 'on'].includes(rawValue.toLowerCase());
+}
+
 /**
  * Agent Mode Configuration
  * Controls whether woly-backend operates as standalone or connects to C&C
@@ -26,12 +41,23 @@ export const agentConfig = {
   // Public URL for this node (optional, for reverse connections)
   publicUrl: process.env.NODE_PUBLIC_URL || '',
 
+  // Optional session token endpoint for short-lived node tokens
+  sessionTokenUrl: process.env.NODE_SESSION_TOKEN_URL || '',
+  sessionTokenRequestTimeoutMs: getEnvNumber('NODE_SESSION_TOKEN_TIMEOUT_MS', 5000),
+  sessionTokenRefreshBufferSeconds: getEnvNumber('NODE_SESSION_TOKEN_REFRESH_BUFFER_SECONDS', 60),
+
+  // If enabled, include query token for transition compatibility
+  wsAllowQueryTokenFallback: getEnvBoolean(
+    'WS_ALLOW_QUERY_TOKEN_FALLBACK',
+    (process.env.NODE_ENV || 'development') !== 'production'
+  ),
+
   // Heartbeat interval in milliseconds
-  heartbeatInterval: parseInt(process.env.HEARTBEAT_INTERVAL || '30000', 10), // 30 seconds
+  heartbeatInterval: getEnvNumber('HEARTBEAT_INTERVAL', 30000), // 30 seconds
 
   // Reconnection settings
-  reconnectInterval: parseInt(process.env.RECONNECT_INTERVAL || '5000', 10), // 5 seconds
-  maxReconnectAttempts: parseInt(process.env.MAX_RECONNECT_ATTEMPTS || '0', 10), // 0 = infinite
+  reconnectInterval: getEnvNumber('RECONNECT_INTERVAL', 5000), // 5 seconds
+  maxReconnectAttempts: getEnvNumber('MAX_RECONNECT_ATTEMPTS', 0), // 0 = infinite
 };
 
 /**

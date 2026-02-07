@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 import os from 'os';
+import axios from 'axios';
 import { agentConfig } from '../config/agent';
 import { NodeMessage, CncCommand, NodeRegistration } from '../types';
 import { logger } from '../utils/logger';
@@ -16,6 +17,8 @@ export class CncClient extends EventEmitter {
   private reconnectAttempts = 0;
   private isConnecting = false;
   private isRegistered = false;
+  private activeConnectionToken: string | null = null;
+  private sessionToken: { token: string; expiresAtMs: number | null } | null = null;
 
   constructor() {
     super();
@@ -33,10 +36,16 @@ export class CncClient extends EventEmitter {
     this.isConnecting = true;
 
     try {
-      const wsUrl = `${agentConfig.cncUrl}/ws/node?token=${agentConfig.authToken}`;
+      const token = await this.resolveConnectionToken();
+      const wsUrl = this.buildWebSocketUrl(token);
       logger.info('Connecting to C&C backend', { url: agentConfig.cncUrl });
+      this.activeConnectionToken = token;
 
-      this.ws = new WebSocket(wsUrl);
+      this.ws = new WebSocket(wsUrl, ['bearer', token], {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       this.ws.on('open', () => this.handleOpen());
       this.ws.on('message', (data: WebSocket.Data) => this.handleMessage(data));
@@ -44,6 +53,7 @@ export class CncClient extends EventEmitter {
       this.ws.on('close', (code: number, reason: Buffer) => this.handleClose(code, reason));
     } catch (error) {
       logger.error('Failed to connect to C&C', { error });
+      this.activeConnectionToken = null;
       this.isConnecting = false;
       this.scheduleReconnect();
     }
@@ -70,6 +80,7 @@ export class CncClient extends EventEmitter {
       this.ws = null;
     }
 
+    this.activeConnectionToken = null;
     this.isRegistered = false;
     this.reconnectAttempts = 0;
   }
@@ -118,7 +129,7 @@ export class CncClient extends EventEmitter {
       nodeId: agentConfig.nodeId,
       name: agentConfig.nodeId,
       location: agentConfig.location,
-      authToken: agentConfig.authToken,
+      authToken: this.activeConnectionToken || agentConfig.authToken,
       publicUrl: agentConfig.publicUrl || undefined,
       metadata: {
         version: '1.0.0', // TODO: Get from package.json
@@ -224,10 +235,23 @@ export class CncClient extends EventEmitter {
    * Handle WebSocket close
    */
   private handleClose(code: number, reason: Buffer): void {
-    logger.warn('C&C connection closed', { code, reason: reason.toString() });
+    const reasonText = reason.toString();
+    logger.warn('C&C connection closed', { code, reason: reasonText });
 
     this.isConnecting = false;
     this.isRegistered = false;
+    this.activeConnectionToken = null;
+    this.ws = null;
+
+    if (this.isExpiredAuthFailure(code, reasonText)) {
+      logger.warn('C&C rejected authentication: token expired');
+      this.invalidateSessionToken();
+      this.emit('auth-expired');
+    } else if (this.isRevokedAuthFailure(code, reasonText)) {
+      logger.error('C&C rejected authentication: token revoked or invalid');
+      this.invalidateSessionToken();
+      this.emit('auth-revoked');
+    }
 
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
@@ -270,6 +294,135 @@ export class CncClient extends EventEmitter {
       this.reconnectTimer = null;
       this.connect();
     }, delay);
+  }
+
+  private buildWebSocketUrl(token: string): string {
+    const baseUrl = `${agentConfig.cncUrl}/ws/node`;
+    if (!agentConfig.wsAllowQueryTokenFallback) {
+      return baseUrl;
+    }
+
+    return `${baseUrl}?token=${encodeURIComponent(token)}`;
+  }
+
+  private async resolveConnectionToken(): Promise<string> {
+    if (!agentConfig.sessionTokenUrl) {
+      return agentConfig.authToken;
+    }
+
+    const refreshBufferMs = agentConfig.sessionTokenRefreshBufferSeconds * 1000;
+    const nowMs = Date.now();
+    if (this.sessionToken) {
+      if (
+        this.sessionToken.expiresAtMs === null ||
+        nowMs < this.sessionToken.expiresAtMs - refreshBufferMs
+      ) {
+        return this.sessionToken.token;
+      }
+
+      logger.info('Session token nearing expiry, requesting refresh');
+    }
+
+    return this.fetchSessionToken();
+  }
+
+  private async fetchSessionToken(): Promise<string> {
+    try {
+      const response = await axios.post(
+        agentConfig.sessionTokenUrl,
+        {
+          nodeId: agentConfig.nodeId,
+          location: agentConfig.location,
+        },
+        {
+          timeout: agentConfig.sessionTokenRequestTimeoutMs,
+          headers: {
+            Authorization: `Bearer ${agentConfig.authToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const { token, expiresAtMs } = this.parseSessionTokenResponse(response.data);
+      this.sessionToken = {
+        token,
+        expiresAtMs,
+      };
+      return token;
+    } catch (error) {
+      this.handleSessionTokenError(error);
+      throw error;
+    }
+  }
+
+  private parseSessionTokenResponse(data: unknown): { token: string; expiresAtMs: number | null } {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Session token response is invalid');
+    }
+
+    const parsed = data as {
+      token?: unknown;
+      expiresAt?: unknown;
+      expiresInSeconds?: unknown;
+    };
+    if (typeof parsed.token !== 'string' || parsed.token.length === 0) {
+      throw new Error('Session token response missing token');
+    }
+
+    let expiresAtMs: number | null = null;
+    if (typeof parsed.expiresAt === 'number') {
+      expiresAtMs = parsed.expiresAt > 1e12 ? parsed.expiresAt : parsed.expiresAt * 1000;
+    } else if (typeof parsed.expiresInSeconds === 'number') {
+      expiresAtMs = Date.now() + parsed.expiresInSeconds * 1000;
+    }
+
+    return { token: parsed.token, expiresAtMs };
+  }
+
+  private handleSessionTokenError(error: unknown): void {
+    const status = this.extractHttpStatus(error);
+
+    if (status === 401) {
+      logger.warn('Session token request rejected: bootstrap token expired');
+      this.invalidateSessionToken();
+      this.emit('auth-expired');
+      return;
+    }
+
+    if (status === 403) {
+      logger.error('Session token request rejected: bootstrap token revoked');
+      this.invalidateSessionToken();
+      this.emit('auth-revoked');
+      return;
+    }
+
+    logger.warn('Session token service unavailable', { error });
+    this.emit('auth-unavailable');
+  }
+
+  private extractHttpStatus(error: unknown): number | null {
+    if (!error || typeof error !== 'object') {
+      return null;
+    }
+
+    const maybeResponse = (error as { response?: { status?: unknown } }).response;
+    if (!maybeResponse || typeof maybeResponse.status !== 'number') {
+      return null;
+    }
+
+    return maybeResponse.status;
+  }
+
+  private isExpiredAuthFailure(code: number, reason: string): boolean {
+    return code === 4001 || code === 4401 || /expired/i.test(reason);
+  }
+
+  private isRevokedAuthFailure(code: number, reason: string): boolean {
+    return code === 4003 || code === 4403 || /revoked|invalid auth|invalid token/i.test(reason);
+  }
+
+  private invalidateSessionToken(): void {
+    this.sessionToken = null;
   }
 }
 
