@@ -6,7 +6,18 @@ Owner: Platform Team
 ## Progress Update (2026-02-07)
 
 - [x] Phase 1 implementation completed on branch `feat/phase1-node-auth-lifecycle` (PR #66).
-- [ ] Phase 2 implementation not started yet.
+- [x] Phase 2 implementation completed on branch `feat/phase2-runtime-validation-v2` (stacked on Phase 1 branch).
+- [x] Ran `npm audit` + `npm audit fix` on branch `feat/phase2-runtime-validation-v2`; safe lockfile updates applied.
+
+## Dependency Security Follow-up (2026-02-07)
+
+- [x] Apply non-breaking dependency remediations via `npm audit fix`.
+- [ ] Resolve remaining high vulnerabilities tied to `local-devices` -> `get-ip-range` -> `ip` (no upstream fix currently available).
+- [ ] Resolve remaining high vulnerabilities tied to `sqlite3` transitive `node-gyp`/`tar` chain (current npm-proposed fix requires `npm audit fix --force` and a semver-major package change).
+- [ ] Decide remediation strategy:
+- [ ] Option A: replace/remove `local-devices` usage and migrate from `sqlite3` to a maintained storage path.
+- [ ] Option B: accept residual risk temporarily with documented compensating controls and tracked owner/date.
+- [ ] Add a CI/security gate decision for audit behavior (fail on high vs. allowlisted exceptions with expiry).
 
 ## Phase 0 - Baseline and Safety Rails
 
@@ -35,14 +46,14 @@ Definition of done:
 
 ## Phase 2 - Runtime Schema Validation
 
-- [ ] Validate all inbound commands before dispatch.
-- [ ] Validate outbound telemetry/events before send.
-- [ ] Add strict unknown-command handling.
-- [ ] Add structured error logging with correlation IDs.
+- [x] Validate all inbound commands before dispatch.
+- [x] Validate outbound telemetry/events before send.
+- [x] Add strict unknown-command handling.
+- [x] Add structured error logging with correlation IDs.
 
 Definition of done:
 
-- [ ] Invalid payload paths have deterministic test coverage.
+- [x] Invalid payload paths have deterministic test coverage.
 
 ## Phase 3 - Shared Protocol Package
 
