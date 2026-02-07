@@ -2,8 +2,13 @@ import { EventEmitter } from 'events';
 import { cncClient } from './cncClient';
 import { agentConfig, validateAgentConfig } from '../config/agent';
 import { logger } from '../utils/logger';
-import { Host } from '../types';
+import { CncCommand, Host } from '../types';
 import HostDatabase from './hostDatabase';
+
+type WakeCommand = Extract<CncCommand, { type: 'wake' }>;
+type ScanCommand = Extract<CncCommand, { type: 'scan' }>;
+type UpdateHostCommand = Extract<CncCommand, { type: 'update-host' }>;
+type DeleteHostCommand = Extract<CncCommand, { type: 'delete-host' }>;
 
 /**
  * Agent Service
@@ -51,8 +56,9 @@ export class AgentService extends EventEmitter {
     // Validate configuration
     try {
       validateAgentConfig();
-    } catch (error: any) {
-      logger.error('Invalid agent configuration', { error: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown configuration error';
+      logger.error('Invalid agent configuration', { error: message });
       throw error;
     }
 
@@ -115,19 +121,19 @@ export class AgentService extends EventEmitter {
     });
 
     // C&C command handlers
-    cncClient.on('command:wake', async (command) => {
+    cncClient.on('command:wake', async (command: WakeCommand) => {
       await this.handleWakeCommand(command);
     });
 
-    cncClient.on('command:scan', async (command) => {
+    cncClient.on('command:scan', async (command: ScanCommand) => {
       await this.handleScanCommand(command);
     });
 
-    cncClient.on('command:update-host', async (command) => {
+    cncClient.on('command:update-host', async (command: UpdateHostCommand) => {
       await this.handleUpdateHostCommand(command);
     });
 
-    cncClient.on('command:delete-host', async (command) => {
+    cncClient.on('command:delete-host', async (command: DeleteHostCommand) => {
       await this.handleDeleteHostCommand(command);
     });
   }
@@ -149,8 +155,9 @@ export class AgentService extends EventEmitter {
       for (const host of hosts) {
         this.sendHostDiscovered(host);
       }
-    } catch (error: any) {
-      logger.error('Failed to send initial host list to C&C', { error: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Failed to send initial host list to C&C', { error: message });
     }
   }
 
@@ -233,26 +240,35 @@ export class AgentService extends EventEmitter {
     logger.info('Sent scan complete to C&C', { hostCount });
   }
 
+  private sendCommandResult(
+    commandId: string,
+    payload: { success: boolean; message?: string; error?: string }
+  ): void {
+    cncClient.send({
+      type: 'command-result',
+      data: {
+        nodeId: agentConfig.nodeId,
+        commandId,
+        ...payload,
+        timestamp: new Date(),
+      },
+    });
+  }
+
   /**
    * Handle wake command from C&C
    */
-  private async handleWakeCommand(command: any): Promise<void> {
+  private async handleWakeCommand(command: WakeCommand): Promise<void> {
     const { commandId, data } = command;
-    const { hostName, mac } = data;
+    const { hostName } = data;
 
-    logger.info('Received wake command from C&C', { commandId, hostName, mac });
+    logger.info('Received wake command from C&C', { commandId, hostName });
 
     if (!this.hostDb) {
       logger.error('Host database not initialized');
-      cncClient.send({
-        type: 'command-result',
-        data: {
-          nodeId: agentConfig.nodeId,
-          commandId,
-          success: false,
-          error: 'Host database not initialized',
-          timestamp: new Date(),
-        },
+      this.sendCommandResult(commandId, {
+        success: false,
+        error: 'Host database not initialized',
       });
       return;
     }
@@ -277,31 +293,19 @@ export class AgentService extends EventEmitter {
         });
       });
 
-      // Send result back to C&C
-      cncClient.send({
-        type: 'command-result',
-        data: {
-          nodeId: agentConfig.nodeId,
-          commandId,
-          success: true,
-          message: `Wake-on-LAN packet sent to ${hostName} (${host.mac})`,
-          timestamp: new Date(),
-        },
+      this.sendCommandResult(commandId, {
+        success: true,
+        message: `Wake-on-LAN packet sent to ${hostName} (${host.mac})`,
       });
 
       logger.info('Wake command completed', { commandId, hostName });
-    } catch (error: any) {
-      logger.error('Wake command failed', { commandId, error: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Wake command failed', { commandId, error: message });
 
-      cncClient.send({
-        type: 'command-result',
-        data: {
-          nodeId: agentConfig.nodeId,
-          commandId,
-          success: false,
-          error: error.message,
-          timestamp: new Date(),
-        },
+      this.sendCommandResult(commandId, {
+        success: false,
+        error: message,
       });
     }
   }
@@ -309,7 +313,7 @@ export class AgentService extends EventEmitter {
   /**
    * Handle scan command from C&C
    */
-  private async handleScanCommand(command: any): Promise<void> {
+  private async handleScanCommand(command: ScanCommand): Promise<void> {
     const { commandId, data } = command;
     const { immediate } = data;
 
@@ -317,15 +321,9 @@ export class AgentService extends EventEmitter {
 
     if (!this.hostDb) {
       logger.error('Host database not initialized');
-      cncClient.send({
-        type: 'command-result',
-        data: {
-          nodeId: agentConfig.nodeId,
-          commandId,
-          success: false,
-          error: 'Host database not initialized',
-          timestamp: new Date(),
-        },
+      this.sendCommandResult(commandId, {
+        success: false,
+        error: 'Host database not initialized',
       });
       return;
     }
@@ -337,31 +335,19 @@ export class AgentService extends EventEmitter {
       // Get updated host list
       const hosts = await this.hostDb.getAllHosts();
 
-      // Send result back to C&C
-      cncClient.send({
-        type: 'command-result',
-        data: {
-          nodeId: agentConfig.nodeId,
-          commandId,
-          success: true,
-          message: `Scan completed, found ${hosts.length} hosts`,
-          timestamp: new Date(),
-        },
+      this.sendCommandResult(commandId, {
+        success: true,
+        message: `Scan completed, found ${hosts.length} hosts`,
       });
 
       logger.info('Scan command completed', { commandId, hostCount: hosts.length });
-    } catch (error: any) {
-      logger.error('Scan command failed', { commandId, error: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Scan command failed', { commandId, error: message });
 
-      cncClient.send({
-        type: 'command-result',
-        data: {
-          nodeId: agentConfig.nodeId,
-          commandId,
-          success: false,
-          error: error.message,
-          timestamp: new Date(),
-        },
+      this.sendCommandResult(commandId, {
+        success: false,
+        error: message,
       });
     }
   }
@@ -369,54 +355,49 @@ export class AgentService extends EventEmitter {
   /**
    * Handle update-host command from C&C
    */
-  private async handleUpdateHostCommand(command: any): Promise<void> {
+  private async handleUpdateHostCommand(command: UpdateHostCommand): Promise<void> {
     const { commandId, data } = command;
 
     logger.info('Received update-host command from C&C', { commandId, host: data.name });
 
     if (!this.hostDb) {
       logger.error('Host database not initialized');
-      cncClient.send({
-        type: 'command-result',
-        data: {
-          nodeId: agentConfig.nodeId,
-          commandId,
-          success: false,
-          error: 'Host database not initialized',
-          timestamp: new Date(),
-        },
+      this.sendCommandResult(commandId, {
+        success: false,
+        error: 'Host database not initialized',
       });
       return;
     }
 
     try {
-      // For now, just log that we received the command
-      // Host updates will be handled via the REST API
-      logger.warn('Update-host command not implemented yet', { commandId, host: data.name });
+      const existing = await this.hostDb.getHost(data.name);
+      if (!existing) {
+        throw new Error(`Host ${data.name} not found`);
+      }
 
-      // Send result back to C&C
-      cncClient.send({
-        type: 'command-result',
-        data: {
-          nodeId: agentConfig.nodeId,
-          commandId,
-          success: false,
-          message: 'Update-host command not implemented yet',
-          timestamp: new Date(),
-        },
+      await this.hostDb.updateHost(data.name, {
+        name: data.name,
+        mac: data.mac,
+        ip: data.ip,
+        status: data.status,
       });
-    } catch (error: any) {
-      logger.error('Update-host command failed', { commandId, error: error.message });
 
-      cncClient.send({
-        type: 'command-result',
-        data: {
-          nodeId: agentConfig.nodeId,
-          commandId,
-          success: false,
-          error: error.message,
-          timestamp: new Date(),
-        },
+      const updated = await this.hostDb.getHost(data.name);
+      if (updated) {
+        this.sendHostUpdated(updated);
+      }
+
+      this.sendCommandResult(commandId, {
+        success: true,
+        message: `Host ${data.name} updated successfully`,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Update-host command failed', { commandId, error: message });
+
+      this.sendCommandResult(commandId, {
+        success: false,
+        error: message,
       });
     }
   }
@@ -424,7 +405,7 @@ export class AgentService extends EventEmitter {
   /**
    * Handle delete-host command from C&C
    */
-  private async handleDeleteHostCommand(command: any): Promise<void> {
+  private async handleDeleteHostCommand(command: DeleteHostCommand): Promise<void> {
     const { commandId, data } = command;
     const { name } = data;
 
@@ -432,47 +413,28 @@ export class AgentService extends EventEmitter {
 
     if (!this.hostDb) {
       logger.error('Host database not initialized');
-      cncClient.send({
-        type: 'command-result',
-        data: {
-          nodeId: agentConfig.nodeId,
-          commandId,
-          success: false,
-          error: 'Host database not initialized',
-          timestamp: new Date(),
-        },
+      this.sendCommandResult(commandId, {
+        success: false,
+        error: 'Host database not initialized',
       });
       return;
     }
 
     try {
-      // For now, just log that we received the command
-      // Host deletion will be handled via the REST API
-      logger.warn('Delete-host command not implemented yet', { commandId, name });
+      await this.hostDb.deleteHost(name);
+      this.sendHostRemoved(name);
 
-      // Send result back to C&C
-      cncClient.send({
-        type: 'command-result',
-        data: {
-          nodeId: agentConfig.nodeId,
-          commandId,
-          success: false,
-          message: 'Delete-host command not implemented yet',
-          timestamp: new Date(),
-        },
+      this.sendCommandResult(commandId, {
+        success: true,
+        message: `Host ${name} deleted successfully`,
       });
-    } catch (error: any) {
-      logger.error('Delete-host command failed', { commandId, error: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Delete-host command failed', { commandId, error: message });
 
-      cncClient.send({
-        type: 'command-result',
-        data: {
-          nodeId: agentConfig.nodeId,
-          commandId,
-          success: false,
-          error: error.message,
-          timestamp: new Date(),
-        },
+      this.sendCommandResult(commandId, {
+        success: false,
+        error: message,
       });
     }
   }

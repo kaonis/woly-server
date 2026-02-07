@@ -114,6 +114,28 @@ describe('HostDatabase', () => {
 
       await expect(db.addHost('TestHost2', '11:22:33:44:55:66', '192.168.1.200')).rejects.toThrow();
     });
+
+    it('should update host details by name', async () => {
+      await db.addHost('ToUpdate', 'AA:BB:CC:DD:EE:10', '192.168.1.210');
+
+      await db.updateHost('ToUpdate', {
+        ip: '192.168.1.211',
+        status: 'awake',
+      });
+
+      const updated = await db.getHost('ToUpdate');
+      expect(updated).toBeDefined();
+      expect(updated?.ip).toBe('192.168.1.211');
+      expect(updated?.status).toBe('awake');
+    });
+
+    it('should delete host by name', async () => {
+      await db.addHost('ToDelete', 'AA:BB:CC:DD:EE:11', '192.168.1.212');
+      await db.deleteHost('ToDelete');
+
+      const deleted = await db.getHost('ToDelete');
+      expect(deleted).toBeUndefined();
+    });
   });
 
   describe('Status management', () => {
