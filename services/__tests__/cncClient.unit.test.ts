@@ -72,6 +72,7 @@ jest.mock('ws', () => ({
 
 import { CncClient } from '../cncClient';
 import { logger } from '../../utils/logger';
+import { PROTOCOL_VERSION } from '@woly/protocol';
 
 describe('CncClient Phase 1 auth lifecycle', () => {
   let client: CncClient;
@@ -105,6 +106,15 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     expect(mockSockets[0].url).toBe('ws://cnc.example/ws/node');
     expect(mockSockets[0].protocols).toEqual(['bearer', 'bootstrap-token']);
     expect(mockSockets[0].options?.headers?.Authorization).toBe('Bearer bootstrap-token');
+  });
+
+  it('includes protocol version metadata in registration payload', async () => {
+    await client.connect();
+    mockSockets[0].emit('open');
+
+    const registrationMessage = JSON.parse(mockSockets[0].sentMessages[0]);
+    expect(registrationMessage.type).toBe('register');
+    expect(registrationMessage.data.metadata.protocolVersion).toBe(PROTOCOL_VERSION);
   });
 
   it('optionally keeps query token fallback for transition mode', async () => {
@@ -271,6 +281,7 @@ describe('CncClient Phase 1 auth lifecycle', () => {
         metadata: {
           version: '1.0.0',
           platform: 'darwin',
+          protocolVersion: PROTOCOL_VERSION,
           networkInfo: {
             subnet: '192.168.1.0/24',
             gateway: '192.168.1.1',
@@ -292,5 +303,34 @@ describe('CncClient Phase 1 auth lifecycle', () => {
         validationIssues: expect.any(Array),
       })
     );
+  });
+
+  it('rejects unsupported protocol versions during registration handshake', async () => {
+    await client.connect();
+    mockSockets[0].emit('open');
+
+    const onProtocolUnsupported = jest.fn();
+    client.on('protocol-unsupported', onProtocolUnsupported);
+
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'registered',
+          data: {
+            nodeId: 'node-1',
+            heartbeatInterval: 30000,
+            protocolVersion: '9.9.9',
+          },
+        })
+      )
+    );
+
+    expect(onProtocolUnsupported).toHaveBeenCalledWith(
+      expect.objectContaining({
+        receivedProtocolVersion: '9.9.9',
+      })
+    );
+    expect(client.isConnected()).toBe(false);
   });
 });

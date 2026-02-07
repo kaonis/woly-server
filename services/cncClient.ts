@@ -5,9 +5,19 @@ import axios from 'axios';
 import { randomUUID } from 'crypto';
 import { ZodError } from 'zod';
 import { agentConfig } from '../config/agent';
-import { NodeMessage, CncCommand, NodeRegistration } from '../types';
+import type {
+  CncCommand,
+  NodeMessage,
+  NodeRegistration,
+  RegisteredCommandData,
+} from '@woly/protocol';
+import {
+  inboundCncCommandSchema,
+  outboundNodeMessageSchema,
+  PROTOCOL_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
+} from '@woly/protocol';
 import { logger } from '../utils/logger';
-import { inboundCncCommandSchema, outboundNodeMessageSchema } from './protocolSchemas';
 
 /**
  * C&C Client Service
@@ -149,6 +159,7 @@ export class CncClient extends EventEmitter {
       metadata: {
         version: '1.0.0', // TODO: Get from package.json
         platform: os.platform(),
+        protocolVersion: PROTOCOL_VERSION,
         networkInfo: {
           subnet: '0.0.0.0/0', // TODO: Get actual subnet
           gateway: '0.0.0.0', // TODO: Get actual gateway
@@ -229,7 +240,26 @@ export class CncClient extends EventEmitter {
   /**
    * Handle registration confirmation
    */
-  private handleRegistered(data: { nodeId: string; heartbeatInterval: number }): void {
+  private handleRegistered(data: RegisteredCommandData): void {
+    if (!data.protocolVersion) {
+      logger.warn('Registration missing protocolVersion; assuming compatibility fallback', {
+        supportedProtocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
+      });
+    }
+
+    if (data.protocolVersion && !SUPPORTED_PROTOCOL_VERSIONS.includes(data.protocolVersion)) {
+      logger.error('Protocol version mismatch during registration', {
+        receivedProtocolVersion: data.protocolVersion,
+        supportedProtocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
+      });
+      this.emit('protocol-unsupported', {
+        receivedProtocolVersion: data.protocolVersion,
+        supportedProtocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
+      });
+      this.ws?.close(4406, 'unsupported protocol version');
+      return;
+    }
+
     logger.info('Registration confirmed by C&C', data);
     this.isRegistered = true;
 
