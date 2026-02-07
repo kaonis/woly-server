@@ -10,6 +10,7 @@ describe('HostDatabase', () => {
 
   beforeEach(async () => {
     // Use in-memory database for each test
+    // better-sqlite3 creates a new isolated :memory: database for each instance
     db = new HostDatabase(':memory:');
     await db.initialize();
   });
