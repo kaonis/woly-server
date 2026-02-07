@@ -20,7 +20,7 @@ export const errorHandler = (
   err: Error | AppError,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) => {
   const statusCode = err instanceof AppError ? err.statusCode : 500;
   const errorCode = err instanceof AppError ? err.code : 'INTERNAL_ERROR';
