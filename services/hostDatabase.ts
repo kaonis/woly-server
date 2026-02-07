@@ -1,5 +1,7 @@
 import Database from 'better-sqlite3';
 import { EventEmitter } from 'events';
+import { mkdirSync } from 'fs';
+import { dirname } from 'path';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import * as networkDiscovery from './networkDiscovery';
@@ -38,6 +40,13 @@ class HostDatabase extends EventEmitter {
    */
   private connectWithRetry(dbPath: string, attempt: number = 1): void {
     try {
+      // Ensure parent directory exists
+      const dir = dirname(dbPath);
+      const created = mkdirSync(dir, { recursive: true });
+      if (created) {
+        logger.info(`Created database directory: ${dir}`);
+      }
+
       this.db = new Database(dbPath);
       logger.info('Connected to the WoLy database.');
       this.connectionRetries = 0;
