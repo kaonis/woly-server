@@ -28,6 +28,10 @@
     "test:preflight": "node scripts/test-preflight.js"
   },
   "private": true,
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "dependencies": {
     "axios": "^1.13.2",
     "cors": "^2.8.5",
