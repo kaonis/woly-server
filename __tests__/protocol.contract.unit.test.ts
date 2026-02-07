@@ -2,7 +2,7 @@ import {
   inboundCncCommandSchema,
   outboundNodeMessageSchema,
   PROTOCOL_VERSION,
-} from '@woly/protocol';
+} from '@kaonis/protocol';
 
 describe('Protocol contract', () => {
   it('encodes and decodes valid outbound messages with shared schema', () => {

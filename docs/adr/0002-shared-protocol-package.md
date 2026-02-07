@@ -9,7 +9,7 @@ Node and C&C currently maintain duplicated protocol declarations. This has alrea
 
 ## Decision
 
-Adopt a shared package (`@woly/protocol`) for protocol types and runtime schemas. Remove duplicate local protocol declarations after migration.
+Adopt a shared package (`@kaonis/protocol`) for protocol types and runtime schemas. Remove duplicate local protocol declarations after migration.
 
 ## Consequences
 
