@@ -1,14 +1,24 @@
 import HostDatabase from '../hostDatabase';
 import * as networkDiscovery from '../networkDiscovery';
 import { DiscoveredHost } from '../../types';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { logger } from '../../utils/logger';
 
 // Mock network discovery module
 jest.mock('../networkDiscovery');
+
+// Mock logger
+jest.mock('../../utils/logger');
 
 describe('HostDatabase', () => {
   let db: HostDatabase;
 
   beforeEach(async () => {
+    // Clear all mocks before each test
+    jest.clearAllMocks();
+
     // Use in-memory database for each test
     // better-sqlite3 creates a new isolated :memory: database for each instance
     db = new HostDatabase(':memory:');
@@ -24,6 +34,53 @@ describe('HostDatabase', () => {
       const hosts = await db.getAllHosts();
       expect(hosts).toBeDefined();
       expect(Array.isArray(hosts)).toBe(true);
+    });
+
+    it('should create database directory if it does not exist', async () => {
+      // Create a unique temp path that doesn't exist yet
+      const tempDir = path.join(os.tmpdir(), `woly-test-${Date.now()}-${Math.random()}`);
+      const dbPath = path.join(tempDir, 'test.db');
+
+      // Ensure directory doesn't exist
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true });
+      }
+
+      // Create database instance - should auto-create directory
+      const testDb = new HostDatabase(dbPath);
+
+      // Verify directory was created
+      expect(fs.existsSync(tempDir)).toBe(true);
+      expect(logger.info).toHaveBeenCalledWith(`Created database directory: ${tempDir}`);
+
+      // Clean up
+      await testDb.close();
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true });
+      }
+    });
+
+    it('should not log directory creation if it already exists', async () => {
+      // Use a temp directory and pre-create it
+      const existingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'woly-test-'));
+      const dbPath = path.join(existingDir, `test-${Date.now()}.db`);
+
+      // Clear logger mock calls
+      jest.clearAllMocks();
+
+      // Create database instance - directory already exists
+      const testDb = new HostDatabase(dbPath);
+
+      // Verify directory creation was not logged (directory existed)
+      expect(logger.info).not.toHaveBeenCalledWith(
+        expect.stringContaining('Created database directory')
+      );
+
+      // Clean up
+      await testDb.close();
+      if (fs.existsSync(existingDir)) {
+        fs.rmSync(existingDir, { recursive: true });
+      }
     });
 
     it('should seed initial hosts when table is empty', async () => {
