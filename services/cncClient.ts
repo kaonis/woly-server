@@ -2,9 +2,12 @@ import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 import os from 'os';
 import axios from 'axios';
+import { randomUUID } from 'crypto';
+import { ZodError } from 'zod';
 import { agentConfig } from '../config/agent';
 import { NodeMessage, CncCommand, NodeRegistration } from '../types';
 import { logger } from '../utils/logger';
+import { inboundCncCommandSchema, outboundNodeMessageSchema } from './protocolSchemas';
 
 /**
  * C&C Client Service
@@ -95,6 +98,18 @@ export class CncClient extends EventEmitter {
     }
 
     try {
+      const validation = outboundNodeMessageSchema.safeParse(message);
+      if (!validation.success) {
+        this.logProtocolValidationError({
+          direction: 'outbound',
+          correlationId: this.extractCorrelationId(message),
+          messageType: message.type,
+          rawData: message,
+          error: validation.error,
+        });
+        return;
+      }
+
       this.ws.send(JSON.stringify(message));
       logger.debug('Sent message to C&C', { type: message.type });
     } catch (error) {
@@ -149,8 +164,35 @@ export class CncClient extends EventEmitter {
    * Handle incoming messages from C&C
    */
   private handleMessage(data: WebSocket.Data): void {
+    let parsedPayload: unknown;
+
     try {
-      const message = JSON.parse(data.toString()) as CncCommand;
+      parsedPayload = JSON.parse(data.toString());
+    } catch (error) {
+      this.logProtocolValidationError({
+        direction: 'inbound',
+        correlationId: randomUUID(),
+        messageType: 'malformed-json',
+        rawData: data.toString(),
+        error,
+      });
+      return;
+    }
+
+    try {
+      const parsedCommand = inboundCncCommandSchema.safeParse(parsedPayload);
+      if (!parsedCommand.success) {
+        this.logProtocolValidationError({
+          direction: 'inbound',
+          correlationId: this.extractCorrelationId(parsedPayload),
+          messageType: this.extractMessageType(parsedPayload),
+          rawData: parsedPayload,
+          error: parsedCommand.error,
+        });
+        return;
+      }
+
+      const message = parsedCommand.data as CncCommand;
       logger.debug('Received message from C&C', { type: message.type });
 
       switch (message.type) {
@@ -172,11 +214,15 @@ export class CncClient extends EventEmitter {
         case 'ping':
           this.handlePing(message.data);
           break;
-        default:
-          logger.warn('Unknown message type from C&C', { message });
       }
     } catch (error) {
-      logger.error('Failed to parse message from C&C', { error, data: data.toString() });
+      this.logProtocolValidationError({
+        direction: 'inbound',
+        correlationId: this.extractCorrelationId(parsedPayload),
+        messageType: this.extractMessageType(parsedPayload),
+        rawData: parsedPayload,
+        error,
+      });
     }
   }
 
@@ -423,6 +469,111 @@ export class CncClient extends EventEmitter {
 
   private invalidateSessionToken(): void {
     this.sessionToken = null;
+  }
+
+  private extractMessageType(payload: unknown): string {
+    if (!payload || typeof payload !== 'object') {
+      return 'unknown';
+    }
+
+    const maybeType = (payload as { type?: unknown }).type;
+    return typeof maybeType === 'string' ? maybeType : 'unknown';
+  }
+
+  private extractCorrelationId(payload: unknown): string {
+    if (!payload || typeof payload !== 'object') {
+      return randomUUID();
+    }
+
+    const topLevelCommandId = (payload as { commandId?: unknown }).commandId;
+    if (typeof topLevelCommandId === 'string' && topLevelCommandId.length > 0) {
+      return topLevelCommandId;
+    }
+
+    const data = (payload as { data?: unknown }).data;
+    if (data && typeof data === 'object') {
+      const nestedCommandId = (data as { commandId?: unknown }).commandId;
+      if (typeof nestedCommandId === 'string' && nestedCommandId.length > 0) {
+        return nestedCommandId;
+      }
+    }
+
+    return randomUUID();
+  }
+
+  private logProtocolValidationError(params: {
+    direction: 'inbound' | 'outbound';
+    correlationId: string;
+    messageType: string;
+    rawData: unknown;
+    error: unknown;
+  }): void {
+    const { direction, correlationId, messageType, rawData, error } = params;
+    const validationIssues =
+      error instanceof ZodError
+        ? error.issues.map((issue) => ({
+            path: issue.path.join('.'),
+            code: issue.code,
+            message: issue.message,
+          }))
+        : undefined;
+
+    logger.error('Protocol validation failed', {
+      direction,
+      correlationId,
+      messageType,
+      error: error instanceof Error ? error.message : String(error),
+      validationIssues,
+      rawData: this.sanitizeProtocolLogData(rawData),
+    });
+  }
+
+  private sanitizeProtocolLogData(value: unknown, depth = 0): unknown {
+    const maxDepth = 5;
+    const maxArrayItems = 50;
+    const maxObjectKeys = 50;
+    const maxStringLength = 2000;
+
+    if (value === null || value === undefined) {
+      return value;
+    }
+
+    if (depth > maxDepth) {
+      return '[truncated-depth]';
+    }
+
+    if (typeof value === 'string') {
+      return value.length > maxStringLength
+        ? `${value.slice(0, maxStringLength)}...[truncated]`
+        : value;
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value
+        .slice(0, maxArrayItems)
+        .map((item) => this.sanitizeProtocolLogData(item, depth + 1));
+    }
+
+    if (typeof value === 'object') {
+      const redacted: Record<string, unknown> = {};
+      const entries = Object.entries(value as Record<string, unknown>).slice(0, maxObjectKeys);
+      for (const [key, nestedValue] of entries) {
+        if (/(token|authorization|password|secret)/i.test(key)) {
+          redacted[key] = '[REDACTED]';
+          continue;
+        }
+
+        redacted[key] = this.sanitizeProtocolLogData(nestedValue, depth + 1);
+      }
+
+      return redacted;
+    }
+
+    return String(value);
   }
 }
 
