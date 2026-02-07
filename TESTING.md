@@ -61,6 +61,12 @@ Integration tests should:
 ## Running Tests
 
 ```bash
+# Ensure the expected Node runtime
+nvm use
+
+# Optional: reinstall native deps after Node upgrade
+npm rebuild
+
 # Run all tests
 npm test
 
@@ -79,6 +85,12 @@ npm run test:integration
 # Run in CI mode (used by GitHub Actions)
 npm run test:ci
 ```
+
+## Runtime Prerequisites
+
+- Tests are pinned to Node.js 20.x for parity with CI (`.nvmrc`).
+- Test preflight verifies that local socket bind is allowed because Supertest-based suites require it.
+- If preflight fails on socket bind, run tests outside restricted/sandboxed execution environments.
 
 ## Writing Tests
 

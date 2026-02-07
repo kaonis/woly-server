@@ -4,12 +4,12 @@
   "description": "WakeOnLan Application Server",
   "main": "dist/app.js",
   "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --maxWorkers=2",
-    "test:unit": "jest --testPathPattern='.unit.test.ts'",
-    "test:integration": "jest --testPathPattern='.integration.test.ts'",
+    "test": "npm run test:preflight && jest",
+    "test:watch": "npm run test:preflight && jest --watch",
+    "test:coverage": "npm run test:preflight && jest --coverage",
+    "test:ci": "npm run test:preflight && jest --ci --coverage --maxWorkers=2",
+    "test:unit": "npm run test:preflight && jest --testPathPattern='.unit.test.ts'",
+    "test:integration": "npm run test:preflight && jest --testPathPattern='.integration.test.ts'",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "start": "ts-node app.ts",
@@ -25,7 +25,7 @@
     "pm2:logs": "pm2 logs woly-node",
     "pm2:monit": "pm2 monit",
     "pm2:delete": "pm2 delete woly-node",
-    "typecheck": "tsc --noEmit"
+    "test:preflight": "node scripts/test-preflight.js"
   },
   "private": true,
   "dependencies": {
