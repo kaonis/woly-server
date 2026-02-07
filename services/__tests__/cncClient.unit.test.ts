@@ -233,6 +233,63 @@ describe('CncClient Phase 1 auth lifecycle', () => {
       expect.objectContaining({
         direction: 'outbound',
         messageType: 'host-discovered',
+        validationIssues: expect.any(Array),
+      })
+    );
+  });
+
+  it('allows outbound host payloads with pingResponsive set to null', async () => {
+    await client.connect();
+
+    client.send({
+      type: 'host-updated',
+      data: {
+        nodeId: 'node-1',
+        name: 'Host-01',
+        mac: 'AA:BB:CC:DD:EE:FF',
+        ip: '192.168.1.50',
+        status: 'awake',
+        lastSeen: null,
+        discovered: 1,
+        pingResponsive: (null as unknown) as number,
+      },
+    });
+
+    expect(mockSockets[0].sentMessages).toHaveLength(1);
+  });
+
+  it('redacts auth tokens in validation error logs', async () => {
+    await client.connect();
+
+    client.send({
+      type: 'register',
+      data: {
+        nodeId: 'node-1',
+        name: '',
+        location: 'lab',
+        authToken: 'secret-token',
+        metadata: {
+          version: '1.0.0',
+          platform: 'darwin',
+          networkInfo: {
+            subnet: '192.168.1.0/24',
+            gateway: '192.168.1.1',
+          },
+        },
+      },
+    });
+
+    expect(logger.error).toHaveBeenCalledWith(
+      'Protocol validation failed',
+      expect.objectContaining({
+        direction: 'outbound',
+        messageType: 'register',
+        rawData: expect.objectContaining({
+          data: expect.objectContaining({
+            authToken: '[REDACTED]',
+          }),
+        }),
+        validationIssues: expect.any(Array),
       })
     );
   });
