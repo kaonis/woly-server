@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import os from 'os';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
+import { ZodError } from 'zod';
 import { agentConfig } from '../config/agent';
 import { NodeMessage, CncCommand, NodeRegistration } from '../types';
 import { logger } from '../utils/logger';
@@ -508,14 +509,71 @@ export class CncClient extends EventEmitter {
     error: unknown;
   }): void {
     const { direction, correlationId, messageType, rawData, error } = params;
+    const validationIssues =
+      error instanceof ZodError
+        ? error.issues.map((issue) => ({
+            path: issue.path.join('.'),
+            code: issue.code,
+            message: issue.message,
+          }))
+        : undefined;
 
     logger.error('Protocol validation failed', {
       direction,
       correlationId,
       messageType,
       error: error instanceof Error ? error.message : String(error),
-      rawData,
+      validationIssues,
+      rawData: this.sanitizeProtocolLogData(rawData),
     });
+  }
+
+  private sanitizeProtocolLogData(value: unknown, depth = 0): unknown {
+    const maxDepth = 5;
+    const maxArrayItems = 50;
+    const maxObjectKeys = 50;
+    const maxStringLength = 2000;
+
+    if (value === null || value === undefined) {
+      return value;
+    }
+
+    if (depth > maxDepth) {
+      return '[truncated-depth]';
+    }
+
+    if (typeof value === 'string') {
+      return value.length > maxStringLength
+        ? `${value.slice(0, maxStringLength)}...[truncated]`
+        : value;
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value
+        .slice(0, maxArrayItems)
+        .map((item) => this.sanitizeProtocolLogData(item, depth + 1));
+    }
+
+    if (typeof value === 'object') {
+      const redacted: Record<string, unknown> = {};
+      const entries = Object.entries(value as Record<string, unknown>).slice(0, maxObjectKeys);
+      for (const [key, nestedValue] of entries) {
+        if (/(token|authorization|password|secret)/i.test(key)) {
+          redacted[key] = '[REDACTED]';
+          continue;
+        }
+
+        redacted[key] = this.sanitizeProtocolLogData(nestedValue, depth + 1);
+      }
+
+      return redacted;
+    }
+
+    return String(value);
   }
 }
 

@@ -9,7 +9,7 @@ const hostPayloadSchema = z.object({
   status: hostStatusSchema,
   lastSeen: z.string().nullable(),
   discovered: z.number().int(),
-  pingResponsive: z.number().int().optional(),
+  pingResponsive: z.number().int().nullable().optional(),
 });
 
 const nodeMetadataSchema = z.object({
