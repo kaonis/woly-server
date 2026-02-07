@@ -85,7 +85,7 @@
     "lint-staged": "^15.2.11",
     "nodemon": "^3.1.7",
     "prettier": "2.2.1",
-    "supertest": "^6.3.4",
+    "supertest": "^7.0.0",
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
