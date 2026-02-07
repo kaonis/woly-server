@@ -3,10 +3,8 @@
 const net = require('net');
 
 const major = Number(process.versions.node.split('.')[0]);
-if (major !== 20) {
-  console.error(
-    `[preflight] Node.js ${process.version} detected. Use Node.js 20.x for consistent local and CI test results.`
-  );
+if (major < 20) {
+  console.error(`[preflight] Node.js ${process.version} detected. Node.js v20+ is required.`);
   process.exit(1);
 }
 
