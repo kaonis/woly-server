@@ -15,9 +15,9 @@ Running `npm audit` reports:
 
 ✅ **Fixed: tar Package Vulnerabilities (via sqlite3 → better-sqlite3 Migration)**
 
-- **CVE-2025-XXXXX**: node-tar Arbitrary File Overwrite (≤7.5.2)
-- **CVE-2025-XXXXX**: node-tar Race Condition on macOS APFS (≤7.5.3)
-- **CVE-2025-XXXXX**: node-tar Hardlink Path Traversal (<7.5.7)
+- **node-tar: Arbitrary File Overwrite and Symlink Poisoning** in versions ≤7.5.2 ([GHSA-8qq5-rm4j-mr97](https://github.com/advisories/GHSA-8qq5-rm4j-mr97))
+- **node-tar: Race Condition via Unicode Ligature Collisions on macOS APFS** in versions ≤7.5.3 ([GHSA-r6q2-hw4h-h46w](https://github.com/advisories/GHSA-r6q2-hw4h-h46w))
+- **node-tar: Hardlink Path Traversal** in versions <7.5.7 ([GHSA-34x7-hfp2-rc4v](https://github.com/advisories/GHSA-34x7-hfp2-rc4v))
 - **Resolution**: Migrated from `sqlite3@5.1.7` to `better-sqlite3@12.6.2`
 - **Impact**: Eliminated 5 high severity vulnerabilities by removing the `sqlite3` → `node-gyp` → `tar` dependency chain entirely
 - **Additional Benefits**:
