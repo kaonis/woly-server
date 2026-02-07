@@ -53,6 +53,8 @@ export type NodeMessage =
       };
     };
 
+export type CommandResultPayload = Extract<NodeMessage, { type: 'command-result' }>['data'];
+
 export interface RegisteredCommandData {
   nodeId: string;
   heartbeatInterval: number;
