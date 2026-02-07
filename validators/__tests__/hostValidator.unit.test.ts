@@ -1,8 +1,8 @@
 import {
+  deleteHostSchema,
+  hostNameParamSchema,
   macAddressSchema,
   updateHostSchema,
-  wakeHostSchema,
-  deleteHostSchema,
 } from '../hostValidator';
 
 describe('hostValidator schemas', () => {
@@ -143,39 +143,22 @@ describe('hostValidator schemas', () => {
     });
   });
 
-  describe('wakeHostSchema', () => {
-    it('should validate MAC address only', () => {
-      const result = wakeHostSchema.validate({ macAddress: 'AA:BB:CC:DD:EE:FF' });
+  describe('hostNameParamSchema', () => {
+    it('should validate host name parameter', () => {
+      const result = hostNameParamSchema.validate({ name: 'PHANTOM-MBP' });
       expect(result.error).toBeUndefined();
     });
 
-    it('should validate MAC address with optional IPv4', () => {
-      const result = wakeHostSchema.validate({
-        macAddress: 'AA:BB:CC:DD:EE:FF',
-        ip: '192.168.1.100',
-      });
+    it('should trim host name parameter', () => {
+      const result = hostNameParamSchema.validate({ name: '  PHANTOM-MBP  ' });
       expect(result.error).toBeUndefined();
+      expect(result.value.name).toBe('PHANTOM-MBP');
     });
 
-    it('should reject IPv6 address', () => {
-      const result = wakeHostSchema.validate({
-        macAddress: 'AA:BB:CC:DD:EE:FF',
-        ip: '2001:0db8:85a3:0000:0000:8a2e:0370:7334',
-      });
+    it('should reject missing host name', () => {
+      const result = hostNameParamSchema.validate({});
       expect(result.error).toBeDefined();
-      expect(result.error?.message).toContain('valid ip address');
-    });
-
-    it('should accept missing IP', () => {
-      const result = wakeHostSchema.validate({ macAddress: 'AA:BB:CC:DD:EE:FF' });
-      expect(result.error).toBeUndefined();
-      expect(result.value.ip).toBeUndefined();
-    });
-
-    it('should reject missing MAC address', () => {
-      const result = wakeHostSchema.validate({ ip: '192.168.1.100' });
-      expect(result.error).toBeDefined();
-      expect(result.error?.message).toContain('required');
+      expect(result.error?.message).toContain('Hostname is required');
     });
   });
 

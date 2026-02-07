@@ -131,8 +131,9 @@ async function scanNetworkARP(): Promise<DiscoveredHost[]> {
     const hostnamesFound = hosts.filter((h) => h.hostname).length;
     logger.info(`Network scan found ${hosts.length} devices (${hostnamesFound} with hostnames)`);
     return hosts;
-  } catch (error: any) {
-    logger.error('Network scan error:', { error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Network scan error:', { error: message });
     return [];
   }
 }
@@ -146,8 +147,9 @@ async function getMACAddress(ip: string): Promise<string | null> {
     const devices = await localDevices();
     const device = devices.find((d) => d.ip === ip);
     return device ? formatMAC(device.mac) : null;
-  } catch (error: any) {
-    logger.error(`Failed to get MAC for IP ${ip}:`, { error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error(`Failed to get MAC for IP ${ip}:`, { error: message });
     return null;
   }
 }
@@ -177,9 +179,10 @@ async function isHostAlive(ip: string): Promise<boolean> {
     }
 
     return result.alive;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     // Downgrade to debug level - ping failures are common and not always errors
-    logger.debug(`Ping error for ${ip}:`, { error: error.message });
+    logger.debug(`Ping error for ${ip}:`, { error: message });
     return false;
   }
 }

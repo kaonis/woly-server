@@ -11,6 +11,7 @@
     "test:unit": "jest --testPathPattern='.unit.test.ts'",
     "test:integration": "jest --testPathPattern='.integration.test.ts'",
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "start": "ts-node app.ts",
     "dev": "nodemon --exec ts-node app.ts",
     "prod": "npm run build && node dist/app.js",

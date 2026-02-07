@@ -104,6 +104,16 @@ export type CncCommand =
   | { type: 'registered'; data: { nodeId: string; heartbeatInterval: number } }
   | { type: 'wake'; commandId: string; data: { hostName: string; mac: string } }
   | { type: 'scan'; commandId: string; data: { immediate: boolean } }
-  | { type: 'update-host'; commandId: string; data: Host }
+  | {
+      type: 'update-host';
+      commandId: string;
+      data: {
+        currentName?: string;
+        name: string;
+        mac?: string;
+        ip?: string;
+        status?: Host['status'];
+      };
+    }
   | { type: 'delete-host'; commandId: string; data: { name: string } }
   | { type: 'ping'; data: { timestamp: Date } };

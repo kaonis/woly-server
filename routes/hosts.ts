@@ -2,7 +2,11 @@ import express from 'express';
 import * as hostsController from '../controllers/hosts';
 import { apiLimiter, scanLimiter, wakeLimiter } from '../middleware/rateLimiter';
 import { validateRequest } from '../middleware/validateRequest';
-import { macAddressSchema, updateHostSchema, wakeHostSchema } from '../validators/hostValidator';
+import {
+  hostNameParamSchema,
+  macAddressSchema,
+  updateHostSchema,
+} from '../validators/hostValidator';
 
 const router = express.Router();
 
@@ -29,6 +33,11 @@ router.get(
 router.get('/:name', hostsController.getHost);
 
 // Wake up a specific host (with validation and rate limiting)
-router.post('/wakeup/:name', wakeLimiter, hostsController.wakeUpHost);
+router.post(
+  '/wakeup/:name',
+  wakeLimiter,
+  validateRequest(hostNameParamSchema, 'params'),
+  hostsController.wakeUpHost
+);
 
 export default router;
