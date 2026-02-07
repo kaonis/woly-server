@@ -75,6 +75,7 @@ Work:
 2. Remove local fallback type declarations once adoption is complete.
 3. Add contract tests that assert encode/decode compatibility with C&C.
 4. Introduce explicit protocol version negotiation at connection start.
+5. Publish `@woly/protocol` to shared registry and migrate both repos from local `file:` dependency to pinned semver dependency.
 
 Acceptance:
 

@@ -61,6 +61,7 @@ Definition of done:
 - [x] Replace local protocol types with `@woly/protocol`.
 - [x] Remove duplicate protocol declarations.
 - [x] Add protocol version negotiation at connect.
+- [ ] Publish `@woly/protocol` to shared registry and switch both repos from `file:` dependency to semver package dependency.
 - [ ] Add cross-repo contract tests.
 
 Definition of done:
