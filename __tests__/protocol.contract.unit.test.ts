@@ -54,4 +54,13 @@ describe('Protocol contract', () => {
 
     expect(inboundCncCommandSchema.safeParse(invalidInbound).success).toBe(false);
   });
+
+  it('accepts protocol error message payloads', () => {
+    const protocolErrorMessage = {
+      type: 'error' as const,
+      message: 'Invalid protocol payload',
+    };
+
+    expect(inboundCncCommandSchema.safeParse(protocolErrorMessage).success).toBe(true);
+  });
 });

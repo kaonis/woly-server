@@ -225,6 +225,9 @@ export class CncClient extends EventEmitter {
         case 'ping':
           this.handlePing(message.data);
           break;
+        case 'error':
+          this.handleProtocolError(message.message);
+          break;
       }
     } catch (error) {
       this.logProtocolValidationError({
@@ -276,6 +279,11 @@ export class CncClient extends EventEmitter {
   private handlePing(data: { timestamp: Date }): void {
     logger.debug('Received ping from C&C', data);
     // Ping doesn't require a response, heartbeat serves that purpose
+  }
+
+  private handleProtocolError(message: string): void {
+    logger.warn('Received protocol error from C&C', { message });
+    this.emit('protocol-error', { message });
   }
 
   /**

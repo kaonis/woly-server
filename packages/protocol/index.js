@@ -137,6 +137,10 @@ const inboundCncCommandSchema = z.discriminatedUnion('type', [
       timestamp: z.coerce.date(),
     }),
   }),
+  z.object({
+    type: z.literal('error'),
+    message: z.string().min(1),
+  }),
 ]);
 
 module.exports = {
