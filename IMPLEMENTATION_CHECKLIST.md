@@ -3,6 +3,11 @@
 Date: 2026-02-07
 Owner: Platform Team
 
+## Progress Update (2026-02-07)
+
+- [x] Phase 1 implementation completed on branch `feat/phase1-node-auth-lifecycle` (PR #66).
+- [ ] Phase 2 implementation not started yet.
+
 ## Phase 0 - Baseline and Safety Rails
 
 - [x] Create and approve ADRs for token transport, shared protocol package, and command reliability.
