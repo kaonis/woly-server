@@ -1,7 +1,7 @@
 import * as networkDiscovery from '../networkDiscovery';
 import localDevices from 'local-devices';
 import ping from 'ping';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { promises as dns } from 'dns';
 import os from 'os';
 
@@ -84,7 +84,7 @@ describe('networkDiscovery', () => {
         new Error('DNS lookup failed')
       );
       (os.platform as jest.MockedFunction<typeof os.platform>).mockReturnValue('win32');
-      (execSync as jest.MockedFunction<typeof execSync>).mockReturnValue(
+      (execFileSync as jest.MockedFunction<typeof execFileSync>).mockReturnValue(
         '   TESTPC       <00>  UNIQUE\n' as any
       );
 
@@ -102,8 +102,8 @@ describe('networkDiscovery', () => {
       (dns.reverse as jest.MockedFunction<typeof dns.reverse>).mockRejectedValue(
         new Error('DNS lookup failed')
       );
-      // Also mock execSync to not provide NetBIOS name
-      (execSync as jest.MockedFunction<typeof execSync>).mockImplementation(() => {
+      // Also mock execFileSync to not provide NetBIOS name
+      (execFileSync as jest.MockedFunction<typeof execFileSync>).mockImplementation(() => {
         throw new Error('NetBIOS lookup failed');
       });
 

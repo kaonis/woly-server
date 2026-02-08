@@ -1,6 +1,6 @@
 import localDevices from 'local-devices';
 import { promises as dns } from 'dns';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import os from 'os';
 import ping from 'ping';
 import { config } from '../config';
@@ -43,7 +43,7 @@ function getHostnameViaNBT(ip: string): string | null {
 
     if (platform === 'win32') {
       // Windows: Use nbtstat to get NetBIOS name
-      const output = execSync(`nbtstat -A ${ip}`, {
+      const output = execFileSync('nbtstat', ['-A', ip], {
         encoding: 'utf-8',
         timeout: 2000,
         windowsHide: true,
@@ -60,7 +60,7 @@ function getHostnameViaNBT(ip: string): string | null {
     } else if (platform === 'linux') {
       // Linux: Try nmblookup if available
       try {
-        const output = execSync(`nmblookup -A ${ip}`, {
+        const output = execFileSync('nmblookup', ['-A', ip], {
           encoding: 'utf-8',
           timeout: 2000,
         });
