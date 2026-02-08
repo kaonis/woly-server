@@ -1,0 +1,28 @@
+{
+  "name": "@kaonis/woly-protocol",
+  "version": "1.0.1",
+  "description": "Shared WoLy node <-> C&C protocol types and runtime schemas",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  }
+}

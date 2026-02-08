@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# TypeScript build output
+dist/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Environment variables
+.env
+
+# Logs
+logs/*.log
+
+# SQLite DBs
+*.db
+
+# OS
+.DS_Store
+
+# IDE
+.idea
+*.iml
+
+# Turbo
+.turbo/
+
+# Debug
+npm-debug.log
+yarn-error.log
