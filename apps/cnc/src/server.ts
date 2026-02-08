@@ -41,7 +41,13 @@ class Server {
     this.app.use(helmet());
     this.app.use(cors({
       origin: config.nodeEnv === 'production'
-        ? (process.env.CORS_ORIGINS || '').split(',').filter(Boolean)
+        ? (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+            // Allow requests with no origin (mobile apps, curl, server-to-server)
+            if (!origin) return callback(null, true);
+            const allowed = (process.env.CORS_ORIGINS || '').split(',').filter(Boolean);
+            if (allowed.includes(origin)) return callback(null, true);
+            callback(new Error(`Origin ${origin} not allowed by CORS`));
+          }
         : '*',
       credentials: true,
     }));
