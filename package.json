@@ -18,8 +18,8 @@
     "test:ci": "turbo run test:ci",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "dev:node-agent": "npm run dev -w apps/node-agent",
-    "dev:cnc": "npm run dev -w apps/cnc",
+    "dev:node-agent": "turbo run dev --filter=@woly-server/node-agent",
+    "dev:cnc": "turbo run dev --filter=@woly-server/cnc",
     "format": "prettier --write ."
   },
   "devDependencies": {
