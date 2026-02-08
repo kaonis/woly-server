@@ -14,7 +14,7 @@ export function createWebSocketServer(
   httpServer: HTTPServer,
   nodeManager: NodeManager
 ): WebSocket.Server {
-  const wss = new WebSocket.Server({ noServer: true });
+  const wss = new WebSocket.Server({ noServer: true, maxPayload: 256 * 1024 });
 
   // Handle upgrade requests
   httpServer.on('upgrade', (request, socket, head) => {

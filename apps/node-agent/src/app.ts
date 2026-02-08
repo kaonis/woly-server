@@ -60,7 +60,7 @@ app.use(
 );
 
 // Body parsing middleware
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 
 // Initialize database
 const hostDb = new HostDatabase(config.database.path);

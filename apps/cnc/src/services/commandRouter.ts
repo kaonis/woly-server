@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { randomUUID } from 'crypto';
 import { CncCommand, CommandResult, WakeupResponse } from '../types';
 import { NodeManager } from './nodeManager';
 import { HostAggregator } from './hostAggregator';
@@ -404,7 +405,7 @@ export class CommandRouter extends EventEmitter {
    * @returns Command ID
    */
   private generateCommandId(): string {
-    return `cmd_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    return `cmd_${randomUUID()}`;
   }
 
   /**
