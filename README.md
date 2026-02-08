@@ -6,18 +6,18 @@ Distributed Wake-on-LAN management system. A monorepo containing two backend ser
 
 ```
 ┌──────────┐       REST/JWT        ┌───────────┐      WebSocket       ┌──────────────┐
-│ Mobile   │ ──────────────────▶  │    C&C    │ ◀──────────────────▶ │  Node Agent  │
-│ App      │                      │  Backend  │                      │  (per LAN)   │
-│ (Expo)   │                      │  :8080    │                      │  :8082       │
-└──────────┘                      └───────────┘                      └──────┬───────┘
-                                        │                                   │
-                                   PostgreSQL                          ARP / WoL
-                                   or SQLite                          Magic Packets
-                                                                          │
-                                                                    ┌─────▼─────┐
-                                                                    │ Local LAN │
-                                                                    │  Devices  │
-                                                                    └───────────┘
+│ Mobile   │ ────────────────────▶ │    C&C    │ ◀──────────────────▶ │  Node Agent  │
+│ App      │                       │  Backend  │                      │  (per LAN)   │
+│ (Expo)   │                       │  :8080    │                      │  :8082       │
+└──────────┘                       └───────────┘                      └──────┬───────┘
+                                         │                                   │
+                                    PostgreSQL                           ARP / WoL
+                                     or SQLite                         Magic Packets
+                                                                             │
+                                                                       ┌─────▼─────┐
+                                                                       │ Local LAN │
+                                                                       │  Devices  │
+                                                                       └───────────┘
 ```
 
 **Node Agent** discovers hosts on its local network via ARP scanning and can wake them with Wake-on-LAN magic packets. It operates standalone or connects to the C&C backend as an agent.

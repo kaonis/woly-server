@@ -33,7 +33,7 @@ The WoLy server codebase follows many security best practices: parameterized SQL
 
 **Fix applied:** Removed the database file from tracking, and strengthened `.gitignore` with an explicit `**/db/*.db` pattern.
 
-**Remaining action:** After making the repo public, consider using `git filter-repo` or BFG Repo-Cleaner to purge the file from git history entirely. Otherwise the data remains accessible via `git log`.
+**Remaining action:** ~~After making the repo public, consider using `git filter-repo` or BFG Repo-Cleaner to purge the file from git history entirely. Otherwise the data remains accessible via `git log`.~~ **Done.** History purged with `git filter-repo` on 2026-02-08.
 
 ### 2. Command Injection in Network Discovery
 
@@ -237,7 +237,7 @@ Before making the repository public:
 - [x] Add request body size limits
 - [x] Add WebSocket message size limits
 - [x] Use cryptographically secure command IDs
-- [ ] Purge database file from git history (`git filter-repo` or BFG Repo-Cleaner)
+- [x] Purge database file from git history (`git filter-repo` — completed 2026-02-08)
 - [ ] Run `npm audit fix` for dependency vulnerabilities
 - [ ] Consider adding API authentication to node-agent
 - [ ] Consider adding rate limiting to CnC auth endpoint
