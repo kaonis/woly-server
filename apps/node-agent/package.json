@@ -1,7 +1,7 @@
 {
-  "name": "woly-backend",
+  "name": "@woly-server/node-agent",
   "version": "0.0.1",
-  "description": "WakeOnLan Application Server",
+  "description": "WakeOnLan Application Server — per-LAN node agent",
   "main": "dist/app.js",
   "scripts": {
     "test": "npm run test:preflight && jest",
@@ -12,15 +12,12 @@
     "test:integration": "npm run test:preflight && jest --testPathPattern='.integration.test.ts'",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "start": "ts-node app.ts",
-    "dev": "nodemon --exec ts-node app.ts",
+    "start": "ts-node src/app.ts",
+    "dev": "nodemon --watch src --exec ts-node src/app.ts",
     "prod": "npm run build && npm run pm2:start",
-    "prepare": "husky",
-    "lint": "eslint .",
-    "lint-fix": "eslint --fix .",
-    "format": "prettier --write .",
-    "protocol:pack": "npm pack ./packages/protocol",
-    "protocol:publish": "npm publish ./packages/protocol --access public",
+    "lint": "eslint src",
+    "lint-fix": "eslint --fix src",
+    "format": "prettier --write src",
     "pm2:start": "pm2 start ecosystem.config.js",
     "pm2:stop": "pm2 stop woly-node",
     "pm2:restart": "pm2 restart woly-node",
@@ -31,11 +28,11 @@
   },
   "private": true,
   "engines": {
-    "node": ">=22.0.0",
+    "node": ">=24.0.0",
     "npm": ">=10.0.0"
   },
   "dependencies": {
-    "@kaonis/woly-protocol": "^1.0.1",
+    "@kaonis/woly-protocol": "*",
     "axios": "^1.13.2",
     "better-sqlite3": "^12.6.2",
     "cors": "^2.8.5",
@@ -55,15 +52,6 @@
     "ws": "^8.18.3",
     "zod": "^3.24.1"
   },
-  "lint-staged": {
-    "*.ts": [
-      "eslint --fix",
-      "prettier --write"
-    ],
-    "*.{json,md}": [
-      "prettier --write"
-    ]
-  },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.19",
@@ -75,20 +63,12 @@
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.6",
     "@types/ws": "^8.18.1",
-    "@typescript-eslint/eslint-plugin": "^7.18.0",
-    "@typescript-eslint/parser": "^7.18.0",
-    "eslint": "^8.57.1",
-    "eslint-config-prettier": "^9.1.2",
-    "husky": "^9.1.7",
     "jest": "^30.0.0",
     "jest-mock-extended": "^4.0.0",
-    "lint-staged": "^16.0.0",
     "nodemon": "^3.1.7",
-    "prettier": "2.2.1",
     "supertest": "^7.0.0",
     "ts-jest": "^29.4.5",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "ts-node": "^10.9.2"
   },
   "overrides": {
     "ip": "^2.0.1",

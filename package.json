@@ -1,0 +1,33 @@
+{
+  "name": "woly-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WoLy server monorepo — node agent + C&C backend + shared protocol",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:ci": "turbo run test:ci",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "dev:node-agent": "npm run dev -w apps/node-agent",
+    "dev:cnc": "npm run dev -w apps/cnc",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "turbo": "^2",
+    "typescript": "^5.9.3",
+    "eslint": "^8.57.1",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint-config-prettier": "^9.1.2",
+    "prettier": "^3.1.1"
+  }
+}
