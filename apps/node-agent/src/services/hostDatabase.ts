@@ -14,12 +14,10 @@ import { Host } from '../types';
 
 class HostDatabase extends EventEmitter {
   private db!: Database.Database; // Definite assignment assertion - assigned in connectWithRetry
-  private initialized: boolean = false;
   private syncInterval?: NodeJS.Timeout;
   private deferredSyncTimeout?: NodeJS.Timeout;
   private scanInProgress: boolean = false;
   private lastScanTime: Date | null = null;
-  private connectionRetries: number = 0;
   private maxRetries: number = 3;
   private retryDelay: number = 1000; // 1 second
   private ready: Promise<void>;
@@ -49,7 +47,6 @@ class HostDatabase extends EventEmitter {
 
       this.db = new Database(dbPath);
       logger.info('Connected to the WoLy database.');
-      this.connectionRetries = 0;
       this.readyResolve();
     } catch (err) {
       const error = err as Error;
@@ -79,7 +76,7 @@ class HostDatabase extends EventEmitter {
 
     this.createTable();
     this.seedInitialHosts();
-    this.initialized = true;
+    // Database is ready
   }
 
   /**

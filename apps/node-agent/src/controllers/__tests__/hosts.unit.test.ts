@@ -176,7 +176,7 @@ describe('hosts controller', () => {
 
       // Mock WoL success
       (wol.wake as jest.Mock).mockImplementation(
-        (mac: string, callback: (err: Error | null) => void) => {
+        (_mac: string, callback: (err: Error | null) => void) => {
           callback(null);
         }
       );
@@ -213,7 +213,7 @@ describe('hosts controller', () => {
 
       // Mock WoL error
       (wol.wake as jest.Mock).mockImplementation(
-        (mac: string, callback: (err: Error | null) => void) => {
+        (_mac: string, callback: (err: Error | null) => void) => {
           callback(new Error('WoL failed'));
         }
       );

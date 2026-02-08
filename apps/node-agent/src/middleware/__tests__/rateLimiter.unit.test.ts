@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import { apiLimiter, scanLimiter, wakeLimiter } from '../rateLimiter';
-import { logger } from '../../utils/logger';
 
 // Mock logger
 jest.mock('../../utils/logger', () => ({

@@ -130,7 +130,7 @@ async function startServer() {
      *               $ref: '#/components/schemas/HealthCheck'
      */
     // Enhanced health check endpoint
-    app.get('/health', async (req: Request, res: Response) => {
+    app.get('/health', async (_req: Request, res: Response) => {
       const health = {
         uptime: process.uptime(),
         timestamp: Date.now(),

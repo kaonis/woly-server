@@ -15,7 +15,7 @@ export type ValidationTarget = 'body' | 'params' | 'query';
  * @returns Express middleware function
  */
 export const validateRequest = (schema: Joi.ObjectSchema, target: ValidationTarget = 'body') => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
     const dataToValidate = req[target];
 
     const { error, value } = schema.validate(dataToValidate, {

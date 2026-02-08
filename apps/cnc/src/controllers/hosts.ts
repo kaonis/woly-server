@@ -52,7 +52,7 @@ export class HostsController {
    */
   async getHostByFQN(req: Request, res: Response): Promise<void> {
     try {
-      const { fqn } = req.params;
+      const fqn = req.params.fqn as string;
 
       const host = await this.hostAggregator.getHostByFQN(fqn);
 
@@ -80,7 +80,7 @@ export class HostsController {
    */
   async wakeupHost(req: Request, res: Response): Promise<void> {
     try {
-      const { fqn } = req.params;
+      const fqn = req.params.fqn as string;
       logger.info('Wake-up request received', { fqn });
 
       const idempotencyKeyHeader = req.header('Idempotency-Key');
@@ -117,7 +117,7 @@ export class HostsController {
    */
   async updateHost(req: Request, res: Response): Promise<void> {
     try {
-      const { fqn } = req.params;
+      const fqn = req.params.fqn as string;
       const hostData = req.body;
       logger.info('Update host request received', { fqn });
 
@@ -166,7 +166,7 @@ export class HostsController {
    */
   async deleteHost(req: Request, res: Response): Promise<void> {
     try {
-      const { fqn } = req.params;
+      const fqn = req.params.fqn as string;
       logger.info('Delete host request received', { fqn });
 
       const idempotencyKeyHeader = req.header('Idempotency-Key');
