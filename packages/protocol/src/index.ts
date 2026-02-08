@@ -33,7 +33,8 @@ export interface NodeRegistration {
   nodeId: string;
   name: string;
   location: string;
-  authToken: string;
+  /** @deprecated Token is validated during WS upgrade. Kept optional for backwards compat. */
+  authToken?: string;
   publicUrl?: string;
   metadata: NodeMetadata;
 }
@@ -124,7 +125,7 @@ export const outboundNodeMessageSchema: z.ZodType<NodeMessage> = z.discriminated
       nodeId: z.string().min(1),
       name: z.string().min(1),
       location: z.string().min(1),
-      authToken: z.string().min(1),
+      authToken: z.string().min(1).optional(),
       publicUrl: z.string().optional(),
       metadata: nodeMetadataSchema,
     }),

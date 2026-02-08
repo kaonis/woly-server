@@ -1,6 +1,5 @@
-import localDevices from 'local-devices';
 import { promises as dns } from 'dns';
-import { execFileSync } from 'child_process';
+import { execFile, execFileSync } from 'child_process';
 import os from 'os';
 import ping from 'ping';
 import { config } from '../config';
@@ -8,10 +7,93 @@ import { logger } from '../utils/logger';
 import { DiscoveredHost } from '../types';
 
 /**
+ * Promisify execFile manually to avoid relying on Node's custom promisify symbol.
+ * Returns { stdout, stderr } explicitly.
+ */
+function execFileAsync(
+  cmd: string,
+  args: string[],
+  opts: { encoding?: BufferEncoding; timeout?: number }
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, opts, (err, stdout, stderr) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+  });
+}
+
+/**
  * Network Discovery Service
- * Scans the local network for active hosts using the local-devices package
+ * Scans the local network for active hosts via the system ARP table.
  * Cross-platform support (Windows, Linux, macOS)
  */
+
+interface ArpDevice {
+  name: string;
+  ip: string;
+  mac: string;
+}
+
+/**
+ * Read the system ARP table by running `arp -a` and parsing the output.
+ * Returns an array of { name, ip, mac } for each entry with a valid MAC.
+ */
+async function readArpTable(): Promise<ArpDevice[]> {
+  const { stdout } = await execFileAsync('arp', ['-a'], {
+    encoding: 'utf-8',
+    timeout: 10_000,
+  });
+
+  const platform = os.platform();
+  return platform === 'win32' ? parseArpWindows(stdout) : parseArpUnix(stdout);
+}
+
+/**
+ * Parse `arp -a` output on macOS / Linux.
+ * Lines look like:  hostname (192.168.1.1) at aa:bb:cc:dd:ee:ff [ether] on eth0
+ *              or:  ? (192.168.1.1) at aa:bb:cc:dd:ee:ff on en0 ifscope [ethernet]
+ */
+function parseArpUnix(output: string): ArpDevice[] {
+  const devices: ArpDevice[] = [];
+  for (const line of output.split('\n')) {
+    const match = line.match(
+      /^(\S+)\s+\((\d+\.\d+\.\d+\.\d+)\)\s+at\s+([0-9a-f:]+)/i
+    );
+    if (match) {
+      const [, name, ip, mac] = match;
+      // Require a strict 6-octet MAC address (e.g., aa:bb:cc:dd:ee:ff)
+      if (mac && /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/i.test(mac)) {
+        devices.push({ name, ip, mac });
+      }
+    }
+  }
+  return devices;
+}
+
+/**
+ * Parse `arp -a` output on Windows.
+ * Lines look like:  192.168.1.1           aa-bb-cc-dd-ee-ff     dynamic
+ */
+function parseArpWindows(output: string): ArpDevice[] {
+  const devices: ArpDevice[] = [];
+  for (const line of output.split('\n')) {
+    const match = line.match(
+      /^\s+(\d+\.\d+\.\d+\.\d+)\s+([0-9a-f-]+)\s+\w+/i
+    );
+    if (match) {
+      const [, ip, mac] = match;
+      // Require a strict 6-octet MAC address in Windows format (e.g., aa-bb-cc-dd-ee-ff)
+      if (mac && /^[0-9a-f]{2}(-[0-9a-f]{2}){5}$/i.test(mac)) {
+        devices.push({ name: '?', ip, mac: mac.replace(/-/g, ':') });
+      }
+    }
+  }
+  return devices;
+}
 
 /**
  * Perform reverse DNS lookup to get hostname from IP
@@ -79,15 +161,14 @@ function getHostnameViaNBT(ip: string): string | null {
 }
 
 /**
- * Scan network using ARP protocol (via local-devices)
+ * Scan network using the system ARP table.
  * Returns array of { ip, mac, hostname }
  */
 async function scanNetworkARP(): Promise<DiscoveredHost[]> {
   try {
     logger.info('Starting ARP network scan...');
 
-    // local-devices returns an array of { name, ip, mac }
-    const devices = await localDevices();
+    const devices = await readArpTable();
 
     if (!devices || devices.length === 0) {
       logger.warn('No devices found on network');
@@ -95,8 +176,8 @@ async function scanNetworkARP(): Promise<DiscoveredHost[]> {
     }
 
     // Format devices for our system with DNS and NetBIOS fallbacks
-    const hostsPromises = devices.map(async (device) => {
-      // Clean up hostname - some devices return '?' or empty strings
+    const hostsPromises = devices.map(async (device: ArpDevice) => {
+      // Clean up hostname - arp often returns '?' or empty strings
       const cleanName = device.name;
 
       // Check if hostname is valid (not ?, unknown, empty, or just an IP)
@@ -128,7 +209,7 @@ async function scanNetworkARP(): Promise<DiscoveredHost[]> {
 
     const hosts = await Promise.all(hostsPromises);
 
-    const hostnamesFound = hosts.filter((h) => h.hostname).length;
+    const hostnamesFound = hosts.filter((h: DiscoveredHost) => h.hostname).length;
     logger.info(`Network scan found ${hosts.length} devices (${hostnamesFound} with hostnames)`);
     return hosts;
   } catch (error: unknown) {
@@ -139,13 +220,12 @@ async function scanNetworkARP(): Promise<DiscoveredHost[]> {
 }
 
 /**
- * Get MAC address for a specific IP
- * Note: This requires scanning the entire network
+ * Get MAC address for a specific IP from the system ARP table.
  */
 async function getMACAddress(ip: string): Promise<string | null> {
   try {
-    const devices = await localDevices();
-    const device = devices.find((d) => d.ip === ip);
+    const devices = await readArpTable();
+    const device = devices.find((d: ArpDevice) => d.ip === ip);
     return device ? formatMAC(device.mac) : null;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -187,4 +267,13 @@ async function isHostAlive(ip: string): Promise<boolean> {
   }
 }
 
-export { scanNetworkARP, getMACAddress, formatMAC, reverseDNSLookup, isHostAlive };
+export {
+  scanNetworkARP,
+  getMACAddress,
+  formatMAC,
+  reverseDNSLookup,
+  isHostAlive,
+  readArpTable,
+  parseArpUnix,
+  parseArpWindows,
+};

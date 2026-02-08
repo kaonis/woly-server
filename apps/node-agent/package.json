@@ -42,7 +42,6 @@
     "express-validator": "^7.2.1",
     "helmet": "^8.0.0",
     "joi": "^18.0.1",
-    "local-devices": "^4.0.0",
     "lru-cache": "^11.2.2",
     "ping": "^1.0.0",
     "swagger-jsdoc": "^6.2.8",
@@ -69,9 +68,5 @@
     "supertest": "^7.0.0",
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2"
-  },
-  "overrides": {
-    "ip": "^2.0.1",
-    "get-ip-range": "^4.0.1"
   }
 }
