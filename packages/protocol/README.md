@@ -7,7 +7,10 @@
 ### Types
 
 - `HostStatus` — `'awake' | 'asleep'`
-- `HostPayload` — Host data transmitted over the wire
+- `Host` — Canonical host representation shared across all WoLy apps (replaces `HostPayload`)
+- `HostPayload` — **@deprecated** Alias for `Host`, kept for backwards compatibility
+- `CommandState` — Command lifecycle state: `'queued' | 'sent' | 'acknowledged' | 'failed' | 'timed_out'`
+- `ErrorResponse` — Standardized error response shape with `error`, `message`, optional `code` and `details`
 - `NodeMetadata` — Agent platform/version/network info
 - `NodeRegistration` — Registration payload sent by nodes
 - `NodeMessage` — Discriminated union of all node → C&C messages
@@ -17,6 +20,10 @@
 
 ### Zod Schemas
 
+- `hostStatusSchema` — Validates `HostStatus` (`'awake' | 'asleep'`)
+- `hostSchema` — Validates `Host` object
+- `commandStateSchema` — Validates `CommandState`
+- `errorResponseSchema` — Validates `ErrorResponse` object
 - `outboundNodeMessageSchema` — Validates `NodeMessage` at runtime
 - `inboundCncCommandSchema` — Validates `CncCommand` at runtime
 
@@ -39,8 +46,15 @@ Both apps consume this package via npm workspace link:
 
 ```typescript
 import {
+  Host,
+  HostStatus,
+  CommandState,
+  ErrorResponse,
   NodeMessage,
   CncCommand,
+  hostSchema,
+  commandStateSchema,
+  errorResponseSchema,
   outboundNodeMessageSchema,
   inboundCncCommandSchema,
   PROTOCOL_VERSION,
@@ -50,6 +64,12 @@ import {
 const result = inboundCncCommandSchema.safeParse(JSON.parse(rawMessage));
 if (result.success) {
   handleCommand(result.data);
+}
+
+// Validate a host object
+const hostResult = hostSchema.safeParse(hostData);
+if (hostResult.success) {
+  const validHost: Host = hostResult.data;
 }
 ```
 
