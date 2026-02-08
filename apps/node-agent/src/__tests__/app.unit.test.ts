@@ -22,7 +22,7 @@ describe('App initialization and health endpoint', () => {
     app.use(express.json());
 
     // Health check endpoint (same as in app.ts)
-    app.get('/health', (req, res) => {
+    app.get('/health', (_req, res) => {
       const uptime = process.uptime();
       const timestamp = Date.now();
 

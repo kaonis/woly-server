@@ -38,7 +38,7 @@ export class NodesController {
    */
   async getNode(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const node = await NodeModel.findById(id);
 
       if (!node) {
@@ -67,7 +67,7 @@ export class NodesController {
    */
   async getNodeHealth(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const node = await NodeModel.findById(id);
 
       if (!node) {

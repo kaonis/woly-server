@@ -51,7 +51,7 @@ function setHostDatabase(db: HostDatabase): void {
  *       500:
  *         $ref: '#/components/responses/InternalError'
  */
-const getAllHosts = async (req: Request, res: Response): Promise<void> => {
+const getAllHosts = async (_req: Request, res: Response): Promise<void> => {
   if (!hostDb) {
     res.status(500).json({ error: 'Database not initialized' });
     return;
@@ -95,7 +95,7 @@ const getAllHosts = async (req: Request, res: Response): Promise<void> => {
  *         $ref: '#/components/responses/InternalError'
  */
 const getHost = async (req: Request, res: Response): Promise<void> => {
-  const { name } = req.params;
+  const name = req.params.name as string;
   logger.info(`Retrieving host with name ${name}`);
 
   if (!hostDb) {
@@ -155,7 +155,7 @@ const getHost = async (req: Request, res: Response): Promise<void> => {
  *         $ref: '#/components/responses/InternalError'
  */
 const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
-  const { name } = req.params;
+  const name = req.params.name as string;
   logger.info(`Trying to wake up host with name ${name}`);
 
   if (!hostDb) {
@@ -221,7 +221,7 @@ const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
  *       500:
  *         $ref: '#/components/responses/InternalError'
  */
-const scanNetwork = async (req: Request, res: Response): Promise<void> => {
+const scanNetwork = async (_req: Request, res: Response): Promise<void> => {
   if (!hostDb) {
     res.status(500).json({ error: 'Database not initialized' });
     return;
@@ -350,7 +350,7 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
  *         $ref: '#/components/responses/InternalError'
  */
 const getMacVendor = async (req: Request, res: Response): Promise<void> => {
-  const { mac } = req.params;
+  const mac = req.params.mac as string;
 
   if (!mac) {
     res.status(400).json({ error: 'MAC address is required' });

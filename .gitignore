@@ -30,3 +30,4 @@ logs/*.log
 # Debug
 npm-debug.log
 yarn-error.log
+apps/node-agent/logs/

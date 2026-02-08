@@ -19,7 +19,7 @@ export class AdminController {
    */
   async deleteNode(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const deleted = await NodeModel.delete(id);
 
       if (!deleted) {

@@ -33,7 +33,7 @@ describe('API Integration Tests', () => {
     app.use('/hosts', hosts);
 
     // Health check endpoint
-    app.get('/health', (req, res) => {
+    app.get('/health', (_req, res) => {
       res.json({ status: 'ok', message: 'Test server running' });
     });
 
