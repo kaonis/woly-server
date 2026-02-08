@@ -1,6 +1,6 @@
 # WoLy C&C Backend
 
-Command & Control backend for distributed WoLy Wake-on-LAN management system. Aggregates data from multiple LAN-based node agents, enabling multi-site host management from a single mobile app.
+> Part of the [woly-server](../../README.md) monorepo. Command & Control backend that aggregates multiple node agents.
 
 ## Architecture
 
@@ -9,23 +9,20 @@ Mobile App → C&C Backend → Multiple Node Agents → LANs
 ```
 
 The C&C backend provides:
+
 - **Node Management**: Registration, health monitoring, heartbeat tracking
 - **Host Aggregation**: Unified view of hosts across all locations
 - **Command Routing**: Routes WoL commands to appropriate nodes
 - **WebSocket Communication**: Real-time bidirectional messaging with nodes
-- **Dual Database Support**: PostgreSQL for production, SQLite for development/VS Code tunnel
+- **Dual Database Support**: PostgreSQL for production, SQLite for development
 
 ## Quick Start
 
-## Contribution Workflow
-
-Use branch + PR flow for all changes. See `DEVELOPMENT_WORKFLOW.md`.
-
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 24+ (see root `.nvmrc`)
 - npm 10+
-- **PostgreSQL 16+** (optional - SQLite supported)
+- **PostgreSQL 16+** (optional — SQLite supported for dev)
 
 Use the baseline runtime for consistency:
 
@@ -33,17 +30,21 @@ Use the baseline runtime for consistency:
 nvm use
 ```
 
-### Installation
+### From monorepo root
 
 ```bash
-# Install dependencies
-npm install --legacy-peer-deps
+npm install
+cp apps/cnc/.env.example apps/cnc/.env
+npm run dev:cnc
+```
 
-# Copy environment configuration
+### Standalone
+
+```bash
+cd apps/cnc
 cp .env.example .env
-
 # Edit .env with your settings
-# Set DB_TYPE, DATABASE_URL, NODE_AUTH_TOKENS, and JWT settings
+npm run dev
 ```
 
 ### Database Setup
@@ -131,7 +132,7 @@ npm run test:coverage
 npm rebuild better-sqlite3 --build-from-source
 ```
 
-- Node.js v20+ is supported. `.nvmrc` provides a baseline local version.
+- Node.js v24+ is required. See root `.nvmrc`.
 
 ## API Endpoints
 
@@ -313,27 +314,6 @@ docker-compose down
 docker-compose up -d --build
 ```
 
-## Phase 1 Deliverables ✅
-
-- [x] Project setup with TypeScript + Express
-- [x] PostgreSQL database with schema
-- [x] Node registration endpoint
-- [x] Node authentication via tokens
-- [x] WebSocket server for node connections
-- [x] Heartbeat mechanism
-- [x] Node status tracking (online/offline)
-- [x] Admin API endpoints
-- [x] Health check endpoints
-- [x] Docker Compose setup
-- [x] Logging infrastructure
-
-## Next Steps (Phase 2)
-
-- [ ] Modify woly-backend to add agent mode
-- [ ] Implement C&C client in node agent
-- [ ] Bidirectional command execution
-- [ ] Test with 2 nodes connected
-
 ## Troubleshooting
 
 ### Database Connection Failed
@@ -362,11 +342,6 @@ pg_isready
 - Node marked offline after 90s of missed heartbeats
 - Check node agent logs for connection issues
 - Verify network connectivity between node and C&C
-
-## Documentation
-
-- [Architecture Specification](../woly/docs/DISTRIBUTED_ARCHITECTURE_SPEC.md)
-- [Implementation Roadmap](../woly/docs/DISTRIBUTED_IMPLEMENTATION_ROADMAP.md)
 
 ## License
 
