@@ -2,19 +2,9 @@
  * Type definitions for WoLy backend
  */
 
-/**
- * Local host representation used internally by the backend.
- * Matches the HostPayload from @kaonis/woly-protocol for consistency.
- */
-export interface Host {
-  name: string;
-  mac: string;
-  ip: string;
-  status: 'awake' | 'asleep';
-  lastSeen: string | null;
-  discovered: number;
-  pingResponsive?: number | null;
-}
+// Canonical Host type comes from the shared protocol package.
+import type { Host } from '@kaonis/woly-protocol';
+export type { Host };
 
 export interface DiscoveredHost {
   ip: string;

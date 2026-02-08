@@ -9,7 +9,11 @@ export const SUPPORTED_PROTOCOL_VERSIONS: readonly string[] = [PROTOCOL_VERSION]
 
 export type HostStatus = 'awake' | 'asleep';
 
-export interface HostPayload {
+/**
+ * Canonical host representation shared across all WoLy apps.
+ * Previously named `HostPayload`; the old name is kept as a deprecated alias.
+ */
+export interface Host {
   name: string;
   mac: string;
   ip: string;
@@ -18,6 +22,9 @@ export interface HostPayload {
   discovered: number;
   pingResponsive?: number | null;
 }
+
+/** @deprecated Use `Host` instead. */
+export type HostPayload = Host;
 
 export interface NodeMetadata {
   version: string;
@@ -39,11 +46,26 @@ export interface NodeRegistration {
   metadata: NodeMetadata;
 }
 
+// --- Command lifecycle ---
+
+export type CommandState = 'queued' | 'sent' | 'acknowledged' | 'failed' | 'timed_out';
+
+// --- Error shape ---
+
+export interface ErrorResponse {
+  error: string;
+  message: string;
+  code?: string;
+  details?: unknown;
+}
+
+// --- WebSocket message types ---
+
 export type NodeMessage =
   | { type: 'register'; data: NodeRegistration }
   | { type: 'heartbeat'; data: { nodeId: string; timestamp: Date } }
-  | { type: 'host-discovered'; data: { nodeId: string } & HostPayload }
-  | { type: 'host-updated'; data: { nodeId: string } & HostPayload }
+  | { type: 'host-discovered'; data: { nodeId: string } & Host }
+  | { type: 'host-updated'; data: { nodeId: string } & Host }
   | { type: 'host-removed'; data: { nodeId: string; name: string } }
   | { type: 'scan-complete'; data: { nodeId: string; hostCount: number } }
   | {
@@ -87,9 +109,9 @@ export type CncCommand =
 
 // --- Zod schemas ---
 
-const hostStatusSchema = z.enum(['awake', 'asleep']);
+export const hostStatusSchema = z.enum(['awake', 'asleep']);
 
-const hostPayloadSchema = z.object({
+export const hostSchema = z.object({
   name: z.string().min(1),
   mac: z.string().min(1),
   ip: z.string().min(1),
@@ -97,6 +119,21 @@ const hostPayloadSchema = z.object({
   lastSeen: z.string().nullable(),
   discovered: z.number().int(),
   pingResponsive: z.number().int().nullable().optional(),
+});
+
+export const commandStateSchema = z.enum([
+  'queued',
+  'sent',
+  'acknowledged',
+  'failed',
+  'timed_out',
+]);
+
+export const errorResponseSchema = z.object({
+  error: z.string().min(1),
+  message: z.string().min(1),
+  code: z.string().optional(),
+  details: z.unknown().optional(),
 });
 
 const nodeMetadataSchema = z.object({
@@ -143,7 +180,7 @@ export const outboundNodeMessageSchema: z.ZodType<NodeMessage> = z.discriminated
       .object({
         nodeId: z.string().min(1),
       })
-      .merge(hostPayloadSchema),
+      .merge(hostSchema),
   }),
   z.object({
     type: z.literal('host-updated'),
@@ -151,7 +188,7 @@ export const outboundNodeMessageSchema: z.ZodType<NodeMessage> = z.discriminated
       .object({
         nodeId: z.string().min(1),
       })
-      .merge(hostPayloadSchema),
+      .merge(hostSchema),
   }),
   z.object({
     type: z.literal('host-removed'),

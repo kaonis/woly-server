@@ -1,6 +1,6 @@
 {
   "name": "@kaonis/woly-protocol",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Shared WoLy node <-> C&C protocol types and runtime schemas",
   "license": "MIT",
   "main": "dist/index.js",
@@ -17,6 +17,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "test": "jest",
     "typecheck": "tsc --noEmit"
   },
   "publishConfig": {
@@ -24,5 +25,11 @@
   },
   "dependencies": {
     "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.0.0",
+    "ts-jest": "^29.4.5",
+    "typescript": "^5.9.3"
   }
 }

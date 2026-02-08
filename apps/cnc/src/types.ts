@@ -2,7 +2,7 @@
  * Core type definitions for WoLy C&C Backend
  */
 
-import type { NodeMetadata as ProtocolNodeMetadata } from '@kaonis/woly-protocol';
+import type { CommandState, Host, NodeMetadata as ProtocolNodeMetadata } from '@kaonis/woly-protocol';
 
 // Node Types
 export interface Node {
@@ -20,16 +20,8 @@ export interface Node {
 
 export type NodeMetadata = ProtocolNodeMetadata;
 
-// Host Types
-export interface Host {
-  name: string;
-  mac: string;
-  ip: string;
-  status: 'awake' | 'asleep';
-  lastSeen?: string | null;
-  discovered?: number;  // 0 or 1, from node agent
-  pingResponsive?: number | null;  // 0, 1, or null, from node agent
-}
+// Host Types — canonical Host comes from protocol
+export type { Host } from '@kaonis/woly-protocol';
 
 export interface AggregatedHost extends Host {
   nodeId: string;
@@ -42,6 +34,8 @@ export interface AggregatedHost extends Host {
 export type {
   CncCommand,
   CommandResultPayload,
+  CommandState,
+  ErrorResponse,
   HostPayload,
   HostStatus,
   NodeMessage,
@@ -78,8 +72,6 @@ export interface WakeupResponse {
   location: string;
 }
 
-export type CommandState = 'queued' | 'sent' | 'acknowledged' | 'failed' | 'timed_out';
-
 export interface CommandRecord {
   id: string;
   nodeId: string;
@@ -92,12 +84,6 @@ export interface CommandRecord {
   updatedAt: Date;
   sentAt: Date | null;
   completedAt: Date | null;
-}
-
-export interface ErrorResponse {
-  error: string;
-  message: string;
-  code?: string;
 }
 
 // Configuration Types
