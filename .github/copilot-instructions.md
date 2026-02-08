@@ -2,7 +2,12 @@
 
 ## Project Overview
 
-Node.js backend for Wake-on-LAN application with automatic network discovery. **Dual-mode architecture**: operates standalone OR as agent connecting to C&C backend via WebSocket. Built with Express, TypeScript, SQLite, and comprehensive test coverage (195 tests, 90%+).
+Node.js backend for Wake-on-LAN application with automatic network discovery. **Dual-mode architecture**: operates standalone OR as agent connecting to C&C backend via WebSocket. Built with Express, TypeScript, better-sqlite3 (migrated from sqlite3 on 2026-02-07), and comprehensive test coverage (195 tests, 90%+).
+
+**Recent Major Changes:**
+
+- Database: Migrated to `better-sqlite3` for security and performance (see `docs/SECURITY_REMEDIATION_2026-02-07.md`)
+- Protocol: Adopting shared `@kaonis/woly-protocol` package for C&C communication (see `docs/adr/0002-shared-protocol-package.md`)
 
 ## Architecture: Dual Operating Modes
 
@@ -53,11 +58,12 @@ C&C Backend (WebSocket) ↔ woly-backend → Local Network (ARP/WoL)
 
 **HostDatabase** (`services/hostDatabase.ts`)
 
-- SQLite operations with EventEmitter pattern
+- better-sqlite3 operations with EventEmitter pattern (synchronous API, no callbacks)
 - Emits: `host-discovered`, `host-updated`, `scan-complete`
 - **Periodic scanning:** `startPeriodicSync()` runs ARP scan at configurable interval (default: 5 min)
-- **Connection retry:** Exponential backoff (3 attempts, 1s delay) - see `connectWithRetry()` line 33-56
+- **Database initialization:** Synchronous connection, immediate schema creation
 - **Critical:** Database instance passed to controllers AND agent service in `app.ts:69,79`
+- **Migration note:** Switched from sqlite3 to better-sqlite3 (Feb 2026) for ~2-3x performance improvement and security
 
 **NetworkDiscovery** (`services/networkDiscovery.ts`)
 
@@ -244,23 +250,23 @@ npm run test:ci        # CI mode (coverage to Codecov)
 **Database Mocking (Unit Tests):**
 
 ```typescript
-// Mock SQLite database
-jest.mock('sqlite3', () => ({
-  verbose: () => ({
-    Database: jest.fn().mockImplementation((path, callback) => {
-      callback(null); // Simulate successful connection
-      return mockDb;
+// Mock better-sqlite3 database (synchronous API)
+jest.mock('better-sqlite3', () => {
+  return jest.fn().mockImplementation(() => ({
+    prepare: jest.fn().mockReturnValue({
+      run: jest.fn().mockReturnValue({ changes: 1, lastInsertRowid: 1 }),
+      get: jest.fn().mockReturnValue(mockHost),
+      all: jest.fn().mockReturnValue([mockHost]),
     }),
-  }),
-}));
+    exec: jest.fn(),
+    close: jest.fn(),
+  }));
+});
 
-// Mock database methods
-const mockDb = {
-  run: jest.fn((sql, params, callback) => callback(null)),
-  get: jest.fn((sql, params, callback) => callback(null, mockHost)),
-  all: jest.fn((sql, params, callback) => callback(null, [mockHost])),
-  close: jest.fn((callback) => callback(null)),
-};
+// Or use in-memory database for real behavior
+import Database from 'better-sqlite3';
+const db = new Database(':memory:');
+db.exec(fs.readFileSync('db/schema.sql', 'utf8'));
 ```
 
 **WebSocket Mocking (Agent Mode Tests):**
@@ -458,6 +464,23 @@ Interactive docs at `/api-docs` endpoint. Configuration in `swagger.ts` using `s
   - `NodeMessage` - Union type for node→C&C messages (register, heartbeat, host-discovered, etc.)
   - `CncCommand` - Union type for C&C→node commands (wake, scan, update-host, etc.)
   - `NodeRegistration` - Registration payload with metadata
+
+**Shared Protocol Package (@kaonis/woly-protocol):**
+
+Protocol types are being migrated to shared package for consistency between node and C&C:
+
+- Lives in `packages/protocol/` within this repo
+- Published to npm as `@kaonis/woly-protocol`
+- Exports runtime validation schemas (Zod) + TypeScript types
+- Version synchronization required across repos (see `ADR-0002`)
+
+**Publishing Protocol:**
+
+```bash
+npm run protocol:pack     # Create tarball for local testing
+npm run protocol:publish  # Publish to npm (requires credentials)
+# Or use GitHub Action: "Publish Protocol Package"
+```
 
 **Union types enable exhaustive TypeScript checking:**
 
@@ -787,9 +810,10 @@ wscat -c "ws://localhost:8080/ws/node?token=test-token"
 
 - `app.ts` - Express app, service initialization, mode detection
 - `types.ts` - Shared protocol types (Host, NodeMessage, CncCommand)
+- `packages/protocol/` - Shared protocol package (@kaonis/woly-protocol)
 - `config/index.ts` - Server configuration
 - `config/agent.ts` - Agent mode configuration and validation
-- `services/hostDatabase.ts` - SQLite operations, event emitter
+- `services/hostDatabase.ts` - better-sqlite3 operations, event emitter
 - `services/networkDiscovery.ts` - ARP scanning, hostname resolution
 - `services/agentService.ts` - Agent mode orchestration
 - `services/cncClient.ts` - WebSocket connection to C&C
@@ -797,6 +821,8 @@ wscat -c "ws://localhost:8080/ws/node?token=test-token"
 - `middleware/rateLimiter.ts` - Rate limiting configuration
 - `middleware/errorHandler.ts` - Global error handling
 - `jest.config.js` - Test configuration with coverage thresholds
+- `docs/SECURITY_REMEDIATION_2026-02-07.md` - Database migration details
+- `docs/adr/0002-shared-protocol-package.md` - Protocol package adoption
 
 ## Integration with Other Projects
 
