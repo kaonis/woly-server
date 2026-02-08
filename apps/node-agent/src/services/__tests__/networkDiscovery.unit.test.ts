@@ -1,12 +1,10 @@
 import * as networkDiscovery from '../networkDiscovery';
-import localDevices from 'local-devices';
 import ping from 'ping';
-import { execFileSync } from 'child_process';
+import { execFileSync, execFile } from 'child_process';
 import { promises as dns } from 'dns';
 import os from 'os';
 
 // Mock all external dependencies
-jest.mock('local-devices');
 jest.mock('ping');
 jest.mock('child_process');
 jest.mock('os', () => ({
@@ -25,17 +23,89 @@ jest.mock('dns', () => ({
   },
 }));
 
+const mockedExecFile = execFile as unknown as jest.MockedFunction<
+  (
+    cmd: string,
+    args: string[],
+    opts: object,
+    cb: (err: Error | null, result: { stdout: string; stderr: string }) => void
+  ) => void
+>;
+
+/** Helper: make the mocked execFile resolve with the given arp output */
+function mockArpOutput(stdout: string) {
+  mockedExecFile.mockImplementation((_cmd, _args, _opts, cb) => {
+    cb(null, { stdout, stderr: '' });
+    return undefined as any;
+  });
+}
+
+// Sample arp -a outputs
+const UNIX_ARP_OUTPUT = [
+  'TestHost (192.168.1.100) at aa:bb:cc:dd:ee:ff [ether] on eth0',
+].join('\n');
+
+const UNIX_ARP_MULTI = [
+  'TestHost (192.168.1.100) at aa:bb:cc:dd:ee:ff [ether] on eth0',
+  '? (192.168.1.101) at 11:22:33:44:55:66 on en0 ifscope [ethernet]',
+].join('\n');
+
+const WINDOWS_ARP_OUTPUT = [
+  '',
+  'Interface: 192.168.1.10 --- 0x4',
+  '  Internet Address      Physical Address      Type',
+  '  192.168.1.100         aa-bb-cc-dd-ee-ff     dynamic',
+].join('\n');
+
 describe('networkDiscovery', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset os.platform mock to default
     (os.platform as jest.MockedFunction<typeof os.platform>).mockReturnValue('linux');
+  });
+
+  describe('parseArpUnix', () => {
+    it('should parse standard unix arp output', () => {
+      const devices = networkDiscovery.parseArpUnix(UNIX_ARP_OUTPUT);
+      expect(devices).toEqual([
+        { name: 'TestHost', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' },
+      ]);
+    });
+
+    it('should parse multiple entries including ? hostnames', () => {
+      const devices = networkDiscovery.parseArpUnix(UNIX_ARP_MULTI);
+      expect(devices).toHaveLength(2);
+      expect(devices[0].name).toBe('TestHost');
+      expect(devices[1].name).toBe('?');
+      expect(devices[1].ip).toBe('192.168.1.101');
+    });
+
+    it('should skip incomplete entries', () => {
+      const output = '? (192.168.1.1) at (incomplete) on en0';
+      const devices = networkDiscovery.parseArpUnix(output);
+      expect(devices).toEqual([]);
+    });
+
+    it('should return empty array for empty output', () => {
+      expect(networkDiscovery.parseArpUnix('')).toEqual([]);
+    });
+  });
+
+  describe('parseArpWindows', () => {
+    it('should parse windows arp output', () => {
+      const devices = networkDiscovery.parseArpWindows(WINDOWS_ARP_OUTPUT);
+      expect(devices).toEqual([
+        { name: '?', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' },
+      ]);
+    });
+
+    it('should return empty array for empty output', () => {
+      expect(networkDiscovery.parseArpWindows('')).toEqual([]);
+    });
   });
 
   describe('scanNetworkARP', () => {
     it('should discover hosts on local network', async () => {
-      const mockDevices = [{ name: 'TestHost', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' }];
-      (localDevices as jest.MockedFunction<typeof localDevices>).mockResolvedValue(mockDevices);
+      mockArpOutput(UNIX_ARP_OUTPUT);
 
       const hosts = await networkDiscovery.scanNetworkARP();
 
@@ -46,17 +116,18 @@ describe('networkDiscovery', () => {
     });
 
     it('should return empty array when no devices found', async () => {
-      (localDevices as jest.MockedFunction<typeof localDevices>).mockResolvedValue([]);
+      mockArpOutput('');
 
       const hosts = await networkDiscovery.scanNetworkARP();
 
       expect(hosts).toEqual([]);
     });
 
-    it('should handle local-devices errors gracefully', async () => {
-      (localDevices as jest.MockedFunction<typeof localDevices>).mockRejectedValue(
-        new Error('Network scan failed')
-      );
+    it('should handle arp command errors gracefully', async () => {
+      mockedExecFile.mockImplementation((_cmd, _args, _opts, cb) => {
+        cb(new Error('arp command failed'), { stdout: '', stderr: '' });
+        return undefined as any;
+      });
 
       const hosts = await networkDiscovery.scanNetworkARP();
 
@@ -64,8 +135,7 @@ describe('networkDiscovery', () => {
     });
 
     it('should fallback to DNS lookup when hostname is invalid', async () => {
-      const mockDevices = [{ name: '?', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' }];
-      (localDevices as jest.MockedFunction<typeof localDevices>).mockResolvedValue(mockDevices);
+      mockArpOutput('? (192.168.1.100) at aa:bb:cc:dd:ee:ff [ether] on eth0');
       (dns.reverse as jest.MockedFunction<typeof dns.reverse>).mockResolvedValue([
         'testhost.local',
       ]);
@@ -78,12 +148,12 @@ describe('networkDiscovery', () => {
     });
 
     it('should fallback to NetBIOS lookup when DNS fails', async () => {
-      const mockDevices = [{ name: '?', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' }];
-      (localDevices as jest.MockedFunction<typeof localDevices>).mockResolvedValue(mockDevices);
+      // Use win32 platform so readArpTable uses the Windows parser
+      (os.platform as jest.MockedFunction<typeof os.platform>).mockReturnValue('win32');
+      mockArpOutput(WINDOWS_ARP_OUTPUT);
       (dns.reverse as jest.MockedFunction<typeof dns.reverse>).mockRejectedValue(
         new Error('DNS lookup failed')
       );
-      (os.platform as jest.MockedFunction<typeof os.platform>).mockReturnValue('win32');
       (execFileSync as jest.MockedFunction<typeof execFileSync>).mockReturnValue(
         '   TESTPC       <00>  UNIQUE\n' as any
       );
@@ -95,14 +165,11 @@ describe('networkDiscovery', () => {
     });
 
     it('should handle hostname as IP address', async () => {
-      const mockDevices = [
-        { name: '192.168.1.100', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' },
-      ];
-      (localDevices as jest.MockedFunction<typeof localDevices>).mockResolvedValue(mockDevices);
+      // arp -a sometimes shows hostname as the IP itself
+      mockArpOutput('192.168.1.100 (192.168.1.100) at aa:bb:cc:dd:ee:ff [ether] on eth0');
       (dns.reverse as jest.MockedFunction<typeof dns.reverse>).mockRejectedValue(
         new Error('DNS lookup failed')
       );
-      // Also mock execFileSync to not provide NetBIOS name
       (execFileSync as jest.MockedFunction<typeof execFileSync>).mockImplementation(() => {
         throw new Error('NetBIOS lookup failed');
       });
@@ -174,11 +241,7 @@ describe('networkDiscovery', () => {
 
   describe('getMACAddress', () => {
     it('should get MAC address for specific IP', async () => {
-      const mockDevices = [
-        { name: 'Host1', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' },
-        { name: 'Host2', ip: '192.168.1.101', mac: '11:22:33:44:55:66' },
-      ];
-      (localDevices as jest.MockedFunction<typeof localDevices>).mockResolvedValue(mockDevices);
+      mockArpOutput(UNIX_ARP_MULTI);
 
       const mac = await networkDiscovery.getMACAddress('192.168.1.100');
 
@@ -186,8 +249,7 @@ describe('networkDiscovery', () => {
     });
 
     it('should return null for non-existent IP', async () => {
-      const mockDevices = [{ name: 'Host1', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' }];
-      (localDevices as jest.MockedFunction<typeof localDevices>).mockResolvedValue(mockDevices);
+      mockArpOutput(UNIX_ARP_OUTPUT);
 
       const mac = await networkDiscovery.getMACAddress('192.168.1.200');
 
@@ -195,9 +257,10 @@ describe('networkDiscovery', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      (localDevices as jest.MockedFunction<typeof localDevices>).mockRejectedValue(
-        new Error('Network error')
-      );
+      mockedExecFile.mockImplementation((_cmd, _args, _opts, cb) => {
+        cb(new Error('Network error'), { stdout: '', stderr: '' });
+        return undefined as any;
+      });
 
       const mac = await networkDiscovery.getMACAddress('192.168.1.100');
 

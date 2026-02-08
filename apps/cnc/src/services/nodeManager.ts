@@ -22,7 +22,7 @@ import { NodeModel } from '../models/Node';
 import { HostAggregator } from './hostAggregator';
 import config from '../config';
 import logger from '../utils/logger';
-import type { WsUpgradeAuthContext } from '../websocket/upgradeAuth';
+import { type WsUpgradeAuthContext, matchesStaticToken } from '../websocket/upgradeAuth';
 import { mintWsSessionToken, verifyWsSessionToken } from '../websocket/sessionTokens';
 
 interface NodeConnection {
@@ -223,9 +223,14 @@ export class NodeManager extends EventEmitter {
         return;
       }
 
-      // If the upgrade used a static token, ensure the registration payload uses the same token.
-      // This reduces the chance of accidental token drift between handshake and payload.
-      if (upgradeAuth.kind === 'static-token' && registration.authToken !== upgradeAuth.token) {
+      // If the upgrade used a static token and the registration payload includes one,
+      // verify they match. Newer nodes omit authToken from the payload (already validated
+      // during WS upgrade) so we only enforce when present for backwards compatibility.
+      if (
+        upgradeAuth.kind === 'static-token' &&
+        registration.authToken &&
+        registration.authToken !== upgradeAuth.token
+      ) {
         logger.warn('Rejected registration for mismatched auth token', {
           nodeId: registration.nodeId,
         });
@@ -310,7 +315,7 @@ export class NodeManager extends EventEmitter {
 
     if (kind === 'static-token' && typeof token === 'string' && token.length > 0) {
       // Re-validate just in case a caller bypassed the upgrade handler.
-      if (!config.nodeAuthTokens.includes(token)) {
+      if (!matchesStaticToken(token, config.nodeAuthTokens)) {
         return null;
       }
       return { kind, token };

@@ -30,7 +30,6 @@ export class CncClient extends EventEmitter {
   private reconnectAttempts = 0;
   private isConnecting = false;
   private isRegistered = false;
-  private activeConnectionToken: string | null = null;
   private sessionToken: { token: string; expiresAtMs: number | null } | null = null;
   private shouldReconnect = true;
 
@@ -55,7 +54,6 @@ export class CncClient extends EventEmitter {
       const token = await this.resolveConnectionToken();
       const wsUrl = this.buildWebSocketUrl(token);
       logger.info('Connecting to C&C backend', { url: agentConfig.cncUrl });
-      this.activeConnectionToken = token;
 
       this.ws = new WebSocket(wsUrl, ['bearer', token], {
         headers: {
@@ -69,7 +67,6 @@ export class CncClient extends EventEmitter {
       this.ws.on('close', (code: number, reason: Buffer) => this.handleClose(code, reason));
     } catch (error) {
       logger.error('Failed to connect to C&C', { error });
-      this.activeConnectionToken = null;
       this.isConnecting = false;
       this.scheduleReconnect();
     }
@@ -96,7 +93,6 @@ export class CncClient extends EventEmitter {
       this.ws = null;
     }
 
-    this.activeConnectionToken = null;
     this.isRegistered = false;
     this.reconnectAttempts = 0;
   }
@@ -157,7 +153,7 @@ export class CncClient extends EventEmitter {
       nodeId: agentConfig.nodeId,
       name: agentConfig.nodeId,
       location: agentConfig.location,
-      authToken: this.activeConnectionToken || agentConfig.authToken,
+      // authToken intentionally omitted — already validated during WS upgrade.
       publicUrl: agentConfig.publicUrl || undefined,
       metadata: {
         version: '1.0.0', // TODO: Get from package.json
@@ -330,7 +326,6 @@ export class CncClient extends EventEmitter {
 
     this.isConnecting = false;
     this.isRegistered = false;
-    this.activeConnectionToken = null;
     this.ws = null;
 
     if (this.isExpiredAuthFailure(code, reasonText)) {

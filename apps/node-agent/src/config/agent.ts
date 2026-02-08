@@ -78,5 +78,13 @@ export function validateAgentConfig(): void {
         `Agent mode enabled but missing required configuration: ${missing.join(', ')}`
       );
     }
+
+    // Enforce TLS in production to prevent token interception
+    const isProduction = (process.env.NODE_ENV || 'development') === 'production';
+    if (isProduction && agentConfig.cncUrl && !agentConfig.cncUrl.startsWith('wss://')) {
+      throw new Error(
+        'CNC_URL must use wss:// in production to prevent token interception'
+      );
+    }
   }
 }

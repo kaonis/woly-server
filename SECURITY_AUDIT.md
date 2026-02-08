@@ -114,11 +114,57 @@ execFileSync('nmblookup', ['-A', ip], ...)
 
 **Fix applied:** Changed to read from `CORS_ORIGINS` environment variable (comma-separated list).
 
+### 8. Timing-Unsafe Static Token Comparison
+
+| Severity | Status |
+|----------|--------|
+| **MEDIUM** | ✅ **FIXED** |
+
+**Finding:** `apps/cnc/src/websocket/upgradeAuth.ts` used `Array.includes()` to check node auth tokens:
+
+```typescript
+// BEFORE (timing-vulnerable)
+config.nodeAuthTokens.includes(token)
+```
+
+This is not constant-time — an attacker could measure response time differences to progressively guess token bytes. The same pattern existed in `nodeManager.ts`'s defensive re-validation.
+
+**Fix applied:** Introduced `matchesStaticToken()` using `crypto.timingSafeEqual` with proper length-guarded comparison:
+
+```typescript
+// AFTER (timing-safe)
+matchesStaticToken(token, config.nodeAuthTokens)
+```
+
+### 9. Auth Token Leaked in Registration Payload
+
+| Severity | Status |
+|----------|--------|
+| **MEDIUM** | ✅ **FIXED** |
+
+**Finding:** After the WebSocket upgrade already validated the node's auth token via HTTP headers, the node-agent sent the same token **again** in the plaintext `register` message payload (`registration.authToken`). This is redundant and increases exposure surface — if WebSocket message logging is enabled (e.g., by a reverse proxy), the token appears in cleartext.
+
+**Fix applied:**
+
+- Made `authToken` optional in the protocol schema (backwards-compatible with older nodes)
+- Node-agent no longer sends `authToken` in the registration payload
+- CnC server skips the payload token check when `authToken` is absent (upgrade auth is sufficient)
+
+### 10. No Client-Side TLS Enforcement
+
+| Severity | Status |
+|----------|--------|
+| **MEDIUM** | ✅ **FIXED** |
+
+**Finding:** The node-agent would connect to `ws://` (unencrypted) URLs even in production, allowing token interception by network observers. The CnC server had `WS_REQUIRE_TLS` but the node-agent had no equivalent client-side check.
+
+**Fix applied:** `validateAgentConfig()` now rejects `CNC_URL` values that don't start with `wss://` when `NODE_ENV=production`.
+
 ---
 
 ## Known Risks (Not Fixed — Require Design Decisions)
 
-### 8. Node-Agent API Has No Authentication
+### 11. Node-Agent API Has No Authentication
 
 | Severity | Impact |
 |----------|--------|
@@ -128,7 +174,7 @@ The node-agent API (`/hosts/*`) has zero authentication. All endpoints are publi
 
 **Recommendation:** Add optional API key authentication that can be enabled via environment variable. When `NODE_API_KEY` is set, require it in an `Authorization` header.
 
-### 9. CnC Node Listing Routes Are Unauthenticated
+### 12. CnC Node Listing Routes Are Unauthenticated
 
 | Severity | Impact |
 |----------|--------|
@@ -138,7 +184,7 @@ While host management endpoints are properly JWT-protected, the node listing end
 
 **Recommendation:** Move node listing behind `authenticateJwt` middleware if the API is internet-facing.
 
-### 10. No Rate Limiting on CnC Token Exchange
+### 13. No Rate Limiting on CnC Token Exchange
 
 | Severity | Impact |
 |----------|--------|
@@ -146,7 +192,7 @@ While host management endpoints are properly JWT-protected, the node listing end
 
 **Recommendation:** Add `express-rate-limit` (already used by node-agent) to the CnC app, especially on the auth endpoint.
 
-### 11. No WebSocket Message Rate Limiting
+### 14. No WebSocket Message Rate Limiting
 
 | Severity | Impact |
 |----------|--------|
@@ -154,7 +200,7 @@ While host management endpoints are properly JWT-protected, the node listing end
 
 **Recommendation:** Implement per-connection message rate limiting (e.g., 100 messages/second).
 
-### 12. No WebSocket Connection Limits per IP
+### 15. No WebSocket Connection Limits per IP
 
 | Severity | Impact |
 |----------|--------|
@@ -162,7 +208,7 @@ While host management endpoints are properly JWT-protected, the node listing end
 
 **Recommendation:** Track connections per IP and enforce a maximum (e.g., 10 per IP).
 
-### 13. Overly Broad CORS on Node-Agent
+### 16. Overly Broad CORS on Node-Agent
 
 | Severity | Impact |
 |----------|--------|
@@ -170,7 +216,7 @@ While host management endpoints are properly JWT-protected, the node listing end
 
 This is fine for development but should be tightened for production deployments.
 
-### 14. Session Token Secret Defaults to JWT Secret
+### 17. Session Token Secret Defaults to JWT Secret
 
 | Severity | Impact |
 |----------|--------|
@@ -184,23 +230,18 @@ This is fine for development but should be tightened for production deployments.
 
 ### npm audit Results
 
-```
-3 high severity vulnerabilities
+| Status | Details |
+|--------|---------|
+| ✅ **RESOLVED** | `npm audit` reports **0 vulnerabilities** |
 
-get-ip-range  *  → DoS vulnerability (GHSA-6q4w-3wp4-q5wf)
-ip  *            → SSRF improper categorization (GHSA-2p57-rm9w-gvfp)
-local-devices *  → Depends on vulnerable get-ip-range and ip
-```
+**Previously:** 3 high severity vulnerabilities in the `local-devices` dependency chain (`get-ip-range`, `ip`, `local-devices`). The `ip` package (GHSA-2p57-rm9w-gvfp) has **no patched version** — all releases `<=2.0.1` are vulnerable. Overrides cannot fix this.
 
-All three vulnerabilities are in the `local-devices` dependency chain (used by node-agent for ARP scanning). Fix available via `npm audit fix --force` (breaking change to `local-devices@3.0.0`).
-
-**Recommendation:** Test `local-devices@3.0.0` and upgrade if ARP scanning still works correctly.
+**Fix applied:** Replaced `local-devices` with a built-in ARP table parser (`arp -a`). This eliminated all 3 vulnerable transitive dependencies (`local-devices`, `get-ip-range`, `ip`, plus `mz` — 15 packages total). The `local-devices` package was unmaintained (last release August 2022) and only provided a thin wrapper around the system `arp` command.
 
 ### Notable Dependencies
 
 | Package | Notes |
 |---------|-------|
-| `local-devices` | ARP scanning library — uncommon, verify maintenance status |
 | `wake_on_lan` | Pinned to `1.0.0` — check if maintained |
 | `ping` | Network ping — verify it's the expected npm package |
 | `better-sqlite3` | Well-maintained, properly used with parameterized queries ✅ |
@@ -238,10 +279,13 @@ Before making the repository public:
 - [x] Add WebSocket message size limits
 - [x] Use cryptographically secure command IDs
 - [x] Purge database file from git history (`git filter-repo` — completed 2026-02-08)
-- [ ] Run `npm audit fix` for dependency vulnerabilities
+- [x] Run `npm audit fix` for dependency vulnerabilities — replaced `local-devices` with built-in ARP parser (0 vulnerabilities)
+- [x] Review the `.env.example` files — no real values leaked, only placeholder defaults
+- [x] Fix timing-safe static token comparison in WebSocket upgrade auth
+- [x] Stop leaking auth token in registration payload (already validated during WS upgrade)
+- [x] Enforce `wss://` in production on node-agent client side
 - [ ] Consider adding API authentication to node-agent
 - [ ] Consider adding rate limiting to CnC auth endpoint
-- [ ] Review the `.env.example` files — ensure no real values leaked
 
 ---
 
@@ -260,7 +304,6 @@ Before making the repository public:
 5. **Things to address for production hardening** (not blocking for public repo):
    - Add API authentication to the node-agent if it'll ever face the internet
    - Add rate limiting to the CnC endpoints
-   - Upgrade `local-devices` to fix the npm audit findings
    - Consider adding a pre-commit hook with `git-secrets` or similar to prevent accidental credential commits
 
 The repo is a good example of a WoL management system. Making it public with these fixes applied is reasonable.
