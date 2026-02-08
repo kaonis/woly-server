@@ -1,103 +1,58 @@
-# woly-backend
+# WoLy Node Agent
 
-[![Tests](https://github.com/kaonis/woly-backend/actions/workflows/test.yml/badge.svg)](https://github.com/kaonis/woly-backend/actions/workflows/test.yml)
-[![codecov](https://codecov.io/gh/kaonis/woly-backend/branch/master/graph/badge.svg)](https://codecov.io/gh/kaonis/woly-backend)
-
-Node.js backend for [WoLy](https://github.com/kaonis/woly) - A Wake-on-LAN application with automatic network discovery.
+> Part of the [woly-server](../../README.md) monorepo. Per-LAN Wake-on-LAN agent with automatic network discovery.
 
 ## Features
 
-- 🔍 **Automatic Network Discovery** - ARP scanning with DNS/NetBIOS hostname resolution
-- 💤 **Wake-on-LAN** - Remote host wake-up via magic packets
-- 📡 **Dual Status Tracking** - Separate `status` (awake/asleep via ARP) and `pingResponsive` (ICMP) fields
-- 🔐 **Security** - Rate limiting, input validation, CORS, Helmet headers
-- 📊 **Health Monitoring** - Enhanced health checks with database status
-- 📝 **API Documentation** - Interactive Swagger UI
-- 🪵 **Structured Logging** - Winston-based logging with file rotation
-- ⚙️ **Configuration Management** - Environment-based configuration with `.env`
-- 🐳 **Docker Support** - Containerized deployment ready
-- ✅ **Testing** - 195 tests with 90% coverage (Jest + Supertest)
+- Automatic network discovery via ARP scanning with DNS/NetBIOS hostname resolution
+- Wake-on-LAN magic packet sending
+- Dual status tracking — `status` (ARP-based, reliable) and `pingResponsive` (ICMP, diagnostic)
+- Standalone or agent mode (connects to C&C backend via WebSocket)
+- Rate limiting, input validation, CORS, Helmet security headers
+- Interactive Swagger API docs at `/api-docs`
+- Structured Winston logging with file rotation
+- 240+ tests with 90%+ coverage
 
 ## Quick Start
 
 ### Prerequisites
 
-- Node.js 22+
-- npm or yarn
-- SQLite3
+- Node.js 24+ (see root `.nvmrc`)
+- npm 10+
 
-### Installation
+### From monorepo root
 
 ```bash
-# Clone the repository
-git clone https://github.com/kaonis/woly-backend.git
-cd woly-backend
-
-# Install dependencies
 npm install
-
-# Create environment file
-cp .env.example .env
-
-# Build
-npm run build
-
-# Start server
-npm start
+cp apps/node-agent/.env.example apps/node-agent/.env
+npm run dev:node-agent
 ```
 
-### Development
+### Standalone development
 
 ```bash
-# Run in development mode with auto-reload
+cd apps/node-agent
 npm run dev
 ```
 
 ## Testing
 
-This project has comprehensive test coverage with enforced thresholds:
-
-- **195 tests** across unit and integration test suites
-- **90%** statement coverage (threshold: 80%)
-- **89.5%** line coverage (threshold: 80%)
-- **76.9%** branch coverage (threshold: 70%)
-- **94.2%** function coverage (threshold: 85%)
-
-### Running Tests
+240+ tests with enforced coverage thresholds (50% branches/functions/lines/statements).
 
 ```bash
-npm test                # Run all tests
-npm run test:coverage   # Run tests with coverage report
-npm run test:watch      # Run tests in watch mode
-npm run test:unit       # Run only unit tests
-npm run test:integration # Run only integration tests
-npm run test:ci         # Run tests in CI mode
-npm run typecheck       # TypeScript checks without emitting build output
+npm test                 # All tests
+npm run test:coverage    # With coverage report
+npm run test:watch       # Watch mode
+npm run test:unit        # Unit tests only
+npm run test:integration # Integration tests only
+npm run test:ci          # CI mode
+npm run typecheck        # Type-check without emitting
 ```
 
-### Test Organization
+**Test organization:**
 
-- **Unit Tests**: Located in `__tests__/` directories alongside source files
-  - Controllers, services, middleware, validators, utilities
-- **Integration Tests**: Located in `__tests__/` at project root
-  - End-to-end API testing with supertest
-
-### Coverage Enforcement
-
-Jest is configured to enforce coverage thresholds in `jest.config.js`:
-
-- CI pipeline fails if coverage drops below thresholds
-- Coverage reports uploaded to Codecov automatically
-- HTML coverage reports available in `coverage/` directory
-
-### Writing Tests
-
-When adding new features:
-
-1. Add unit tests for business logic and utilities
-2. Add integration tests for new API endpoints
-3. Run `npm run test:coverage` to verify coverage
-4. Ensure all thresholds are met before committing
+- Unit tests: `src/**/__tests__/*.unit.test.ts` (alongside source)
+- Integration tests: `src/__tests__/*.integration.test.ts`
 
 ## Host Status Fields
 
@@ -411,92 +366,27 @@ Logs are written to:
 - `logs/combined.log` (all levels)
 - `logs/error.log` (errors only)
 
-## Development
-
-### Project Structure
+## Project Structure
 
 ```
-woly-backend/
-├── app.ts                 # Application entry point
-├── config/
-│   └── index.ts          # Configuration management
-├── controllers/
-│   └── hosts.ts          # Request handlers
-├── middleware/
-│   ├── errorHandler.ts   # Error handling
-│   ├── rateLimiter.ts    # Rate limiting
-│   └── validateRequest.ts # Input validation
-├── routes/
-│   └── hosts.ts          # Route definitions
-├── services/
-│   ├── hostDatabase.ts   # Database operations
-│   └── networkDiscovery.ts # Network scanning
-├── utils/
-│   └── logger.ts         # Logging configuration
-├── validators/
-│   └── hostValidator.ts  # Joi schemas
-├── swagger.ts            # API documentation config
-└── types.ts              # TypeScript types
+apps/node-agent/
+├── src/
+│   ├── app.ts                 # Express app + initialization
+│   ├── types.ts               # Local TypeScript types
+│   ├── swagger.ts             # OpenAPI/Swagger config
+│   ├── config/                # Environment configuration
+│   ├── controllers/           # Request handlers
+│   ├── middleware/            # Error handling, rate limiting, validation
+│   ├── routes/                # Route definitions
+│   ├── services/              # Business logic (hostDatabase, networkDiscovery, agent)
+│   ├── utils/                 # Logger
+│   └── validators/            # Joi schemas
+├── types/                     # Ambient .d.ts for untyped packages
+├── jest.config.js
+├── tsconfig.json              # Extends ../../tsconfig.base.json
+└── Dockerfile
 ```
-
-### Code Quality
-
-The project uses:
-
-- **TypeScript** for type safety
-- **ESLint** for code linting
-- **Prettier** for code formatting
-- **Husky** for pre-commit hooks
-- **lint-staged** for staged file linting
-
-### Pre-commit Hooks
-
-Before each commit:
-
-1. ESLint automatically fixes issues
-2. Prettier formats code
-3. Commit fails if linting errors remain
-
-## Recent Improvements (Phase 1-4)
-
-### ✅ Phase 1: Foundation
-
-- Environment-based configuration management
-- Winston structured logging
-- Global error handling middleware
-- CORS and Helmet security
-- Enhanced health checks
-- Docker support
-
-### ✅ Phase 2: Security & Reliability
-
-- Rate limiting on all endpoints
-- Joi input validation
-- Standardized error responses
-- Database connection retry logic
-
-### ✅ Phase 4: Documentation & DX
-
-- OpenAPI/Swagger documentation
-- Modernized ESLint configuration
-- Pre-commit hooks with Husky
-- Enhanced README
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run `npm run build` to verify
-5. Commit (pre-commit hooks will run)
-6. Push and create a pull request
 
 ## License
 
 MIT
-
-## Links
-
-- **Frontend**: https://github.com/kaonis/woly
-- **API Docs**: http://localhost:8082/api-docs (when running)
-- **Issues**: https://github.com/kaonis/woly-backend/issues
