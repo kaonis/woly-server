@@ -3,7 +3,8 @@
  */
 
 // Canonical Host type comes from the shared protocol package.
-export type { Host } from '@kaonis/woly-protocol';
+import type { Host } from '@kaonis/woly-protocol';
+export type { Host };
 
 export interface DiscoveredHost {
   ip: string;
@@ -17,7 +18,7 @@ export interface MacVendorCacheEntry {
 }
 
 export interface HostsResponse {
-  hosts: import('@kaonis/woly-protocol').Host[];
+  hosts: Host[];
   scanInProgress: boolean;
   lastScanTime: string | null;
 }
@@ -25,7 +26,7 @@ export interface HostsResponse {
 export interface ScanResponse {
   message: string;
   hostsCount: number;
-  hosts: import('@kaonis/woly-protocol').Host[];
+  hosts: Host[];
 }
 
 export interface WakeUpResponse {
