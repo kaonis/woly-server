@@ -1,13 +1,30 @@
 import { promises as dns } from 'dns';
 import { execFile, execFileSync } from 'child_process';
-import { promisify } from 'util';
 import os from 'os';
 import ping from 'ping';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { DiscoveredHost } from '../types';
 
-const execFileAsync = promisify(execFile);
+/**
+ * Promisify execFile manually to avoid relying on Node's custom promisify symbol.
+ * Returns { stdout, stderr } explicitly.
+ */
+function execFileAsync(
+  cmd: string,
+  args: string[],
+  opts: { encoding?: BufferEncoding; timeout?: number }
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, opts, (err, stdout, stderr) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+  });
+}
 
 /**
  * Network Discovery Service
@@ -48,8 +65,8 @@ function parseArpUnix(output: string): ArpDevice[] {
     );
     if (match) {
       const [, name, ip, mac] = match;
-      // Skip incomplete entries (e.g. "(incomplete)")
-      if (mac && mac.includes(':')) {
+      // Require a strict 6-octet MAC address (e.g., aa:bb:cc:dd:ee:ff)
+      if (mac && /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/i.test(mac)) {
         devices.push({ name, ip, mac });
       }
     }
@@ -69,7 +86,8 @@ function parseArpWindows(output: string): ArpDevice[] {
     );
     if (match) {
       const [, ip, mac] = match;
-      if (mac && mac.includes('-')) {
+      // Require a strict 6-octet MAC address in Windows format (e.g., aa-bb-cc-dd-ee-ff)
+      if (mac && /^[0-9a-f]{2}(-[0-9a-f]{2}){5}$/i.test(mac)) {
         devices.push({ name: '?', ip, mac: mac.replace(/-/g, ':') });
       }
     }

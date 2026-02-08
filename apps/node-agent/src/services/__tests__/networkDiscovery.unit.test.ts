@@ -28,14 +28,14 @@ const mockedExecFile = execFile as unknown as jest.MockedFunction<
     cmd: string,
     args: string[],
     opts: object,
-    cb: (err: Error | null, result: { stdout: string; stderr: string }) => void
+    cb: (err: Error | null, stdout: string, stderr: string) => void
   ) => void
 >;
 
 /** Helper: make the mocked execFile resolve with the given arp output */
 function mockArpOutput(stdout: string) {
   mockedExecFile.mockImplementation((_cmd, _args, _opts, cb) => {
-    cb(null, { stdout, stderr: '' });
+    cb(null, stdout, '');
     return undefined as any;
   });
 }
@@ -85,6 +85,24 @@ describe('networkDiscovery', () => {
       expect(devices).toEqual([]);
     });
 
+    it('should reject malformed MAC addresses with too few octets', () => {
+      const output = 'host (192.168.1.1) at a:b:c on en0';
+      const devices = networkDiscovery.parseArpUnix(output);
+      expect(devices).toEqual([]);
+    });
+
+    it('should reject MAC addresses with invalid characters', () => {
+      const output = 'host (192.168.1.1) at gg:bb:cc:dd:ee:ff on en0';
+      const devices = networkDiscovery.parseArpUnix(output);
+      expect(devices).toEqual([]);
+    });
+
+    it('should reject MAC addresses with single-digit octets', () => {
+      const output = 'host (192.168.1.1) at a:b:c:d:e:f on en0';
+      const devices = networkDiscovery.parseArpUnix(output);
+      expect(devices).toEqual([]);
+    });
+
     it('should return empty array for empty output', () => {
       expect(networkDiscovery.parseArpUnix('')).toEqual([]);
     });
@@ -96,6 +114,18 @@ describe('networkDiscovery', () => {
       expect(devices).toEqual([
         { name: '?', ip: '192.168.1.100', mac: 'aa:bb:cc:dd:ee:ff' },
       ]);
+    });
+
+    it('should reject malformed Windows MAC addresses with too few octets', () => {
+      const output = '  192.168.1.100         aa-bb-cc     dynamic';
+      const devices = networkDiscovery.parseArpWindows(output);
+      expect(devices).toEqual([]);
+    });
+
+    it('should reject Windows MAC addresses with invalid format', () => {
+      const output = '  192.168.1.100         aa:bb:cc:dd:ee:ff     dynamic';
+      const devices = networkDiscovery.parseArpWindows(output);
+      expect(devices).toEqual([]);
     });
 
     it('should return empty array for empty output', () => {
@@ -125,7 +155,7 @@ describe('networkDiscovery', () => {
 
     it('should handle arp command errors gracefully', async () => {
       mockedExecFile.mockImplementation((_cmd, _args, _opts, cb) => {
-        cb(new Error('arp command failed'), { stdout: '', stderr: '' });
+        cb(new Error('arp command failed'), '', '');
         return undefined as any;
       });
 
@@ -258,7 +288,7 @@ describe('networkDiscovery', () => {
 
     it('should handle errors gracefully', async () => {
       mockedExecFile.mockImplementation((_cmd, _args, _opts, cb) => {
-        cb(new Error('Network error'), { stdout: '', stderr: '' });
+        cb(new Error('Network error'), '', '');
         return undefined as any;
       });
 
