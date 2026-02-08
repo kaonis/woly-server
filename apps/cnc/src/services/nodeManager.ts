@@ -13,7 +13,7 @@ import {
 } from '@kaonis/woly-protocol';
 import type {
   CncCommand,
-  HostPayload,
+  Host,
   CommandResultPayload,
   NodeMessage,
   NodeRegistration,
@@ -420,7 +420,7 @@ export class NodeManager extends EventEmitter {
   /**
    * Handle host-discovered event
    */
-  private async handleHostDiscovered(data: HostPayload & { nodeId: string }): Promise<void> {
+  private async handleHostDiscovered(data: Host & { nodeId: string }): Promise<void> {
     try {
       const connection = this.connections.get(data.nodeId);
       if (!connection) {
@@ -442,7 +442,7 @@ export class NodeManager extends EventEmitter {
   /**
    * Handle host-updated event
    */
-  private async handleHostUpdated(data: HostPayload & { nodeId: string }): Promise<void> {
+  private async handleHostUpdated(data: Host & { nodeId: string }): Promise<void> {
     try {
       const connection = this.connections.get(data.nodeId);
       if (!connection) {
