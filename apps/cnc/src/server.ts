@@ -41,14 +41,14 @@ class Server {
     this.app.use(helmet());
     this.app.use(cors({
       origin: config.nodeEnv === 'production'
-        ? ['https://your-mobile-app-domain.com']
+        ? (process.env.CORS_ORIGINS || '').split(',').filter(Boolean)
         : '*',
       credentials: true,
     }));
 
     // Body parsing
-    this.app.use(express.json());
-    this.app.use(express.urlencoded({ extended: true }));
+    this.app.use(express.json({ limit: '100kb' }));
+    this.app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
     // Request logging
     this.app.use((req, _res, next) => {

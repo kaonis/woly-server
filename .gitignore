@@ -16,6 +16,7 @@ logs/*.log
 
 # SQLite DBs
 *.db
+**/db/*.db
 
 # OS
 .DS_Store

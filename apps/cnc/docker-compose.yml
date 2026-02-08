@@ -5,9 +5,9 @@ services:
     image: postgres:16-alpine
     container_name: woly-postgres
     environment:
-      POSTGRES_USER: woly
-      POSTGRES_PASSWORD: woly_password
-      POSTGRES_DB: woly_cnc
+      POSTGRES_USER: ${POSTGRES_USER:-woly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-woly_cnc}
     ports:
       - "5432:5432"
     volumes:
@@ -28,9 +28,9 @@ services:
     environment:
       PORT: 8080
       NODE_ENV: development
-      DATABASE_URL: postgresql://woly:woly_password@postgres:5432/woly_cnc
-      NODE_AUTH_TOKENS: ${NODE_AUTH_TOKENS:-dev-token-home,dev-token-office,dev-token-datacenter}
-      JWT_SECRET: ${JWT_SECRET:-development-secret-change-in-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-woly}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-woly_cnc}
+      NODE_AUTH_TOKENS: ${NODE_AUTH_TOKENS:?Set NODE_AUTH_TOKENS in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       NODE_HEARTBEAT_INTERVAL: 30000
       NODE_TIMEOUT: 90000
       LOG_LEVEL: info
