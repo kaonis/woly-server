@@ -4,7 +4,8 @@
  */
 
 import Database from 'better-sqlite3';
-import { join } from 'path';
+import { mkdirSync, readFileSync } from 'fs';
+import { dirname, join } from 'path';
 import config from '../config';
 import logger from '../utils/logger';
 
@@ -32,6 +33,9 @@ class SqliteDatabase {
     }
 
     try {
+      // Ensure parent directory exists
+      mkdirSync(dirname(this.dbPath), { recursive: true });
+
       this.db = new Database(this.dbPath, { verbose: logger.debug.bind(logger) });
 
       // Enable foreign keys
@@ -40,10 +44,26 @@ class SqliteDatabase {
       // Enable WAL mode for better concurrency
       this.db.pragma('journal_mode = WAL');
 
+      // Auto-initialize schema (all statements use IF NOT EXISTS)
+      this.initializeSchema();
+
       logger.info('SQLite database connected successfully', { path: this.dbPath });
     } catch (error) {
       logger.error('Failed to connect to SQLite database', { error });
       throw error;
+    }
+  }
+
+  private initializeSchema(): void {
+    if (!this.db) return;
+
+    try {
+      const schemaPath = join(__dirname, 'schema.sqlite.sql');
+      const schema = readFileSync(schemaPath, 'utf-8');
+      this.db.exec(schema);
+      logger.info('SQLite schema initialized');
+    } catch (error) {
+      logger.warn('Could not auto-initialize SQLite schema', { error });
     }
   }
 
