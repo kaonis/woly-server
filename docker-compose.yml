@@ -1,0 +1,46 @@
+# version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: woly-postgres
+    environment:
+      POSTGRES_USER: woly
+      POSTGRES_PASSWORD: woly_password
+      POSTGRES_DB: woly_cnc
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U woly"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cnc-backend:
+    build: .
+    container_name: woly-cnc-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      NODE_ENV: development
+      DATABASE_URL: postgresql://woly:woly_password@postgres:5432/woly_cnc
+      NODE_AUTH_TOKENS: ${NODE_AUTH_TOKENS:-dev-token-home,dev-token-office,dev-token-datacenter}
+      JWT_SECRET: ${JWT_SECRET:-development-secret-change-in-production}
+      NODE_HEARTBEAT_INTERVAL: 30000
+      NODE_TIMEOUT: 90000
+      LOG_LEVEL: info
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+    command: npm run dev
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
