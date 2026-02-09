@@ -193,6 +193,12 @@ See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 | Build | Turborepo, tsc |
 | CI | GitHub Actions |
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
+For improvement ideas and feature requests, see [IMPROVEMENTS.md](IMPROVEMENTS.md).
+
 ## Related
 
 - [WoLy Mobile App](https://github.com/kaonis/woly) — React Native / Expo client
