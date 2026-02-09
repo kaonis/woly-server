@@ -1,4 +1,4 @@
-# WoLy Server — Security Audit & Public-Readiness Assessment
+# WoLy Server — Security Audit
 
 **Date:** 2026-02-08
 **Scope:** Full repository (`apps/cnc`, `apps/node-agent`, `packages/protocol`)
@@ -7,15 +7,11 @@
 
 ## Executive Summary
 
-The WoLy server codebase follows many security best practices: parameterized SQL queries, Helmet security headers, Zod schema validation on WebSocket messages, timing-safe token comparison, and proper `.gitignore` rules. However, several issues were found that need attention — some of which have been **fixed in this PR**, and others that remain as known risks to address over time.
-
-### Verdict: Can You Make This Repo Public?
-
-**Yes, after the fixes in this PR are merged.** The codebase is generally well-structured and doesn't contain leaked production secrets. The critical items (committed database with real device data, command injection vector) have been fixed here. The remaining items are hardening measures — important for production, but not blockers for a public repo.
+The WoLy server codebase follows many security best practices: parameterized SQL queries, Helmet security headers, Zod schema validation on WebSocket messages, timing-safe token comparison, and proper `.gitignore` rules. This audit documents security fixes that were applied before making the repository public, along with known risks that remain to be addressed over time.
 
 ---
 
-## Critical Issues (Fixed in This PR)
+## Critical Issues (Fixed)
 
 ### 1. Committed SQLite Database with Real Device Data
 
@@ -33,7 +29,7 @@ The WoLy server codebase follows many security best practices: parameterized SQL
 
 **Fix applied:** Removed the database file from tracking, and strengthened `.gitignore` with an explicit `**/db/*.db` pattern.
 
-**Remaining action:** ~~After making the repo public, consider using `git filter-repo` or BFG Repo-Cleaner to purge the file from git history entirely. Otherwise the data remains accessible via `git log`.~~ **Done.** History purged with `git filter-repo` on 2026-02-08.
+**Completed:** History purged with `git filter-repo` on 2026-02-08.
 
 ### 2. Command Injection in Network Discovery
 
@@ -267,9 +263,7 @@ This is fine for development but should be tightened for production deployments.
 
 ---
 
-## Public Repo Checklist
-
-Before making the repository public:
+## Security Fixes Applied
 
 - [x] Remove committed database with real device data
 - [x] Fix command injection vulnerability
@@ -289,21 +283,21 @@ Before making the repository public:
 
 ---
 
-## My Honest Take
+## Summary
 
-**You should make it public.** Here's why:
+The WoLy server demonstrates solid security practices for a distributed Wake-on-LAN management system:
 
-1. **The code quality is above average** for a personal project. Parameterized queries, proper JWT handling with timing-safe comparisons, Zod validation, Helmet headers — you've clearly thought about security from the start.
+1. **Code quality is strong** — parameterized queries, proper JWT handling with timing-safe comparisons, Zod validation, and Helmet headers show thoughtful security design.
 
-2. **The critical issues are fixable** (and have been fixed in this PR). The command injection was the scariest finding, but it was limited to NetBIOS hostname lookups where the IP comes from ARP scan results — not directly from user input. Still needed fixing, but the blast radius was contained.
+2. **Critical issues were addressed** before going public. The command injection vulnerability was limited to NetBIOS hostname lookups from ARP scan results (not user input), reducing its blast radius, but was properly fixed nonetheless.
 
-3. **No production secrets were leaked.** The `.env` files were never committed. The docker-compose defaults were development-only values. The biggest exposure was the SQLite database with real MAC addresses and device names from your home network.
+3. **No production secrets were leaked.** Environment files were never committed, docker-compose defaults were development-only, and the committed SQLite database was removed from git history.
 
-4. **The architecture is sensible.** Separating the protocol package, using workspace links, having proper build ordering — this is well-organized code that other developers could learn from.
+4. **Architecture is well-organized** — separated protocol package, workspace links, and proper build ordering make this a good reference implementation.
 
-5. **Things to address for production hardening** (not blocking for public repo):
-   - Add API authentication to the node-agent if it'll ever face the internet
+5. **Production hardening recommendations** (ongoing):
+   - Add API authentication to the node-agent for internet-facing deployments
    - Add rate limiting to the CnC endpoints
-   - Consider adding a pre-commit hook with `git-secrets` or similar to prevent accidental credential commits
+   - Consider pre-commit hooks with `git-secrets` to prevent accidental credential commits
 
-The repo is a good example of a WoL management system. Making it public with these fixes applied is reasonable.
+This repository serves as a solid example of a secure WoL management system implementation.
