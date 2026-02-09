@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run typecheck:*)",
+      "Bash(source:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(nvm current:*)",
+      "Bash(nvm use:*)",
+      "Bash(export:*)",
+      "Bash([ -s \"$NVM_DIR/nvm.sh\" ])",
+      "Bash(. \"$NVM_DIR/nvm.sh\")",
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(/opt/homebrew/bin/gh:*)",
+      "Bash(brew:*)",
+      "WebFetch(domain:github.com)"
+    ]
+  }
+}
