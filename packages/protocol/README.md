@@ -87,12 +87,38 @@ Output goes to `dist/`. Both `main` and `types` in package.json point there.
 
 ## Publishing to npm
 
-This package is also published to npm for the mobile app to consume:
+This package is also published to npm for the mobile app to consume.
+
+### Quick Start (Recommended)
+
+From the **monorepo root**, use the provided npm scripts:
+
+```bash
+# 1. Bump version (patch/minor/major)
+npm run protocol:version:patch   # For bug fixes (1.1.0 → 1.1.1)
+npm run protocol:version:minor   # For new features (1.1.0 → 1.2.0)
+npm run protocol:version:major   # For breaking changes (1.1.0 → 2.0.0)
+
+# 2. Publish to npm (builds automatically)
+npm run protocol:publish         # Publish with 'latest' tag
+
+# OR publish as pre-release
+npm run protocol:publish:next    # Publish with 'next' tag
+```
+
+### Manual Publishing (Legacy)
+
+If you prefer to publish manually:
 
 ```bash
 cd packages/protocol
 npm version patch
+npm run build
 npm publish --access public
 ```
 
-The monorepo apps always use the workspace-linked source, so publishing is only needed when the mobile app needs updated types.
+### Notes
+
+- The monorepo apps always use the workspace-linked source, so publishing is only needed when the mobile app needs updated types.
+- Publishing requires proper npm authentication and permissions for the `@kaonis` scope.
+- The `publishConfig.access: "public"` in package.json ensures scoped packages are published publicly.
