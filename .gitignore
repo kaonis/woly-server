@@ -16,7 +16,11 @@ logs/*.log
 
 # SQLite DBs
 *.db
+*.db-shm
+*.db-wal
 **/db/*.db
+**/db/*.db-shm
+**/db/*.db-wal
 
 # OS
 .DS_Store
