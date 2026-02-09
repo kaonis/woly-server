@@ -209,6 +209,7 @@ export class HostAggregator extends EventEmitter {
       const { reconciled, wasRenamed } = await this.reconcileHostByMac(nodeId, host, location);
 
       if (reconciled) {
+        const method = wasRenamed ? 'MAC (renamed)' : 'MAC or name';
         logger.info('Host already exists, updated', {
           nodeId,
           hostName: host.name,
@@ -216,7 +217,7 @@ export class HostAggregator extends EventEmitter {
           mac: host.mac,
           newIp: host.ip,
           newStatus: host.status,
-          wasRenamed,
+          reconciledBy: method,
         });
         return;
       }
