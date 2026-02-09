@@ -114,10 +114,8 @@ export class HostAggregator extends EventEmitter {
     const fullyQualifiedName = this.buildFQN(host.name, location, nodeId);
     const timestamp = this.isSqlite ? 'CURRENT_TIMESTAMP' : 'NOW()';
 
-    // Extract extra fields from node agent's Host type (discovered, pingResponsive)
-    const hostData = host as any;
-    const discovered = hostData.discovered ?? 1;
-    const pingResponsive = hostData.pingResponsive ?? null;
+    const discovered = host.discovered ?? 1;
+    const pingResponsive = host.pingResponsive ?? null;
 
     // Convert lastSeen to ISO string for SQLite compatibility
     const lastSeen = host.lastSeen
@@ -156,6 +154,51 @@ export class HostAggregator extends EventEmitter {
   }
 
   /**
+   * Reconcile and update/insert a host using MAC-first reconciliation.
+   * Returns true if host was reconciled by MAC or name, false if it's a new host.
+   */
+  private async reconcileHostByMac(
+    nodeId: string,
+    host: Host,
+    location: string
+  ): Promise<{ reconciled: boolean; wasRenamed: boolean }> {
+    // Reconcile by stable identifier first (MAC). Names can change due to renames or flaky hostname resolution.
+    const existingByMac =
+      host.mac && typeof host.mac === 'string'
+        ? await this.findHostRowByNodeAndMac(nodeId, host.mac)
+        : null;
+
+    if (existingByMac) {
+      // If a duplicate row already exists (legacy bug), clean it up after updating.
+      // If the target name already exists with the same MAC (duplicate), prefer keeping `existingByMac`.
+      const wasRenamed = existingByMac.name !== host.name;
+      if (wasRenamed) {
+        const existingByName = await this.findHostRowByNodeAndName(nodeId, host.name);
+        if (existingByName && existingByName.mac === host.mac && existingByName.id !== existingByMac.id) {
+          await db.query('DELETE FROM aggregated_hosts WHERE id = $1 AND node_id = $2', [
+            existingByName.id,
+            nodeId,
+          ]);
+        }
+      }
+
+      await this.updateHostRowById(existingByMac.id, nodeId, host, location);
+      await this.deleteOtherHostsByNodeAndMac(nodeId, host.mac, existingByMac.id);
+
+      return { reconciled: true, wasRenamed };
+    }
+
+    // Check if host already exists for this node by name (fallback).
+    const existingByName = await this.findHostRowByNodeAndName(nodeId, host.name);
+    if (existingByName) {
+      await this.updateHostRowById(existingByName.id, nodeId, host, location);
+      return { reconciled: true, wasRenamed: false };
+    }
+
+    return { reconciled: false, wasRenamed: false };
+  }
+
+  /**
    * Process host-discovered event from a node
    */
   async onHostDiscovered(event: HostDiscoveredEvent): Promise<void> {
@@ -163,69 +206,34 @@ export class HostAggregator extends EventEmitter {
     const fullyQualifiedName = this.buildFQN(host.name, location, nodeId);
 
     try {
-      // Reconcile by stable identifier first (MAC). Names can change due to renames or flaky hostname resolution.
-      const existingByMac =
-        host.mac && typeof host.mac === 'string'
-          ? await this.findHostRowByNodeAndMac(nodeId, host.mac)
-          : null;
+      const { reconciled, wasRenamed } = await this.reconcileHostByMac(nodeId, host, location);
 
-      if (existingByMac) {
-        // If a duplicate row already exists (legacy bug), clean it up after updating.
-        // If the target name already exists with the same MAC (duplicate), prefer keeping `existingByMac`.
-        if (existingByMac.name !== host.name) {
-          const existingByName = await this.findHostRowByNodeAndName(nodeId, host.name);
-          if (existingByName && existingByName.mac === host.mac && existingByName.id !== existingByMac.id) {
-            await db.query('DELETE FROM aggregated_hosts WHERE id = $1 AND node_id = $2', [
-              existingByName.id,
-              nodeId,
-            ]);
-          }
-        }
-
-        await this.updateHostRowById(existingByMac.id, nodeId, host, location);
-        const deleted = await this.deleteOtherHostsByNodeAndMac(nodeId, host.mac, existingByMac.id);
-
-        logger.info('Host already exists (by MAC), updated', {
-          nodeId,
-          oldName: existingByMac.name,
-          hostName: host.name,
-          fullyQualifiedName,
-          mac: host.mac,
-          newIp: host.ip,
-          newStatus: host.status,
-          dedupedRows: deleted,
-        });
-
-        return;
-      }
-
-      // Check if host already exists for this node by name (fallback).
-      const existing = await this.findHostRowByNodeAndName(nodeId, host.name);
-
-      if (existing) {
-        // Host already exists, update it
-        await this.updateHostRowById(existing.id, nodeId, host, location);
+      if (reconciled) {
+        const method = wasRenamed ? 'MAC (renamed)' : 'MAC or name';
         logger.info('Host already exists, updated', {
           nodeId,
           hostName: host.name,
           fullyQualifiedName,
+          mac: host.mac,
           newIp: host.ip,
           newStatus: host.status,
+          reconciledBy: method,
         });
-      } else {
-        // New host, insert it
-        await this.insertHost(nodeId, host, location, fullyQualifiedName);
-        logger.info('Host discovered and added to aggregated database', {
-          nodeId,
-          hostName: host.name,
-          fullyQualifiedName,
-          mac: host.mac,
-          ip: host.ip,
-          status: host.status,
-        });
-
-        this.emit('host-added', { nodeId, host, fullyQualifiedName });
+        return;
       }
+
+      // New host, insert it
+      await this.insertHost(nodeId, host, location, fullyQualifiedName);
+      logger.info('Host discovered and added to aggregated database', {
+        nodeId,
+        hostName: host.name,
+        fullyQualifiedName,
+        mac: host.mac,
+        ip: host.ip,
+        status: host.status,
+      });
+
+      this.emit('host-added', { nodeId, host, fullyQualifiedName });
     } catch (error) {
       logger.error('Failed to process host-discovered event', {
         nodeId,
@@ -244,58 +252,26 @@ export class HostAggregator extends EventEmitter {
     const fullyQualifiedName = this.buildFQN(host.name, location, nodeId);
 
     try {
-      // Prefer MAC-based reconciliation so renames don't create duplicates.
-      const existingByMac =
-        host.mac && typeof host.mac === 'string'
-          ? await this.findHostRowByNodeAndMac(nodeId, host.mac)
-          : null;
+      const { reconciled } = await this.reconcileHostByMac(nodeId, host, location);
 
-      if (existingByMac) {
-        if (existingByMac.name !== host.name) {
-          const existingByName = await this.findHostRowByNodeAndName(nodeId, host.name);
-          if (existingByName && existingByName.mac === host.mac && existingByName.id !== existingByMac.id) {
-            await db.query('DELETE FROM aggregated_hosts WHERE id = $1 AND node_id = $2', [
-              existingByName.id,
-              nodeId,
-            ]);
-          }
-        }
-
-        await this.updateHostRowById(existingByMac.id, nodeId, host, location);
-        const deleted = await this.deleteOtherHostsByNodeAndMac(nodeId, host.mac, existingByMac.id);
-
+      if (reconciled) {
         logger.debug('Host updated in aggregated database', {
           nodeId,
           hostName: host.name,
           fullyQualifiedName,
           status: host.status,
-          dedupedRows: deleted,
         });
 
         this.emit('host-updated', { nodeId, host, fullyQualifiedName });
         return;
       }
 
-      const existing = await this.findHostRowByNodeAndName(nodeId, host.name);
-
-      if (existing) {
-        await this.updateHostRowById(existing.id, nodeId, host, location);
-        logger.debug('Host updated in aggregated database', {
-          nodeId,
-          hostName: host.name,
-          fullyQualifiedName,
-          status: host.status,
-        });
-
-        this.emit('host-updated', { nodeId, host, fullyQualifiedName });
-      } else {
-        // Host doesn't exist yet, treat as discovery
-        logger.debug('Received update for unknown host, treating as discovery', {
-          nodeId,
-          hostName: host.name,
-        });
-        await this.onHostDiscovered(event);
-      }
+      // Host doesn't exist yet, treat as discovery
+      logger.debug('Received update for unknown host, treating as discovery', {
+        nodeId,
+        hostName: host.name,
+      });
+      await this.onHostDiscovered(event);
     } catch (error) {
       logger.error('Failed to process host-updated event', {
         nodeId,
@@ -600,10 +576,8 @@ export class HostAggregator extends EventEmitter {
     location: string,
     fullyQualifiedName: string
   ): Promise<void> {
-    // Extract extra fields from node agent's Host type (discovered, pingResponsive)
-    const hostData = host as any;
-    const discovered = hostData.discovered ?? 1;
-    const pingResponsive = hostData.pingResponsive ?? null;
+    const discovered = host.discovered ?? 1;
+    const pingResponsive = host.pingResponsive ?? null;
 
     // Convert lastSeen to ISO string for SQLite compatibility
     const lastSeen = host.lastSeen 
