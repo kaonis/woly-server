@@ -15,7 +15,42 @@ export class AdminController {
     private nodeManager?: NodeManager
   ) {}
   /**
-   * DELETE /api/admin/nodes/:id - Deregister a node
+   * @swagger
+   * /api/admin/nodes/{id}:
+   *   delete:
+   *     summary: Deregister a node
+   *     description: Remove a node from the system (admin only)
+   *     tags: [Admin]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: The node ID to delete
+   *         example: home-network
+   *     responses:
+   *       200:
+   *         description: Node deleted successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 message:
+   *                   type: string
+   *                   example: Node home-network deleted successfully
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
    */
   async deleteNode(req: Request, res: Response): Promise<void> {
     try {
@@ -45,7 +80,25 @@ export class AdminController {
   }
 
   /**
-   * GET /api/admin/stats - Get system statistics
+   * @swagger
+   * /api/admin/stats:
+   *   get:
+   *     summary: Get system statistics
+   *     description: Retrieve comprehensive system statistics including nodes, hosts, and WebSocket connections (admin only)
+   *     tags: [Admin]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: System statistics
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/SystemStats'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
    */
   async getStats(_req: Request, res: Response): Promise<void> {
     try {
@@ -73,10 +126,46 @@ export class AdminController {
   }
 
   /**
-   * GET /api/admin/commands - List recent command outcomes
-   * Query params:
-   * - limit (optional, default 50)
-   * - nodeId (optional)
+   * @swagger
+   * /api/admin/commands:
+   *   get:
+   *     summary: List recent command outcomes
+   *     description: Retrieve recent command history with optional filtering (admin only)
+   *     tags: [Admin]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: limit
+   *         schema:
+   *           type: integer
+   *           minimum: 1
+   *           maximum: 200
+   *           default: 50
+   *         description: Maximum number of commands to return
+   *         example: 50
+   *       - in: query
+   *         name: nodeId
+   *         schema:
+   *           type: string
+   *         description: Optional node ID to filter commands
+   *         example: home-network
+   *     responses:
+   *       200:
+   *         description: List of recent commands
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 commands:
+   *                   type: array
+   *                   items:
+   *                     $ref: '#/components/schemas/Command'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
    */
   async listCommands(req: Request, res: Response): Promise<void> {
     try {
