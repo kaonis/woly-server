@@ -3,6 +3,7 @@
  */
 
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { NodesController } from '../controllers/nodes';
 import { AdminController } from '../controllers/admin';
 import { HostsController } from '../controllers/hosts';
@@ -19,6 +20,13 @@ export function createRoutes(
 ): Router {
   const router = Router();
 
+  const adminRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 admin requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   // Controllers
   const nodesController = new NodesController(nodeManager);
   const adminController = new AdminController(hostAggregator, nodeManager);
@@ -33,7 +41,7 @@ export function createRoutes(
 
   // Route group protection
   router.use('/hosts', authenticateJwt, authorizeRoles('operator', 'admin'));
-  router.use('/admin', authenticateJwt, authorizeRoles('admin'));
+  router.use('/admin', authenticateJwt, authorizeRoles('admin'), adminRateLimiter);
 
   // Host API routes
   router.get('/hosts', (req, res) => hostsController.getHosts(req, res));
