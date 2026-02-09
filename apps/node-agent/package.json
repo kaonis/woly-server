@@ -2,6 +2,7 @@
   "name": "@woly-server/node-agent",
   "version": "0.0.1",
   "description": "WakeOnLan Application Server — per-LAN node agent",
+  "license": "Apache-2.0",
   "main": "dist/app.js",
   "scripts": {
     "test": "npm run test:preflight && jest",

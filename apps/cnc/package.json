@@ -2,6 +2,7 @@
   "name": "@woly-server/cnc",
   "version": "1.0.0",
   "description": "Command & Control backend for distributed WoLy Wake-on-LAN management",
+  "license": "Apache-2.0",
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon --watch src --exec ts-node src/server.ts",

@@ -179,4 +179,4 @@ See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ## License
 
-MIT
+Apache License 2.0 (see `LICENSE`).

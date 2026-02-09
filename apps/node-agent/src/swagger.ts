@@ -12,8 +12,8 @@ const options: swaggerJsdoc.Options = {
         url: 'https://github.com/kaonis/woly-backend',
       },
       license: {
-        name: 'MIT',
-        url: 'https://opensource.org/licenses/MIT',
+        name: 'Apache 2.0',
+        url: 'https://www.apache.org/licenses/LICENSE-2.0.html',
       },
     },
     servers: [
