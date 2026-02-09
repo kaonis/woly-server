@@ -238,7 +238,17 @@ async function getMACAddress(ip: string): Promise<string | null> {
  * Format MAC address to standard format
  */
 function formatMAC(mac: string): string {
-  return mac.toUpperCase().replace(/-/g, ':');
+  const trimmed = mac.trim().toUpperCase();
+
+  // Normalize common variants into canonical "AA:BB:CC:DD:EE:FF".
+  // - "aa-bb-cc-dd-ee-ff" -> "AA:BB:CC:DD:EE:FF"
+  // - "aabbccddeeff"      -> "AA:BB:CC:DD:EE:FF"
+  const hexOnly = trimmed.replace(/[^0-9A-F]/g, '');
+  if (hexOnly.length === 12) {
+    return hexOnly.match(/.{2}/g)!.join(':');
+  }
+
+  return trimmed.replace(/-/g, ':');
 }
 
 /**

@@ -210,6 +210,54 @@ describe('HostAggregator', () => {
       const host = await hostAggregator.getHostByFQN('test-host-4@Test-Location-test-node-1');
       expect(host).not.toBeNull();
     });
+
+    it('should not create a duplicate when a host is renamed (same MAC)', async () => {
+      // Initial discovery uses a default-style name (as node-agent does when hostname is missing).
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-2',
+        location: 'Home Office',
+        host: {
+          name: 'device-192-168-1-1',
+          mac: 'AA:BB:CC:DD:EE:10',
+          ip: '192.168.1.1',
+          status: 'awake' as const,
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      // Rename event: same MAC, new name.
+      await hostAggregator.onHostUpdated({
+        nodeId: 'test-node-2',
+        location: 'Home Office',
+        host: {
+          name: 'Router',
+          mac: 'AA:BB:CC:DD:EE:10',
+          ip: '192.168.1.1',
+          status: 'awake' as const,
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      // Old FQN should no longer resolve.
+      const old = await hostAggregator.getHostByFQN('device-192-168-1-1@Home-Office-test-node-2');
+      expect(old).toBeNull();
+
+      // New FQN should resolve.
+      const renamed = await hostAggregator.getHostByFQN('Router@Home-Office-test-node-2');
+      expect(renamed).not.toBeNull();
+      expect(renamed!.mac).toBe('AA:BB:CC:DD:EE:10');
+
+      // Ensure only one row exists for (node, mac).
+      const countResult = await db.query(
+        'SELECT COUNT(*) as count FROM aggregated_hosts WHERE node_id = $1 AND mac = $2',
+        ['test-node-2', 'AA:BB:CC:DD:EE:10']
+      );
+      expect(parseInt(countResult.rows[0].count, 10)).toBe(1);
+    });
   });
 
   describe('onHostRemoved', () => {
@@ -244,6 +292,57 @@ describe('HostAggregator', () => {
 
       const host = await hostAggregator.getHostByFQN('test-host-5@Test-Location-test-node-1');
       expect(host).toBeNull();
+    });
+
+    it('should remove legacy duplicates with the same MAC', async () => {
+      // Insert duplicate rows directly to simulate legacy data (same node+mac, different names).
+      const nodeId = 'test-node-3';
+      const location = 'Lab';
+
+      await db.query(
+        `INSERT INTO aggregated_hosts
+          (node_id, name, mac, ip, status, last_seen, location, fully_qualified_name, discovered, ping_responsive)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [
+          nodeId,
+          'device-192-168-1-1',
+          'AA:BB:CC:DD:EE:20',
+          '192.168.1.1',
+          'awake',
+          new Date().toISOString(),
+          location,
+          'device-192-168-1-1@Lab-test-node-3',
+          1,
+          1,
+        ]
+      );
+
+      await db.query(
+        `INSERT INTO aggregated_hosts
+          (node_id, name, mac, ip, status, last_seen, location, fully_qualified_name, discovered, ping_responsive)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [
+          nodeId,
+          'Router',
+          'AA:BB:CC:DD:EE:20',
+          '192.168.1.1',
+          'awake',
+          new Date().toISOString(),
+          location,
+          'Router@Lab-test-node-3',
+          1,
+          1,
+        ]
+      );
+
+      // Remove one by name; expect all rows with same MAC are deleted.
+      await hostAggregator.onHostRemoved({ nodeId, name: 'Router' });
+
+      const countResult = await db.query(
+        'SELECT COUNT(*) as count FROM aggregated_hosts WHERE node_id = $1 AND mac = $2',
+        [nodeId, 'AA:BB:CC:DD:EE:20']
+      );
+      expect(parseInt(countResult.rows[0].count, 10)).toBe(0);
     });
 
     it('should handle removal of non-existent host', async () => {

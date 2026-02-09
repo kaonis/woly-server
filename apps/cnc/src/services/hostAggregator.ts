@@ -35,6 +35,169 @@ export class HostAggregator extends EventEmitter {
     super();
   }
 
+  // Internal row shape used for reconciliation/deduping. External API types do not expose `id`.
+  private async findHostRowByNodeAndName(
+    nodeId: string,
+    name: string
+  ): Promise<(AggregatedHost & { id: number }) | null> {
+    const result = await db.query(
+      `SELECT
+        ah.id,
+        ah.node_id as "nodeId",
+        ah.name,
+        ah.mac,
+        ah.ip,
+        ah.status,
+        ah.last_seen as "lastSeen",
+        ah.location,
+        ah.fully_qualified_name as "fullyQualifiedName",
+        ah.discovered,
+        ah.ping_responsive as "pingResponsive",
+        ah.created_at as "createdAt",
+        ah.updated_at as "updatedAt"
+      FROM aggregated_hosts ah
+      WHERE ah.node_id = $1 AND ah.name = $2`,
+      [nodeId, name]
+    );
+
+    return result.rows[0] || null;
+  }
+
+  private async findHostRowByNodeAndMac(
+    nodeId: string,
+    mac: string
+  ): Promise<(AggregatedHost & { id: number }) | null> {
+    const result = await db.query(
+      `SELECT
+        ah.id,
+        ah.node_id as "nodeId",
+        ah.name,
+        ah.mac,
+        ah.ip,
+        ah.status,
+        ah.last_seen as "lastSeen",
+        ah.location,
+        ah.fully_qualified_name as "fullyQualifiedName",
+        ah.discovered,
+        ah.ping_responsive as "pingResponsive",
+        ah.created_at as "createdAt",
+        ah.updated_at as "updatedAt"
+      FROM aggregated_hosts ah
+      WHERE ah.node_id = $1 AND ah.mac = $2
+      ORDER BY ah.updated_at DESC, ah.id DESC
+      LIMIT 1`,
+      [nodeId, mac]
+    );
+
+    return result.rows[0] || null;
+  }
+
+  private async deleteOtherHostsByNodeAndMac(
+    nodeId: string,
+    mac: string,
+    keepId: number
+  ): Promise<number> {
+    const result = await db.query(
+      `DELETE FROM aggregated_hosts
+       WHERE node_id = $1 AND mac = $2 AND id <> $3`,
+      [nodeId, mac, keepId]
+    );
+    return result.rowCount || 0;
+  }
+
+  private async updateHostRowById(
+    id: number,
+    nodeId: string,
+    host: Host,
+    location: string
+  ): Promise<void> {
+    const fullyQualifiedName = this.buildFQN(host.name, location, nodeId);
+    const timestamp = this.isSqlite ? 'CURRENT_TIMESTAMP' : 'NOW()';
+
+    const discovered = host.discovered ?? 1;
+    const pingResponsive = host.pingResponsive ?? null;
+
+    // Convert lastSeen to ISO string for SQLite compatibility
+    const lastSeen = host.lastSeen
+      ? typeof host.lastSeen === 'string'
+        ? host.lastSeen
+        : new Date(host.lastSeen).toISOString()
+      : null;
+
+    await db.query(
+      `UPDATE aggregated_hosts
+        SET name = $1,
+            mac = $2,
+            ip = $3,
+            status = $4,
+            last_seen = $5,
+            location = $6,
+            fully_qualified_name = $7,
+            discovered = $8,
+            ping_responsive = $9,
+            updated_at = ${timestamp}
+        WHERE id = $10 AND node_id = $11`,
+      [
+        host.name,
+        host.mac,
+        host.ip,
+        host.status,
+        lastSeen,
+        location,
+        fullyQualifiedName,
+        discovered,
+        pingResponsive,
+        id,
+        nodeId,
+      ]
+    );
+  }
+
+  /**
+   * Reconcile and update/insert a host using MAC-first reconciliation.
+   * Returns true if host was reconciled by MAC or name, false if it's a new host.
+   */
+  private async reconcileHostByMac(
+    nodeId: string,
+    host: Host,
+    location: string
+  ): Promise<{ reconciled: boolean; wasRenamed: boolean }> {
+    // Reconcile by stable identifier first (MAC). Names can change due to renames or flaky hostname resolution.
+    const existingByMac =
+      host.mac && typeof host.mac === 'string'
+        ? await this.findHostRowByNodeAndMac(nodeId, host.mac)
+        : null;
+
+    if (existingByMac) {
+      // If a duplicate row already exists (legacy bug), clean it up after updating.
+      // If the target name already exists with the same MAC (duplicate), prefer keeping `existingByMac`.
+      const wasRenamed = existingByMac.name !== host.name;
+      if (wasRenamed) {
+        const existingByName = await this.findHostRowByNodeAndName(nodeId, host.name);
+        if (existingByName && existingByName.mac === host.mac && existingByName.id !== existingByMac.id) {
+          await db.query('DELETE FROM aggregated_hosts WHERE id = $1 AND node_id = $2', [
+            existingByName.id,
+            nodeId,
+          ]);
+        }
+      }
+
+      await this.updateHostRowById(existingByMac.id, nodeId, host, location);
+      await this.deleteOtherHostsByNodeAndMac(nodeId, host.mac, existingByMac.id);
+
+      return { reconciled: true, wasRenamed };
+    }
+
+    // Check if host already exists for this node by name (fallback).
+    const existingByName = await this.findHostRowByNodeAndName(nodeId, host.name);
+    if (existingByName) {
+      await this.updateHostRowById(existingByName.id, nodeId, host, location);
+      return { reconciled: true, wasRenamed: false };
+    }
+
+    return { reconciled: false, wasRenamed: false };
+  }
+
   /**
    * Process host-discovered event from a node
    */
@@ -43,33 +206,34 @@ export class HostAggregator extends EventEmitter {
     const fullyQualifiedName = this.buildFQN(host.name, location, nodeId);
 
     try {
-      // Check if host already exists for this node
-      const existing = await this.findHostByNodeAndName(nodeId, host.name);
+      const { reconciled, wasRenamed } = await this.reconcileHostByMac(nodeId, host, location);
 
-      if (existing) {
-        // Host already exists, update it
-        await this.updateHost(nodeId, host, location);
+      if (reconciled) {
+        const method = wasRenamed ? 'MAC (renamed)' : 'MAC or name';
         logger.info('Host already exists, updated', {
           nodeId,
           hostName: host.name,
           fullyQualifiedName,
+          mac: host.mac,
           newIp: host.ip,
           newStatus: host.status,
+          reconciledBy: method,
         });
-      } else {
-        // New host, insert it
-        await this.insertHost(nodeId, host, location, fullyQualifiedName);
-        logger.info('Host discovered and added to aggregated database', {
-          nodeId,
-          hostName: host.name,
-          fullyQualifiedName,
-          mac: host.mac,
-          ip: host.ip,
-          status: host.status,
-        });
-
-        this.emit('host-added', { nodeId, host, fullyQualifiedName });
+        return;
       }
+
+      // New host, insert it
+      await this.insertHost(nodeId, host, location, fullyQualifiedName);
+      logger.info('Host discovered and added to aggregated database', {
+        nodeId,
+        hostName: host.name,
+        fullyQualifiedName,
+        mac: host.mac,
+        ip: host.ip,
+        status: host.status,
+      });
+
+      this.emit('host-added', { nodeId, host, fullyQualifiedName });
     } catch (error) {
       logger.error('Failed to process host-discovered event', {
         nodeId,
@@ -88,10 +252,9 @@ export class HostAggregator extends EventEmitter {
     const fullyQualifiedName = this.buildFQN(host.name, location, nodeId);
 
     try {
-      const existing = await this.findHostByNodeAndName(nodeId, host.name);
+      const { reconciled } = await this.reconcileHostByMac(nodeId, host, location);
 
-      if (existing) {
-        await this.updateHost(nodeId, host, location);
+      if (reconciled) {
         logger.debug('Host updated in aggregated database', {
           nodeId,
           hostName: host.name,
@@ -100,14 +263,15 @@ export class HostAggregator extends EventEmitter {
         });
 
         this.emit('host-updated', { nodeId, host, fullyQualifiedName });
-      } else {
-        // Host doesn't exist yet, treat as discovery
-        logger.debug('Received update for unknown host, treating as discovery', {
-          nodeId,
-          hostName: host.name,
-        });
-        await this.onHostDiscovered(event);
+        return;
       }
+
+      // Host doesn't exist yet, treat as discovery
+      logger.debug('Received update for unknown host, treating as discovery', {
+        nodeId,
+        hostName: host.name,
+      });
+      await this.onHostDiscovered(event);
     } catch (error) {
       logger.error('Failed to process host-updated event', {
         nodeId,
@@ -125,10 +289,20 @@ export class HostAggregator extends EventEmitter {
     const { nodeId, name } = event;
 
     try {
+      // Best-effort: if we can resolve MAC for the removed name, delete all rows for that MAC.
+      // This cleans up legacy duplicates where the same device existed under multiple names.
+      const existing = await this.findHostRowByNodeAndName(nodeId, name);
       const result = await db.query(
         'DELETE FROM aggregated_hosts WHERE node_id = $1 AND name = $2 RETURNING *',
         [nodeId, name]
       );
+
+      if (existing?.mac) {
+        await db.query('DELETE FROM aggregated_hosts WHERE node_id = $1 AND mac = $2', [
+          nodeId,
+          existing.mac,
+        ]);
+      }
 
       if (result.rowCount && result.rowCount > 0) {
         logger.info('Host removed from aggregated database', {
@@ -396,42 +570,14 @@ export class HostAggregator extends EventEmitter {
     return nodeId ? `${name}@${sanitizedLocation}-${nodeId}` : `${name}@${sanitizedLocation}`;
   }
 
-  private async findHostByNodeAndName(
-    nodeId: string,
-    name: string
-  ): Promise<AggregatedHost | null> {
-    const result = await db.query(
-      `SELECT
-        ah.node_id as "nodeId",
-        ah.name,
-        ah.mac,
-        ah.ip,
-        ah.status,
-        ah.last_seen as "lastSeen",
-        ah.location,
-        ah.fully_qualified_name as "fullyQualifiedName",
-        ah.discovered,
-        ah.ping_responsive as "pingResponsive",
-        ah.created_at as "createdAt",
-        ah.updated_at as "updatedAt"
-      FROM aggregated_hosts ah
-      WHERE ah.node_id = $1 AND ah.name = $2`,
-      [nodeId, name]
-    );
-
-    return result.rows[0] || null;
-  }
-
   private async insertHost(
     nodeId: string,
     host: Host,
     location: string,
     fullyQualifiedName: string
   ): Promise<void> {
-    // Extract extra fields from node agent's Host type (discovered, pingResponsive)
-    const hostData = host as any;
-    const discovered = hostData.discovered ?? 1;
-    const pingResponsive = hostData.pingResponsive ?? null;
+    const discovered = host.discovered ?? 1;
+    const pingResponsive = host.pingResponsive ?? null;
 
     // Convert lastSeen to ISO string for SQLite compatibility
     const lastSeen = host.lastSeen 
@@ -456,58 +602,4 @@ export class HostAggregator extends EventEmitter {
       ]
     );
   }
-
-  private async updateHost(
-    nodeId: string,
-    host: Host,
-    location: string
-  ): Promise<void> {
-    const fullyQualifiedName = this.buildFQN(host.name, location, nodeId);
-    const timestamp = this.isSqlite ? 'CURRENT_TIMESTAMP' : 'NOW()';
-    
-    // Extract extra fields from node agent's Host type (discovered, pingResponsive)
-    const hostData = host as any;
-    const discovered = hostData.discovered ?? 1;
-    const pingResponsive = hostData.pingResponsive ?? null;
-
-    // Convert lastSeen to ISO string for SQLite compatibility
-    const lastSeen = host.lastSeen 
-      ? (typeof host.lastSeen === 'string' ? host.lastSeen : new Date(host.lastSeen).toISOString())
-      : null;
-
-    const result = await db.query(
-      `UPDATE aggregated_hosts
-        SET mac = $1,
-            ip = $2,
-            status = $3,
-            last_seen = $4,
-            location = $5,
-            fully_qualified_name = $6,
-            discovered = $7,
-            ping_responsive = $8,
-           updated_at = ${timestamp}
-        WHERE node_id = $9 AND name = $10`,
-      [
-        host.mac,
-        host.ip,
-        host.status,
-        lastSeen,
-        location,
-        fullyQualifiedName,
-        discovered,
-        pingResponsive,
-        nodeId,
-        host.name,
-      ]
-    );
-
-    logger.debug('Host UPDATE executed', {
-      nodeId,
-      hostName: host.name,
-      ip: host.ip,
-      status: host.status,
-      rowsAffected: result.rowCount,
-    });
-  }
 }
-
