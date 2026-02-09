@@ -55,7 +55,28 @@ When modifying `packages/protocol/src/index.ts`:
 2. Run `npm run build -w packages/protocol` to regenerate `dist/`
 3. Run `npm run typecheck` to verify both apps still compile
 4. Run `npm run test` to verify no runtime regressions
-5. If the mobile app needs the update, bump version and publish to npm
+5. If the mobile app needs the update, publish to npm (see below)
+
+### Publishing `@kaonis/woly-protocol` to npm
+
+The protocol package is published to npm for the mobile app to consume. Use these scripts from the **monorepo root**:
+
+```bash
+# 1. Bump version (creates a git commit and tag)
+npm run protocol:version:patch   # Bug fixes (1.1.0 → 1.1.1)
+npm run protocol:version:minor   # New features (1.1.0 → 1.2.0)
+npm run protocol:version:major   # Breaking changes (1.1.0 → 2.0.0)
+
+# 2. Build and publish to npm
+npm run protocol:publish         # Publish with 'latest' tag
+npm run protocol:publish:next    # Publish with 'next' tag (for pre-releases)
+```
+
+**Notes:**
+- `protocol:publish` automatically runs `protocol:build` before publishing
+- Requires npm authentication and publish permissions for `@kaonis` scope
+- The `publishConfig.access: "public"` in package.json ensures scoped packages are published publicly
+- Monorepo apps always use the workspace-linked source, so publishing only affects the mobile app
 
 ## TypeScript
 

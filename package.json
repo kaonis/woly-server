@@ -21,7 +21,13 @@
     "typecheck": "turbo run typecheck",
     "dev:node-agent": "turbo run dev --filter=@woly-server/node-agent",
     "dev:cnc": "turbo run dev --filter=@woly-server/cnc",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "protocol:build": "npm run build --workspace=@kaonis/woly-protocol",
+    "protocol:publish": "npm run protocol:build && npm publish --workspace=@kaonis/woly-protocol",
+    "protocol:publish:next": "npm run protocol:build && npm publish --workspace=@kaonis/woly-protocol --tag next",
+    "protocol:version:patch": "npm version patch --workspace=@kaonis/woly-protocol",
+    "protocol:version:minor": "npm version minor --workspace=@kaonis/woly-protocol",
+    "protocol:version:major": "npm version major --workspace=@kaonis/woly-protocol"
   },
   "devDependencies": {
     "turbo": "^2",

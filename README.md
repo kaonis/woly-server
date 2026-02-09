@@ -93,6 +93,12 @@ npm run build -w packages/protocol
 | `npm run dev:node-agent` | Start node agent in dev mode |
 | `npm run dev:cnc` | Start C&C backend in dev mode |
 | `npm run format` | Format all files with Prettier |
+| `npm run protocol:build` | Build the protocol package |
+| `npm run protocol:publish` | Build and publish protocol to npm (latest tag) |
+| `npm run protocol:publish:next` | Build and publish protocol to npm (next tag) |
+| `npm run protocol:version:patch` | Bump protocol version (patch) |
+| `npm run protocol:version:minor` | Bump protocol version (minor) |
+| `npm run protocol:version:major` | Bump protocol version (major) |
 
 ## Node Agent
 
@@ -129,6 +135,20 @@ Runs on port 8080 by default. See [apps/cnc/README.md](apps/cnc/README.md) for f
 - **Protocol versioning** — `PROTOCOL_VERSION`, `SUPPORTED_PROTOCOL_VERSIONS`
 
 Both apps consume it via npm workspace link. It's also published to npm for the mobile app. See [packages/protocol/README.md](packages/protocol/README.md).
+
+### Publishing the Protocol Package
+
+To publish `@kaonis/woly-protocol` to npm (for the mobile app):
+
+```bash
+# 1. Bump version
+npm run protocol:version:patch   # or :minor, :major
+
+# 2. Publish to npm
+npm run protocol:publish         # or protocol:publish:next for pre-release
+```
+
+See [packages/protocol/README.md](packages/protocol/README.md) for more details.
 
 ## Docker
 
