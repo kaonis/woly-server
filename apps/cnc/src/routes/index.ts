@@ -25,7 +25,7 @@ export function createRoutes(
     max: 100, // limit each IP to 100 admin requests per windowMs
     standardHeaders: true,
     legacyHeaders: false,
-    handler: (req, res, _next) => {
+    handler: (_req, res, _next) => {
       // Return JSON error consistent with CNC API error shape
       res.status(429).json({
         error: 'Too Many Requests',
