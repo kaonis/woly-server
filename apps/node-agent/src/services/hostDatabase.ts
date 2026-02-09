@@ -188,11 +188,12 @@ class HostDatabase extends EventEmitter {
    */
   async getHostByMAC(mac: string): Promise<Host | undefined> {
     try {
+      const formattedMac = networkDiscovery.formatMAC(mac);
       return this.db
         .prepare(
           'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts WHERE mac = ?'
         )
-        .get(mac) as Host | undefined;
+        .get(formattedMac) as Host | undefined;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error(`Failed to get host by MAC ${mac}:`, { error: message });
@@ -208,11 +209,12 @@ class HostDatabase extends EventEmitter {
       const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered, pingResponsive)
                    VALUES(?, ?, ?, ?, datetime('now'), 1, NULL)`;
       try {
-        this.db.prepare(sql).run(name, mac, ip, 'asleep');
+        const formattedMac = networkDiscovery.formatMAC(mac);
+        this.db.prepare(sql).run(name, formattedMac, ip, 'asleep');
         logger.info(`Added host: ${name}`);
         resolve({
           name,
-          mac,
+          mac: formattedMac,
           ip,
           status: 'asleep',
           lastSeen: new Date().toISOString(),
@@ -241,10 +243,11 @@ class HostDatabase extends EventEmitter {
     return new Promise((resolve, reject) => {
       const sql = `UPDATE hosts SET lastSeen = datetime('now'), discovered = 1, status = ?, pingResponsive = ? WHERE mac = ?`;
       try {
-        const info = this.db.prepare(sql).run(status, pingResponsive, mac);
+        const formattedMac = networkDiscovery.formatMAC(mac);
+        const info = this.db.prepare(sql).run(status, pingResponsive, formattedMac);
         if (info.changes === 0) {
           // No rows were updated - MAC doesn't exist
-          reject(new Error(`Host with MAC ${mac} not found in database`));
+          reject(new Error(`Host with MAC ${formattedMac} not found in database`));
         } else {
           resolve();
         }
@@ -271,7 +274,7 @@ class HostDatabase extends EventEmitter {
       }
       if (updates.mac !== undefined) {
         fields.push('mac = ?');
-        values.push(updates.mac);
+        values.push(networkDiscovery.formatMAC(updates.mac));
       }
       if (updates.ip !== undefined) {
         fields.push('ip = ?');

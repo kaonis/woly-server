@@ -19,6 +19,11 @@ describe('HostDatabase', () => {
     // Clear all mocks before each test
     jest.clearAllMocks();
 
+    // Default MAC normalization used throughout HostDatabase.
+    (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
+      mac.toUpperCase().replace(/-/g, ':')
+    );
+
     // Use in-memory database for each test
     // better-sqlite3 creates a new isolated :memory: database for each instance
     db = new HostDatabase(':memory:');
@@ -153,6 +158,19 @@ describe('HostDatabase', () => {
       const retrieved = await db.getHost('TestHost');
       expect(retrieved).toBeDefined();
       expect(retrieved?.name).toBe('TestHost');
+    });
+
+    it('should normalize MAC addresses on insert so scan updates match', async () => {
+      await db.addHost('MacFormatHost', 'aa-bb-cc-dd-ee-ff', '192.168.1.240');
+
+      // updateHostSeen may be called with a different but equivalent format.
+      await expect(db.updateHostSeen('AA:BB:CC:DD:EE:FF', 'awake')).resolves.toBeUndefined();
+
+      const byMac = await db.getHostByMAC('aa:bb:cc:dd:ee:ff');
+      expect(byMac).toBeDefined();
+      expect(byMac?.name).toBe('MacFormatHost');
+      expect(byMac?.mac).toBe('AA:BB:CC:DD:EE:FF');
+      expect(byMac?.status).toBe('awake');
     });
 
     it('should reject duplicate host names', async () => {

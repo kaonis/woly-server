@@ -263,6 +263,11 @@ describe('networkDiscovery', () => {
       expect(mac).toBe('AA:BB:CC:DD:EE:FF');
     });
 
+    it('should expand 12-hex MACs into colon format', () => {
+      const mac = networkDiscovery.formatMAC('aabbccddeeff');
+      expect(mac).toBe('AA:BB:CC:DD:EE:FF');
+    });
+
     it('should handle already formatted MAC addresses', () => {
       const mac = networkDiscovery.formatMAC('AA:BB:CC:DD:EE:FF');
       expect(mac).toBe('AA:BB:CC:DD:EE:FF');

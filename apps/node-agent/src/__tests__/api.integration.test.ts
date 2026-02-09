@@ -48,6 +48,9 @@ describe('API Integration Tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
+      mac.toUpperCase().replace(/-/g, ':')
+    );
   });
 
   describe('GET /health', () => {
