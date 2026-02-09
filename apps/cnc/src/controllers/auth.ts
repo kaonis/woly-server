@@ -70,6 +70,33 @@ function mintJwt(params: { sub: string; role: 'operator' | 'admin' }): { token: 
 }
 
 export class AuthController {
+  /**
+   * @swagger
+   * /api/auth/token:
+   *   post:
+   *     summary: Issue JWT token
+   *     description: Exchange an operator or admin Bearer token for a JWT token with specified role
+   *     tags: [Authentication]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: false
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/TokenRequest'
+   *     responses:
+   *       200:
+   *         description: JWT token issued successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/TokenResponse'
+   *       400:
+   *         $ref: '#/components/responses/BadRequest'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   */
   issueToken(req: Request, res: Response): void {
     const bearerResult = getBearerToken(req);
     if (bearerResult.error === 'missing') {

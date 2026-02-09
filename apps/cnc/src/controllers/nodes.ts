@@ -11,7 +11,26 @@ export class NodesController {
   constructor(private nodeManager: NodeManager) {}
 
   /**
-   * GET /api/nodes - List all nodes
+   * @swagger
+   * /api/nodes:
+   *   get:
+   *     summary: List all nodes
+   *     description: Retrieve a list of all registered nodes with connection status
+   *     tags: [Nodes]
+   *     responses:
+   *       200:
+   *         description: List of nodes
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 nodes:
+   *                   type: array
+   *                   items:
+   *                     $ref: '#/components/schemas/Node'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
    */
   async listNodes(_req: Request, res: Response): Promise<void> {
     try {
@@ -34,7 +53,31 @@ export class NodesController {
   }
 
   /**
-   * GET /api/nodes/:id - Get node by ID
+   * @swagger
+   * /api/nodes/{id}:
+   *   get:
+   *     summary: Get node by ID
+   *     description: Retrieve detailed information about a specific node
+   *     tags: [Nodes]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: The node ID
+   *         example: home-network
+   *     responses:
+   *       200:
+   *         description: Node found
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Node'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
    */
   async getNode(req: Request, res: Response): Promise<void> {
     try {
@@ -63,7 +106,53 @@ export class NodesController {
   }
 
   /**
-   * GET /api/nodes/:id/health - Check node health
+   * @swagger
+   * /api/nodes/{id}/health:
+   *   get:
+   *     summary: Check node health
+   *     description: Get detailed health status of a specific node
+   *     tags: [Nodes]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: The node ID
+   *         example: home-network
+   *     responses:
+   *       200:
+   *         description: Node health status
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 nodeId:
+   *                   type: string
+   *                   example: home-network
+   *                 status:
+   *                   type: string
+   *                   enum: [online, offline]
+   *                   example: online
+   *                 connected:
+   *                   type: boolean
+   *                   example: true
+   *                 lastHeartbeat:
+   *                   type: string
+   *                   format: date-time
+   *                   example: '2026-02-09T13:00:00.000Z'
+   *                 timeSinceHeartbeat:
+   *                   type: integer
+   *                   description: Milliseconds since last heartbeat
+   *                   example: 5000
+   *                 healthy:
+   *                   type: boolean
+   *                   example: true
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
    */
   async getNodeHealth(req: Request, res: Response): Promise<void> {
     try {

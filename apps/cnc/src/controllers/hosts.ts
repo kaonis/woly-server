@@ -14,9 +14,39 @@ export class HostsController {
   ) {}
 
   /**
-   * GET /api/hosts
-   * Get all aggregated hosts from all nodes
-   * Query params: nodeId (optional) - filter by specific node
+   * @swagger
+   * /api/hosts:
+   *   get:
+   *     summary: Get all aggregated hosts
+   *     description: Retrieve all hosts from all nodes with optional filtering by node ID
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: nodeId
+   *         schema:
+   *           type: string
+   *         description: Optional node ID to filter hosts
+   *         example: home-network
+   *     responses:
+   *       200:
+   *         description: List of hosts with statistics
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 hosts:
+   *                   type: array
+   *                   items:
+   *                     $ref: '#/components/schemas/Host'
+   *                 stats:
+   *                   $ref: '#/components/schemas/HostStats'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
    */
   async getHosts(req: Request, res: Response): Promise<void> {
     try {
@@ -47,8 +77,35 @@ export class HostsController {
   }
 
   /**
-   * GET /api/hosts/:fqn
-   * Get a specific host by fully qualified name (hostname@location)
+   * @swagger
+   * /api/hosts/{fqn}:
+   *   get:
+   *     summary: Get host by fully qualified name
+   *     description: Retrieve detailed information about a specific host using its FQN (hostname@location)
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Fully qualified name (hostname@location)
+   *         example: PHANTOM-MBP@home-network
+   *     responses:
+   *       200:
+   *         description: Host found
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Host'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
    */
   async getHostByFQN(req: Request, res: Response): Promise<void> {
     try {
@@ -75,8 +132,43 @@ export class HostsController {
   }
 
   /**
-   * POST /api/hosts/wakeup/:fqn
-   * Send Wake-on-LAN packet to a specific host
+   * @swagger
+   * /api/hosts/wakeup/{fqn}:
+   *   post:
+   *     summary: Wake up a host using Wake-on-LAN
+   *     description: Send a Wake-on-LAN magic packet to the specified host via its managing node
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Fully qualified name (hostname@location)
+   *         example: PHANTOM-MBP@home-network
+   *       - in: header
+   *         name: Idempotency-Key
+   *         schema:
+   *           type: string
+   *         description: Optional idempotency key to prevent duplicate commands
+   *         example: unique-request-id-123
+   *     responses:
+   *       200:
+   *         description: Wake command sent successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/CommandResult'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       503:
+   *         $ref: '#/components/responses/ServiceUnavailable'
+   *       504:
+   *         $ref: '#/components/responses/GatewayTimeout'
    */
   async wakeupHost(req: Request, res: Response): Promise<void> {
     try {
@@ -112,8 +204,59 @@ export class HostsController {
   }
 
   /**
-   * PUT /api/hosts/:fqn
-   * Update a host's information
+   * @swagger
+   * /api/hosts/{fqn}:
+   *   put:
+   *     summary: Update host information
+   *     description: Update a host's properties via its managing node
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Fully qualified name (hostname@location)
+   *         example: PHANTOM-MBP@home-network
+   *       - in: header
+   *         name: Idempotency-Key
+   *         schema:
+   *           type: string
+   *         description: Optional idempotency key to prevent duplicate commands
+   *         example: unique-request-id-123
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             description: Host properties to update
+   *     responses:
+   *       200:
+   *         description: Host updated successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 message:
+   *                   type: string
+   *                   example: Host updated successfully
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
+   *       503:
+   *         $ref: '#/components/responses/ServiceUnavailable'
+   *       504:
+   *         $ref: '#/components/responses/GatewayTimeout'
    */
   async updateHost(req: Request, res: Response): Promise<void> {
     try {
@@ -161,8 +304,52 @@ export class HostsController {
   }
 
   /**
-   * DELETE /api/hosts/:fqn
-   * Delete a host
+   * @swagger
+   * /api/hosts/{fqn}:
+   *   delete:
+   *     summary: Delete a host
+   *     description: Remove a host from its managing node
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Fully qualified name (hostname@location)
+   *         example: PHANTOM-MBP@home-network
+   *       - in: header
+   *         name: Idempotency-Key
+   *         schema:
+   *           type: string
+   *         description: Optional idempotency key to prevent duplicate commands
+   *         example: unique-request-id-123
+   *     responses:
+   *       200:
+   *         description: Host deleted successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 message:
+   *                   type: string
+   *                   example: Host deleted successfully
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
+   *       503:
+   *         $ref: '#/components/responses/ServiceUnavailable'
+   *       504:
+   *         $ref: '#/components/responses/GatewayTimeout'
    */
   async deleteHost(req: Request, res: Response): Promise<void> {
     try {

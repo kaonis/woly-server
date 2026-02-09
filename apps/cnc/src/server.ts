@@ -6,6 +6,7 @@ import express from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
+import swaggerUi from 'swagger-ui-express';
 import config from './config';
 import logger from './utils/logger';
 import db from './database/connection';
@@ -16,6 +17,7 @@ import { createRoutes } from './routes';
 import { createWebSocketServer } from './websocket/server';
 import { errorHandler } from './middleware/errorHandler';
 import { reconcileCommandsOnStartup } from './services/commandReconciler';
+import { specs } from './swagger';
 
 class Server {
   private app: express.Application;
@@ -68,7 +70,31 @@ class Server {
   }
 
   private setupRoutes(): void {
-    // Health check endpoint (root level)
+    // API Documentation
+    this.app.use(
+      '/api-docs',
+      swaggerUi.serve,
+      swaggerUi.setup(specs, {
+        customCss: '.swagger-ui .topbar { display: none }',
+        customSiteTitle: 'WoLy C&C API Documentation',
+      })
+    );
+
+    /**
+     * @swagger
+     * /health:
+     *   get:
+     *     summary: Health check endpoint
+     *     description: Returns the current health status of the C&C service
+     *     tags: [Health]
+     *     responses:
+     *       200:
+     *         description: Service is healthy
+     *         content:
+     *           application/json:
+     *             schema:
+     *               $ref: '#/components/schemas/HealthCheck'
+     */
     this.app.get('/health', (_req, res) => {
       res.json({
         status: 'healthy',
@@ -77,7 +103,31 @@ class Server {
       });
     });
 
-    // Root endpoint
+    /**
+     * @swagger
+     * /:
+     *   get:
+     *     summary: Root endpoint
+     *     description: Returns basic information about the C&C service
+     *     tags: [Health]
+     *     responses:
+     *       200:
+     *         description: Service information
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 name:
+     *                   type: string
+     *                   example: WoLy C&C Backend
+     *                 version:
+     *                   type: string
+     *                   example: '1.0.0'
+     *                 status:
+     *                   type: string
+     *                   example: running
+     */
     this.app.get('/', (_req, res) => {
       res.json({
         name: 'WoLy C&C Backend',
