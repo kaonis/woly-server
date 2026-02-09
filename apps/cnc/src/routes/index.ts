@@ -25,6 +25,14 @@ export function createRoutes(
     max: 100, // limit each IP to 100 admin requests per windowMs
     standardHeaders: true,
     legacyHeaders: false,
+    handler: (req, res, _next) => {
+      // Return JSON error consistent with CNC API error shape
+      res.status(429).json({
+        error: 'Too Many Requests',
+        message: 'Too many requests, please try again later.',
+        code: 'RATE_LIMIT_EXCEEDED',
+      });
+    },
   });
 
   // Controllers
@@ -41,7 +49,7 @@ export function createRoutes(
 
   // Route group protection
   router.use('/hosts', authenticateJwt, authorizeRoles('operator', 'admin'));
-  router.use('/admin', authenticateJwt, authorizeRoles('admin'), adminRateLimiter);
+  router.use('/admin', adminRateLimiter, authenticateJwt, authorizeRoles('admin'));
 
   // Host API routes
   router.get('/hosts', (req, res) => hostsController.getHosts(req, res));
