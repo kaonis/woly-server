@@ -28,6 +28,9 @@ function setHostDatabase(db: HostDatabase): void {
  *     summary: Get all hosts
  *     description: Retrieve a list of all network hosts (both discovered and manually added)
  *     tags: [Hosts]
+ *     security:
+ *       - BearerAuth: []
+ *       - {}
  *     responses:
  *       200:
  *         description: List of hosts with scan status
@@ -48,6 +51,12 @@ function setHostDatabase(db: HostDatabase): void {
  *                   format: date-time
  *                   nullable: true
  *                   description: Timestamp of the last completed scan
+ *       401:
+ *         description: Unauthorized - API key required (when NODE_API_KEY is configured)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  *       500:
  *         $ref: '#/components/responses/InternalError'
  */
@@ -74,6 +83,9 @@ const getAllHosts = async (_req: Request, res: Response): Promise<void> => {
  *     summary: Get a specific host by name
  *     description: Retrieve detailed information about a single host
  *     tags: [Hosts]
+ *     security:
+ *       - BearerAuth: []
+ *       - {}
  *     parameters:
  *       - in: path
  *         name: name
@@ -91,6 +103,12 @@ const getAllHosts = async (_req: Request, res: Response): Promise<void> => {
  *               $ref: '#/components/schemas/Host'
  *       204:
  *         description: Host not found
+ *       401:
+ *         description: Unauthorized - API key required (when NODE_API_KEY is configured)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  *       500:
  *         $ref: '#/components/responses/InternalError'
  */
@@ -119,6 +137,9 @@ const getHost = async (req: Request, res: Response): Promise<void> => {
  *     summary: Wake up a host using Wake-on-LAN
  *     description: Send a Wake-on-LAN magic packet to the specified host
  *     tags: [Wake-on-LAN]
+ *     security:
+ *       - BearerAuth: []
+ *       - {}
  *     parameters:
  *       - in: path
  *         name: name
@@ -149,6 +170,12 @@ const getHost = async (req: Request, res: Response): Promise<void> => {
  *                   example: Wake-on-LAN packet sent
  *       204:
  *         description: Host not found
+ *       401:
+ *         description: Unauthorized - API key required (when NODE_API_KEY is configured)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  *       429:
  *         $ref: '#/components/responses/TooManyRequests'
  *       500:
@@ -198,6 +225,9 @@ const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
  *     summary: Trigger immediate network scan
  *     description: Force an immediate network discovery scan using ARP, ICMP ping, and DNS/NetBIOS lookups. Rate limited to 5 requests per minute.
  *     tags: [Network]
+ *     security:
+ *       - BearerAuth: []
+ *       - {}
  *     responses:
  *       200:
  *         description: Scan completed successfully
@@ -216,6 +246,12 @@ const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/Host'
+ *       401:
+ *         description: Unauthorized - API key required (when NODE_API_KEY is configured)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  *       429:
  *         $ref: '#/components/responses/TooManyRequests'
  *       500:
@@ -244,6 +280,9 @@ const scanNetwork = async (_req: Request, res: Response): Promise<void> => {
  *     summary: Add a new host manually
  *     description: Manually add a host to the database (not discovered automatically)
  *     tags: [Hosts]
+ *     security:
+ *       - BearerAuth: []
+ *       - {}
  *     requestBody:
  *       required: true
  *       content:
@@ -278,6 +317,12 @@ const scanNetwork = async (_req: Request, res: Response): Promise<void> => {
  *               $ref: '#/components/schemas/Host'
  *       400:
  *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         description: Unauthorized - API key required (when NODE_API_KEY is configured)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  *       429:
  *         $ref: '#/components/responses/TooManyRequests'
  *       500:
@@ -306,6 +351,9 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
  *     summary: Get MAC address vendor information
  *     description: Look up the manufacturer/vendor of a network device by MAC address. Results are cached for 24 hours.
  *     tags: [Hosts]
+ *     security:
+ *       - BearerAuth: []
+ *       - {}
  *     parameters:
  *       - in: path
  *         name: mac
@@ -334,6 +382,12 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
  *                   example: 'macvendors.com (cached)'
  *       400:
  *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         description: Unauthorized - API key required (when NODE_API_KEY is configured)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  *       429:
  *         description: Rate limit exceeded (external API or internal throttling)
  *         content:
