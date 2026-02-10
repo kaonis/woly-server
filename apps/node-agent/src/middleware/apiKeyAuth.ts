@@ -11,7 +11,7 @@ import { logger } from '../utils/logger';
  * 
  * Expected header format: Authorization: Bearer <api-key>
  */
-export const apiKeyAuth = (req: Request, res: Response, next: NextFunction) => {
+export const apiKeyAuth = (req: Request, _res: Response, next: NextFunction) => {
   // If no API key is configured, skip authentication
   if (!config.auth.apiKey) {
     return next();

@@ -55,6 +55,14 @@ const options: swaggerJsdoc.Options = {
       },
     ],
     components: {
+      securitySchemes: {
+        BearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'API Key',
+          description: 'Optional API key authentication (enabled when NODE_API_KEY is set)',
+        },
+      },
       schemas: {
         Host: {
           type: 'object',
