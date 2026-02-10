@@ -2,6 +2,14 @@
 
 > Part of the [woly-server](../../README.md) monorepo. Command & Control backend that aggregates multiple node agents.
 
+## Documentation
+
+- **[Architecture Decision Records](docs/adr/)** — Design decisions for authentication, shared protocol, command lifecycle
+- **[Compatibility Matrix](docs/compatibility.md)** — Node/C&C version compatibility and upgrade guidance
+- **[Architecture Plan](ARCHITECTURE_PLAN.md)** — Phased implementation roadmap
+- **[Implementation Checklist](IMPLEMENTATION_CHECKLIST.md)** — Progress tracking
+- **[Runbooks](docs/runbooks/)** — Operational procedures
+
 ## Architecture
 
 ```
