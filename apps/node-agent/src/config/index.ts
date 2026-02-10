@@ -30,4 +30,7 @@ export const config = {
   logging: {
     level: process.env.LOG_LEVEL || 'info',
   },
+  auth: {
+    apiKey: process.env.NODE_API_KEY,
+  },
 };

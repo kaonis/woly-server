@@ -2,6 +2,7 @@ import express from 'express';
 import * as hostsController from '../controllers/hosts';
 import { apiLimiter, scanLimiter, wakeLimiter } from '../middleware/rateLimiter';
 import { validateRequest } from '../middleware/validateRequest';
+import { apiKeyAuth } from '../middleware/apiKeyAuth';
 import {
   hostNameParamSchema,
   macAddressSchema,
@@ -9,6 +10,9 @@ import {
 } from '../validators/hostValidator';
 
 const router = express.Router();
+
+// Apply API key authentication to all routes (if configured)
+router.use(apiKeyAuth);
 
 // Apply general API rate limiter to all routes
 router.use(apiLimiter);
