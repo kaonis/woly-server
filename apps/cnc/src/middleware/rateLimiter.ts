@@ -9,11 +9,6 @@ import { logger } from '../utils/logger';
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5,
-  message: {
-    error: 'Too Many Requests',
-    message: 'Too many authentication attempts from this IP, please try again later.',
-    code: 'RATE_LIMIT_EXCEEDED',
-  },
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
   handler: (req, res) => {
@@ -34,11 +29,6 @@ export const authLimiter = rateLimit({
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
-  message: {
-    error: 'Too Many Requests',
-    message: 'Too many requests from this IP, please try again later.',
-    code: 'RATE_LIMIT_EXCEEDED',
-  },
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
