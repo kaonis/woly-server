@@ -3,7 +3,6 @@
  */
 
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
 import { NodesController } from '../controllers/nodes';
 import { AdminController } from '../controllers/admin';
 import { HostsController } from '../controllers/hosts';
@@ -12,6 +11,7 @@ import { NodeManager } from '../services/nodeManager';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
 import { authenticateJwt, authorizeRoles } from '../middleware/auth';
+import { authLimiter, apiLimiter } from '../middleware/rateLimiter';
 
 export function createRoutes(
   nodeManager: NodeManager,
@@ -20,36 +20,21 @@ export function createRoutes(
 ): Router {
   const router = Router();
 
-  const adminRateLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 admin requests per windowMs
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: (_req, res, _next) => {
-      // Return JSON error consistent with CNC API error shape
-      res.status(429).json({
-        error: 'Too Many Requests',
-        message: 'Too many requests, please try again later.',
-        code: 'RATE_LIMIT_EXCEEDED',
-      });
-    },
-  });
-
   // Controllers
   const nodesController = new NodesController(nodeManager);
   const adminController = new AdminController(hostAggregator, nodeManager);
   const hostsController = new HostsController(hostAggregator, commandRouter);
   const authController = new AuthController();
 
-  // Public API routes
-  router.get('/nodes', (req, res) => nodesController.listNodes(req, res));
-  router.get('/nodes/:id', (req, res) => nodesController.getNode(req, res));
-  router.get('/nodes/:id/health', (req, res) => nodesController.getNodeHealth(req, res));
-  router.post('/auth/token', (req, res) => authController.issueToken(req, res));
+  // Public API routes with rate limiting
+  router.get('/nodes', apiLimiter, (req, res) => nodesController.listNodes(req, res));
+  router.get('/nodes/:id', apiLimiter, (req, res) => nodesController.getNode(req, res));
+  router.get('/nodes/:id/health', apiLimiter, (req, res) => nodesController.getNodeHealth(req, res));
+  router.post('/auth/token', authLimiter, (req, res) => authController.issueToken(req, res));
 
   // Route group protection
   router.use('/hosts', authenticateJwt, authorizeRoles('operator', 'admin'));
-  router.use('/admin', adminRateLimiter, authenticateJwt, authorizeRoles('admin'));
+  router.use('/admin', apiLimiter, authenticateJwt, authorizeRoles('admin'));
 
   // Host API routes
   router.get('/hosts', (req, res) => hostsController.getHosts(req, res));
