@@ -27,14 +27,17 @@ export function createRoutes(
   const authController = new AuthController();
 
   // Public API routes with rate limiting
-  router.get('/nodes', apiLimiter, (req, res) => nodesController.listNodes(req, res));
-  router.get('/nodes/:id', apiLimiter, (req, res) => nodesController.getNode(req, res));
-  router.get('/nodes/:id/health', apiLimiter, (req, res) => nodesController.getNodeHealth(req, res));
   router.post('/auth/token', authLimiter, (req, res) => authController.issueToken(req, res));
 
   // Route group protection
+  router.use('/nodes', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/hosts', authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/admin', apiLimiter, authenticateJwt, authorizeRoles('admin'));
+
+  // Node API routes (protected)
+  router.get('/nodes', (req, res) => nodesController.listNodes(req, res));
+  router.get('/nodes/:id', (req, res) => nodesController.getNode(req, res));
+  router.get('/nodes/:id/health', (req, res) => nodesController.getNodeHealth(req, res));
 
   // Host API routes
   router.get('/hosts', (req, res) => hostsController.getHosts(req, res));

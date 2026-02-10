@@ -136,14 +136,21 @@ npm rebuild better-sqlite3 --build-from-source
 
 ## API Endpoints
 
-### Public API (for Mobile App)
+### Public API
+
+```
+POST   /api/auth/token         # Exchange operator token for JWT (mobile sign-in)
+GET    /health                 # Server health check
+```
+
+### Protected Node API
+
+Requires `Authorization: Bearer <jwt>` with role `operator` or `admin`.
 
 ```
 GET    /api/nodes              # List all nodes
 GET    /api/nodes/:id          # Get node details
 GET    /api/nodes/:id/health   # Check node health
-POST   /api/auth/token         # Exchange operator token for JWT (mobile sign-in)
-GET    /health                 # Server health check
 ```
 
 ### Protected Host API
@@ -291,11 +298,11 @@ curl -X POST http://localhost:8080/api/nodes/register \
     }
   }'
 
-# Check nodes
-curl http://localhost:8080/api/nodes
+# Check nodes (requires JWT — obtain via /api/auth/token first)
+curl -H "Authorization: Bearer <jwt>" http://localhost:8080/api/nodes
 
-# Check health
-curl http://localhost:8080/api/nodes/test-node/health
+# Check health (requires JWT)
+curl -H "Authorization: Bearer <jwt>" http://localhost:8080/api/nodes/test-node/health
 ```
 
 ## Docker Deployment
