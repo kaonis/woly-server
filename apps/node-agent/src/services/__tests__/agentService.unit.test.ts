@@ -485,6 +485,32 @@ describe('AgentService command handlers', () => {
     );
   });
 
+  it('rejects update-host payload with invalid mac format', async () => {
+    await ((service as unknown) as {
+      handleUpdateHostCommand: (command: unknown) => Promise<void>;
+    }).handleUpdateHostCommand({
+      type: 'update-host',
+      commandId: 'cmd-update-invalid-mac',
+      data: {
+        name: 'PHANTOM-MBP',
+        mac: 'INVALID-MAC',
+      },
+    });
+
+    expect(hostDbMock.getHost).not.toHaveBeenCalled();
+    expect(hostDbMock.updateHost).not.toHaveBeenCalled();
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-update-invalid-mac',
+          success: false,
+          error: 'Invalid update-host payload: mac has invalid format',
+        }),
+      })
+    );
+  });
+
   it('deletes host and sends removal event', async () => {
     const sendHostRemovedSpy = jest
       .spyOn((service as unknown) as { sendHostRemoved: (name: string) => void }, 'sendHostRemoved')
