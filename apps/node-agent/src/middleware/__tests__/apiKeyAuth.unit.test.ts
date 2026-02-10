@@ -221,10 +221,11 @@ describe('apiKeyAuth middleware', () => {
         authorization: `Bearer  ${validApiKey}`,
       };
 
-      // This should fail because we split on space and expect exactly 2 parts
-      expect(() => {
-        apiKeyAuth(mockReq as Request, mockRes as Response, mockNext);
-      }).toThrow(AppError);
+      // Should now succeed with flexible whitespace parsing
+      apiKeyAuth(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(logger.warn).not.toHaveBeenCalled();
     });
 
     it('should be case-sensitive for Bearer prefix', () => {
