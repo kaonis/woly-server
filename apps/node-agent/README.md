@@ -267,6 +267,40 @@ LOG_LEVEL=info          # error, warn, info, http, debug
 
 ## Security Features
 
+### API Authentication (Optional)
+
+**NEW**: Optional API key authentication for `/hosts/*` endpoints.
+
+- **Enable**: Set `NODE_API_KEY` environment variable
+- **Disable**: Leave `NODE_API_KEY` unset (default - standalone mode)
+- **Header Format**: `Authorization: Bearer <your-api-key>`
+- **Protected Endpoints**: All `/hosts/*` routes when enabled
+- **Public Endpoints**: `/health` (always accessible)
+
+**Example Usage**:
+
+```bash
+# Request without authentication (fails when NODE_API_KEY is set)
+curl http://localhost:8082/hosts
+# Response: 401 Unauthorized
+
+# Request with authentication
+curl -H "Authorization: Bearer your-api-key" http://localhost:8082/hosts
+# Response: 200 OK with hosts list
+
+# Health check (always public)
+curl http://localhost:8082/health
+# Response: 200 OK (no auth required)
+```
+
+**Security Features**:
+- Constant-time key comparison (prevents timing attacks)
+- Flexible whitespace handling per HTTP spec
+- Case-sensitive validation
+- Descriptive error messages
+
+**Recommendation**: Enable for deployments exposed beyond local network.
+
 ### Rate Limiting
 
 - **General API**: 100 requests per 15 minutes per IP

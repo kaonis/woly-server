@@ -94,7 +94,34 @@ Despite the high CVSS score, this vulnerability has **minimal impact** on this a
 
 ### Additional Hardening
 
-- Enable authentication for production deployments (not included by default)
+### API Authentication (NEW: 2026-02-10)
+
+✅ **Implemented**: Optional API key authentication for `/hosts/*` endpoints
+
+- **Environment Variable**: `NODE_API_KEY` - Set to enable authentication
+- **Header Format**: `Authorization: Bearer <api-key>`
+- **Endpoints Protected**: All `/hosts/*` routes when `NODE_API_KEY` is set
+- **Public Endpoints**: `/health` (always accessible for monitoring)
+- **Security Features**:
+  - Constant-time key comparison (prevents timing attacks)
+  - Proper 401 error responses
+  - Case-sensitive validation
+  - HTTP spec compliant whitespace handling
+
+**Usage**:
+
+```bash
+# Without authentication (default - standalone mode)
+export NODE_API_KEY=""  # or leave unset
+
+# With authentication (recommended for exposed deployments)
+export NODE_API_KEY="your-secure-random-key-here"
+```
+
+**Recommendation**: Enable authentication for any deployment exposed beyond the local network.
+
+### Other Security Measures
+
 - Use HTTPS/TLS for all network communication
 - Implement request logging and monitoring
 - Regular security updates via `npm update`
