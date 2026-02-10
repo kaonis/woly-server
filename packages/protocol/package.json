@@ -20,6 +20,7 @@
   "scripts": {
     "build": "tsc",
     "test": "jest",
+    "test:ci": "jest",
     "typecheck": "tsc --noEmit"
   },
   "publishConfig": {

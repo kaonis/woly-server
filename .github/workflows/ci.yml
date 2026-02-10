@@ -28,9 +28,6 @@ jobs:
       - name: Build, lint, typecheck, test
         run: npx turbo run lint typecheck test:ci build
 
-      - name: Schema validation tests
-        run: npm test -w packages/protocol -- schemas.test.ts
-
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v6
