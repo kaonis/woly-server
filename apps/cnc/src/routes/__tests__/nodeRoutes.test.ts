@@ -23,7 +23,7 @@ jest.mock('../../config', () => ({
     nodeAuthTokens: ['test-node-token'],
     nodeHeartbeatInterval: 30000,
     nodeTimeout: 60000,
-    jwtExpirySeconds: 3600,
+    jwtTtlSeconds: 3600,
   },
 }));
 
