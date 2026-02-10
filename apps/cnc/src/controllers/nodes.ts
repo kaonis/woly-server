@@ -17,6 +17,8 @@ export class NodesController {
    *     summary: List all nodes
    *     description: Retrieve a list of all registered nodes with connection status
    *     tags: [Nodes]
+   *     security:
+   *       - bearerAuth: []
    *     responses:
    *       200:
    *         description: List of nodes
@@ -29,6 +31,10 @@ export class NodesController {
    *                   type: array
    *                   items:
    *                     $ref: '#/components/schemas/Node'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       403:
+   *         $ref: '#/components/responses/Forbidden'
    *       500:
    *         $ref: '#/components/responses/InternalError'
    */
@@ -59,6 +65,8 @@ export class NodesController {
    *     summary: Get node by ID
    *     description: Retrieve detailed information about a specific node
    *     tags: [Nodes]
+   *     security:
+   *       - bearerAuth: []
    *     parameters:
    *       - in: path
    *         name: id
@@ -74,6 +82,10 @@ export class NodesController {
    *           application/json:
    *             schema:
    *               $ref: '#/components/schemas/Node'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       403:
+   *         $ref: '#/components/responses/Forbidden'
    *       404:
    *         $ref: '#/components/responses/NotFound'
    *       500:
@@ -112,6 +124,8 @@ export class NodesController {
    *     summary: Check node health
    *     description: Get detailed health status of a specific node
    *     tags: [Nodes]
+   *     security:
+   *       - bearerAuth: []
    *     parameters:
    *       - in: path
    *         name: id
@@ -149,6 +163,10 @@ export class NodesController {
    *                 healthy:
    *                   type: boolean
    *                   example: true
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       403:
+   *         $ref: '#/components/responses/Forbidden'
    *       404:
    *         $ref: '#/components/responses/NotFound'
    *       500:
