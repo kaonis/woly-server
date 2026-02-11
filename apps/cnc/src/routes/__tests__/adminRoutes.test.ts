@@ -2,13 +2,13 @@
  * Integration tests for admin routes authentication and authorization
  */
 
-import { createHmac } from 'crypto';
 import express, { Express } from 'express';
 import request from 'supertest';
 import { createRoutes } from '../index';
 import { NodeManager } from '../../services/nodeManager';
 import { HostAggregator } from '../../services/hostAggregator';
 import { CommandRouter } from '../../services/commandRouter';
+import { createToken } from './testUtils';
 
 // Mock config before importing middleware
 jest.mock('../../config', () => ({
@@ -42,20 +42,6 @@ jest.mock('../../models/Command', () => ({
     listRecent: jest.fn().mockResolvedValue([]),
   },
 }));
-
-function encodeBase64Url(value: object): string {
-  return Buffer.from(JSON.stringify(value)).toString('base64url');
-}
-
-function createToken(payload: Record<string, unknown>, secret = 'test-secret'): string {
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const encodedHeader = encodeBase64Url(header);
-  const encodedPayload = encodeBase64Url(payload);
-  const signature = createHmac('sha256', secret)
-    .update(`${encodedHeader}.${encodedPayload}`)
-    .digest('base64url');
-  return `${encodedHeader}.${encodedPayload}.${signature}`;
-}
 
 describe('Admin Routes Authentication and Authorization', () => {
   let app: Express;
