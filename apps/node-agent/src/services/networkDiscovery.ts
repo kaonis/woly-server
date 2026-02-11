@@ -301,7 +301,7 @@ function formatMAC(mac: string): string {
   const trimmed = mac.trim().toUpperCase();
 
   // First, try splitting by colon or hyphen to handle short octets (e.g. "bc:7:1d:dd:5b:9c")
-  const parts = trimmed.split(/[:\-]/);
+  const parts = trimmed.split(/[:-]/);
   if (parts.length === 6 && parts.every((p) => /^[0-9A-F]{1,2}$/.test(p))) {
     return parts.map((p) => p.padStart(2, '0')).join(':');
   }
