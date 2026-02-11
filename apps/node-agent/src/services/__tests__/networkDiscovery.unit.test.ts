@@ -97,10 +97,16 @@ describe('networkDiscovery', () => {
       expect(devices).toEqual([]);
     });
 
-    it('should reject MAC addresses with single-digit octets', () => {
+    it('should accept MAC addresses with single-digit octets (macOS short format)', () => {
       const output = 'host (192.168.1.1) at a:b:c:d:e:f on en0';
       const devices = networkDiscovery.parseArpUnix(output);
-      expect(devices).toEqual([]);
+      expect(devices).toEqual([{ name: 'host', ip: '192.168.1.1', mac: 'a:b:c:d:e:f' }]);
+    });
+
+    it('should accept MAC addresses with mixed short and full octets (macOS)', () => {
+      const output = '? (192.168.1.5) at bc:7:1d:dd:5b:9c on en0 ifscope [ethernet]';
+      const devices = networkDiscovery.parseArpUnix(output);
+      expect(devices).toEqual([{ name: '?', ip: '192.168.1.5', mac: 'bc:7:1d:dd:5b:9c' }]);
     });
 
     it('should return empty array for empty output', () => {
@@ -271,6 +277,12 @@ describe('networkDiscovery', () => {
     it('should handle already formatted MAC addresses', () => {
       const mac = networkDiscovery.formatMAC('AA:BB:CC:DD:EE:FF');
       expect(mac).toBe('AA:BB:CC:DD:EE:FF');
+    });
+
+    it('should zero-pad single-digit octets from macOS arp output', () => {
+      expect(networkDiscovery.formatMAC('bc:7:1d:dd:5b:9c')).toBe('BC:07:1D:DD:5B:9C');
+      expect(networkDiscovery.formatMAC('80:6d:97:60:39:8')).toBe('80:6D:97:60:39:08');
+      expect(networkDiscovery.formatMAC('a:b:c:d:e:f')).toBe('0A:0B:0C:0D:0E:0F');
     });
   });
 

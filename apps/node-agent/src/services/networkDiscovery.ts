@@ -94,7 +94,7 @@ async function readArpTable(): Promise<ArpDevice[]> {
 
   const { stdout } = await execFileAsync('arp', ['-a'], {
     encoding: 'utf-8',
-    timeout: 10_000,
+    timeout: 30_000,
   });
 
   const platform = os.platform();
@@ -105,6 +105,11 @@ async function readArpTable(): Promise<ArpDevice[]> {
  * Parse `arp -a` output on macOS / Linux.
  * Lines look like:  hostname (192.168.1.1) at aa:bb:cc:dd:ee:ff [ether] on eth0
  *              or:  ? (192.168.1.1) at aa:bb:cc:dd:ee:ff on en0 ifscope [ethernet]
+ *              or:  ? (192.168.1.5) at bc:7:1d:dd:5b:9c on en0 ifscope [ethernet]
+ *
+ * Note: macOS may output MACs with single-digit octets (e.g. `bc:7:1d:dd:5b:9c`
+ * instead of `bc:07:1d:dd:5b:9c`). We accept 1-2 hex digits per octet and let
+ * `formatMAC` normalise them.
  */
 function parseArpUnix(output: string): ArpDevice[] {
   const devices: ArpDevice[] = [];
@@ -114,8 +119,8 @@ function parseArpUnix(output: string): ArpDevice[] {
     );
     if (match) {
       const [, name, ip, mac] = match;
-      // Require a strict 6-octet MAC address (e.g., aa:bb:cc:dd:ee:ff)
-      if (mac && /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/i.test(mac)) {
+      // Accept 6-octet MAC with 1-2 hex digits per octet (macOS may shorten them)
+      if (mac && /^[0-9a-f]{1,2}(:[0-9a-f]{1,2}){5}$/i.test(mac)) {
         devices.push({ name, ip, mac });
       }
     }
@@ -284,14 +289,24 @@ async function getMACAddress(ip: string): Promise<string | null> {
 }
 
 /**
- * Format MAC address to standard format
+ * Format MAC address to standard canonical format "AA:BB:CC:DD:EE:FF".
+ *
+ * Handles:
+ * - "aa:bb:cc:dd:ee:ff"  → "AA:BB:CC:DD:EE:FF"
+ * - "aa-bb-cc-dd-ee-ff"  → "AA:BB:CC:DD:EE:FF"
+ * - "aabbccddeeff"       → "AA:BB:CC:DD:EE:FF"
+ * - "bc:7:1d:dd:5b:9c"   → "BC:07:1D:DD:5B:9C"  (macOS short octets)
  */
 function formatMAC(mac: string): string {
   const trimmed = mac.trim().toUpperCase();
 
-  // Normalize common variants into canonical "AA:BB:CC:DD:EE:FF".
-  // - "aa-bb-cc-dd-ee-ff" -> "AA:BB:CC:DD:EE:FF"
-  // - "aabbccddeeff"      -> "AA:BB:CC:DD:EE:FF"
+  // First, try splitting by colon or hyphen to handle short octets (e.g. "bc:7:1d:dd:5b:9c")
+  const parts = trimmed.split(/[:\-]/);
+  if (parts.length === 6 && parts.every((p) => /^[0-9A-F]{1,2}$/.test(p))) {
+    return parts.map((p) => p.padStart(2, '0')).join(':');
+  }
+
+  // Fallback: strip non-hex and try 12-char contiguous format (e.g. "aabbccddeeff")
   const hexOnly = trimmed.replace(/[^0-9A-F]/g, '');
   if (hexOnly.length === 12) {
     return hexOnly.match(/.{2}/g)!.join(':');
