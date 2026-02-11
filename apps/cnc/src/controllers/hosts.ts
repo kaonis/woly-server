@@ -5,7 +5,7 @@
 import { Request, Response } from 'express';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
-import { lookupMacVendor } from '../services/macVendorService';
+import { lookupMacVendor, MAC_ADDRESS_PATTERN } from '../services/macVendorService';
 import logger from '../utils/logger';
 
 export class HostsController {
@@ -485,8 +485,7 @@ export class HostsController {
 
       // Validate MAC address format to match OpenAPI contract and prevent
       // malformed inputs from reaching the external API/cache.
-      const macPattern = /^([0-9A-Fa-f]{2}([-:])){5}[0-9A-Fa-f]{2}$|^[0-9A-Fa-f]{12}$/;
-      if (!macPattern.test(mac)) {
+      if (!MAC_ADDRESS_PATTERN.test(mac)) {
         res.status(400).json({ error: 'Invalid MAC address format' });
         return;
       }

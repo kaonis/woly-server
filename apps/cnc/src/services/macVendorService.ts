@@ -12,6 +12,14 @@
 import { LRUCache } from 'lru-cache';
 import logger from '../utils/logger';
 
+// --- MAC validation ---
+
+/**
+ * Regex pattern for validating MAC addresses.
+ * Accepts standard formats: XX:XX:XX:XX:XX:XX, XX-XX-XX-XX-XX-XX, or XXXXXXXXXXXX
+ */
+export const MAC_ADDRESS_PATTERN = /^([0-9A-Fa-f]{2}([-:])){5}[0-9A-Fa-f]{2}$|^[0-9A-Fa-f]{12}$/;
+
 // --- Cache ---
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -109,8 +117,13 @@ export async function lookupMacVendor(mac: string): Promise<MacVendorResponse> {
     });
   };
 
-  // Chain the request to enforce serialization
-  requestQueue = requestQueue.then(() => performLookup(), () => performLookup());
+  // Chain the request to enforce serialization.
+  // Both success and error cases continue to the next lookup to maintain the queue.
+  // Errors from performLookup propagate to the caller after updating the queue.
+  requestQueue = requestQueue.then(
+    () => performLookup(),
+    () => performLookup()
+  );
   return requestQueue as Promise<MacVendorResponse>;
 }
 
