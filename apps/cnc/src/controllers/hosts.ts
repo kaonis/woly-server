@@ -483,16 +483,31 @@ export class HostsController {
         return;
       }
 
+      // Validate MAC address format to match OpenAPI contract and prevent
+      // malformed inputs from reaching the external API/cache.
+      const macPattern = /^([0-9A-Fa-f]{2}([-:])){5}[0-9A-Fa-f]{2}$|^[0-9A-Fa-f]{12}$/;
+      if (!macPattern.test(mac)) {
+        res.status(400).json({ error: 'Invalid MAC address format' });
+        return;
+      }
+
       const result = await lookupMacVendor(mac);
       res.json(result);
     } catch (error: any) {
-      const statusCode = error.statusCode || 500;
-      logger.error('MAC vendor lookup failed', { mac: req.params.mac, error: error.message });
+      // Log the full error object for stack/context
+      logger.error('MAC vendor lookup failed', { mac: req.params.mac, error });
 
+      const statusCode = error.statusCode || 500;
       if (statusCode === 429) {
-        res.status(429).json({ error: error.message, mac: req.params.mac });
+        res.status(429).json({
+          error: 'Too Many Requests',
+          message: error.message,
+        });
       } else {
-        res.status(500).json({ error: 'Failed to lookup MAC vendor' });
+        res.status(500).json({
+          error: 'Internal Server Error',
+          message: 'Failed to lookup MAC vendor',
+        });
       }
     }
   }

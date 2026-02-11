@@ -41,7 +41,9 @@ export function createRoutes(
 
   // Host API routes
   // IMPORTANT: mac-vendor must be registered before the :fqn catch-all
-  router.get('/hosts/mac-vendor/:mac', (req, res) => hostsController.getMacVendor(req, res));
+  router.get('/hosts/mac-vendor/:mac', apiLimiter, (req, res) =>
+    hostsController.getMacVendor(req, res),
+  );
   router.get('/hosts', (req, res) => hostsController.getHosts(req, res));
   router.get('/hosts/:fqn', (req, res) => hostsController.getHostByFQN(req, res));
   router.post('/hosts/wakeup/:fqn', (req, res) => hostsController.wakeupHost(req, res));
