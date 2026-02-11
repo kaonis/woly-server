@@ -5,12 +5,13 @@
 import { Request, Response } from 'express';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
+import { lookupMacVendor } from '../services/macVendorService';
 import logger from '../utils/logger';
 
 export class HostsController {
   constructor(
     private hostAggregator: HostAggregator,
-    private commandRouter: CommandRouter
+    private commandRouter: CommandRouter,
   ) {}
 
   /**
@@ -176,16 +177,17 @@ export class HostsController {
       logger.info('Wake-up request received', { fqn });
 
       const idempotencyKeyHeader = req.header('Idempotency-Key');
-      const idempotencyKey = idempotencyKeyHeader && idempotencyKeyHeader.trim().length > 0
-        ? idempotencyKeyHeader.trim()
-        : null;
+      const idempotencyKey =
+        idempotencyKeyHeader && idempotencyKeyHeader.trim().length > 0
+          ? idempotencyKeyHeader.trim()
+          : null;
 
       const result = await this.commandRouter.routeWakeCommand(fqn, { idempotencyKey });
 
       res.json(result);
     } catch (error: any) {
       logger.error('Failed to wake host', { fqn: req.params.fqn, error });
-      
+
       // Determine appropriate status code
       let statusCode = 500;
       if (error.message?.includes('not found')) {
@@ -265,11 +267,14 @@ export class HostsController {
       logger.info('Update host request received', { fqn });
 
       const idempotencyKeyHeader = req.header('Idempotency-Key');
-      const idempotencyKey = idempotencyKeyHeader && idempotencyKeyHeader.trim().length > 0
-        ? idempotencyKeyHeader.trim()
-        : null;
+      const idempotencyKey =
+        idempotencyKeyHeader && idempotencyKeyHeader.trim().length > 0
+          ? idempotencyKeyHeader.trim()
+          : null;
 
-      const result = await this.commandRouter.routeUpdateHostCommand(fqn, hostData, { idempotencyKey });
+      const result = await this.commandRouter.routeUpdateHostCommand(fqn, hostData, {
+        idempotencyKey,
+      });
 
       if (!result.success) {
         res.status(500).json({
@@ -285,7 +290,7 @@ export class HostsController {
       });
     } catch (error: any) {
       logger.error('Failed to update host', { fqn: req.params.fqn, error });
-      
+
       // Determine appropriate status code
       let statusCode = 500;
       if (error.message?.includes('not found')) {
@@ -357,9 +362,10 @@ export class HostsController {
       logger.info('Delete host request received', { fqn });
 
       const idempotencyKeyHeader = req.header('Idempotency-Key');
-      const idempotencyKey = idempotencyKeyHeader && idempotencyKeyHeader.trim().length > 0
-        ? idempotencyKeyHeader.trim()
-        : null;
+      const idempotencyKey =
+        idempotencyKeyHeader && idempotencyKeyHeader.trim().length > 0
+          ? idempotencyKeyHeader.trim()
+          : null;
 
       const result = await this.commandRouter.routeDeleteHostCommand(fqn, { idempotencyKey });
 
@@ -377,7 +383,7 @@ export class HostsController {
       });
     } catch (error: any) {
       logger.error('Failed to delete host', { fqn: req.params.fqn, error });
-      
+
       // Determine appropriate status code
       let statusCode = 500;
       if (error.message?.includes('not found')) {
@@ -392,6 +398,102 @@ export class HostsController {
         error: statusCode === 500 ? 'Internal Server Error' : 'Service Unavailable',
         message: error.message || 'Failed to delete host',
       });
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/hosts/mac-vendor/{mac}:
+   *   get:
+   *     summary: Get MAC address vendor information
+   *     description: |
+   *       Look up the manufacturer/vendor of a network device by MAC address.
+   *       Results are cached for 24 hours to minimize external API calls.
+   *       The external macvendors.com API is rate-limited to one request per second.
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: mac
+   *         required: true
+   *         schema:
+   *           type: string
+   *           pattern: '^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'
+   *         description: MAC address to look up (case-insensitive, accepts colon or hyphen delimiters)
+   *         example: '80:6D:97:60:39:08'
+   *     responses:
+   *       200:
+   *         description: Vendor information retrieved successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               required:
+   *                 - mac
+   *                 - vendor
+   *                 - source
+   *               properties:
+   *                 mac:
+   *                   type: string
+   *                   description: MAC address as provided in request
+   *                   example: '80:6D:97:60:39:08'
+   *                 vendor:
+   *                   type: string
+   *                   description: Vendor/manufacturer name (or "Unknown Vendor" if not found)
+   *                   example: 'Apple, Inc.'
+   *                 source:
+   *                   type: string
+   *                   description: Data source (includes "cached" suffix for cached results)
+   *                   example: 'macvendors.com (cached)'
+   *       400:
+   *         description: Bad request - MAC address missing or invalid format
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 error:
+   *                   type: string
+   *                   example: 'MAC address is required'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       429:
+   *         description: Rate limit exceeded - wait before retrying
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 error:
+   *                   type: string
+   *                   example: 'Rate limit exceeded, please try again later'
+   *                 mac:
+   *                   type: string
+   *                   example: 'AA:BB:CC:DD:EE:FF'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
+   */
+  async getMacVendor(req: Request, res: Response): Promise<void> {
+    try {
+      const mac = req.params.mac as string;
+
+      if (!mac) {
+        res.status(400).json({ error: 'MAC address is required' });
+        return;
+      }
+
+      const result = await lookupMacVendor(mac);
+      res.json(result);
+    } catch (error: any) {
+      const statusCode = error.statusCode || 500;
+      logger.error('MAC vendor lookup failed', { mac: req.params.mac, error: error.message });
+
+      if (statusCode === 429) {
+        res.status(429).json({ error: error.message, mac: req.params.mac });
+      } else {
+        res.status(500).json({ error: 'Failed to lookup MAC vendor' });
+      }
     }
   }
 }

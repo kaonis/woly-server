@@ -16,7 +16,7 @@ import { authLimiter, apiLimiter } from '../middleware/rateLimiter';
 export function createRoutes(
   nodeManager: NodeManager,
   hostAggregator: HostAggregator,
-  commandRouter: CommandRouter
+  commandRouter: CommandRouter,
 ): Router {
   const router = Router();
 
@@ -40,6 +40,8 @@ export function createRoutes(
   router.get('/nodes/:id/health', (req, res) => nodesController.getNodeHealth(req, res));
 
   // Host API routes
+  // IMPORTANT: mac-vendor must be registered before the :fqn catch-all
+  router.get('/hosts/mac-vendor/:mac', (req, res) => hostsController.getMacVendor(req, res));
   router.get('/hosts', (req, res) => hostsController.getHosts(req, res));
   router.get('/hosts/:fqn', (req, res) => hostsController.getHostByFQN(req, res));
   router.post('/hosts/wakeup/:fqn', (req, res) => hostsController.wakeupHost(req, res));
