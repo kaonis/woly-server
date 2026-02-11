@@ -30,6 +30,7 @@ jest.mock('../../config', () => ({
 // Mock the MAC vendor service
 jest.mock('../../services/macVendorService', () => ({
   lookupMacVendor: jest.fn(),
+  MAC_ADDRESS_PATTERN: /^([0-9A-Fa-f]{2}([-:])){5}[0-9A-Fa-f]{2}$|^[0-9A-Fa-f]{12}$/,
 }));
 
 // Mock logger
@@ -131,8 +132,8 @@ describe('MAC Vendor Lookup Route Integration', () => {
 
       expect(response.status).toBe(429);
       expect(response.body).toMatchObject({
-        error: 'Rate limit exceeded, please try again later',
-        mac: 'AA:BB:CC:DD:EE:FF',
+        error: 'Too Many Requests',
+        message: 'Rate limit exceeded, please try again later',
       });
     });
 
@@ -147,7 +148,8 @@ describe('MAC Vendor Lookup Route Integration', () => {
 
       expect(response.status).toBe(500);
       expect(response.body).toMatchObject({
-        error: 'Failed to lookup MAC vendor',
+        error: 'Internal Server Error',
+        message: 'Failed to lookup MAC vendor',
       });
     });
 

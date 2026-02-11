@@ -119,4 +119,22 @@ describe('macVendorService', () => {
     expect(cachedResult.source).toBe('macvendors.com (cached)');
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
+
+  it('should reject invalid MAC address formats', async () => {
+    await expect(lookupMacVendor('invalid')).rejects.toThrow('Invalid MAC address format');
+    await expect(lookupMacVendor('ZZ:ZZ:ZZ:ZZ:ZZ:ZZ')).rejects.toThrow('Invalid MAC address format');
+    await expect(lookupMacVendor('AA:BB:CC:DD:EE')).rejects.toThrow('Invalid MAC address format');
+    await expect(lookupMacVendor('AA:BB:CC:DD:EE:FF:GG')).rejects.toThrow('Invalid MAC address format');
+  });
+
+  it('should accept MAC addresses with leading/trailing whitespace', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: async () => 'Test Vendor',
+    });
+
+    const result = await lookupMacVendor('  AA:BB:CC:DD:EE:FF  ');
+    expect(result.vendor).toBe('Test Vendor');
+  });
 });

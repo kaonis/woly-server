@@ -7,6 +7,7 @@ import type { Request, Response } from 'express';
 // Mock the mac vendor service
 jest.mock('../../services/macVendorService', () => ({
   lookupMacVendor: jest.fn(),
+  MAC_ADDRESS_PATTERN: /^([0-9A-Fa-f]{2}([-:])){5}[0-9A-Fa-f]{2}$|^[0-9A-Fa-f]{12}$/,
 }));
 
 // Mock logger
@@ -71,6 +72,16 @@ describe('HostsController.getMacVendor', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'MAC address is required' });
   });
 
+  it('should return 400 when MAC format is invalid', async () => {
+    const req = { params: { mac: 'invalid-mac' } } as unknown as Request;
+    const res = createMockResponse();
+
+    await controller.getMacVendor(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Invalid MAC address format' });
+  });
+
   it('should return 429 when rate limited', async () => {
     mockLookup.mockRejectedValueOnce(
       Object.assign(new Error('Rate limit exceeded, please try again later'), { statusCode: 429 }),
@@ -83,8 +94,8 @@ describe('HostsController.getMacVendor', () => {
 
     expect(res.status).toHaveBeenCalledWith(429);
     expect(res.json).toHaveBeenCalledWith({
-      error: 'Rate limit exceeded, please try again later',
-      mac: 'AA:BB:CC:DD:EE:FF',
+      error: 'Too Many Requests',
+      message: 'Rate limit exceeded, please try again later',
     });
   });
 
@@ -99,6 +110,9 @@ describe('HostsController.getMacVendor', () => {
     await controller.getMacVendor(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Failed to lookup MAC vendor' });
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Internal Server Error',
+      message: 'Failed to lookup MAC vendor',
+    });
   });
 });
