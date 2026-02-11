@@ -9,16 +9,31 @@ import { DiscoveredHost } from '../types';
 /**
  * Promisify execFile manually to avoid relying on Node's custom promisify symbol.
  * Returns { stdout, stderr } explicitly.
+ *
+ * When `rejectOnStderr` is false (default), a non-zero exit code is tolerated as
+ * long as stdout contains data — the caller can still parse useful output even if
+ * the command returns an error exit code (e.g. `arp -a` with incomplete entries).
  */
 function execFileAsync(
   cmd: string,
   args: string[],
-  opts: { encoding?: BufferEncoding; timeout?: number }
+  opts: { encoding?: BufferEncoding; timeout?: number },
+  { rejectOnNonZero = false }: { rejectOnNonZero?: boolean } = {}
 ): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     execFile(cmd, args, opts, (err, stdout, stderr) => {
       if (err) {
-        reject(err);
+        // If we have stdout data, resolve anyway so callers can parse partial output.
+        // This handles commands like `arp -a` that exit non-zero but still produce
+        // valid output (e.g. incomplete ARP entries on macOS).
+        if (!rejectOnNonZero && typeof stdout === 'string' && stdout.trim().length > 0) {
+          logger.debug(`Command '${cmd}' exited with error but produced output, parsing anyway`, {
+            error: err.message,
+          });
+          resolve({ stdout, stderr: typeof stderr === 'string' ? stderr : '' });
+        } else {
+          reject(err);
+        }
       } else {
         resolve({ stdout, stderr });
       }
@@ -39,10 +54,44 @@ interface ArpDevice {
 }
 
 /**
+ * Prime the ARP cache by pinging the subnet broadcast address.
+ * On macOS/Linux, `arp -a` only returns cached entries — if no recent traffic
+ * has occurred the table can be empty. A broadcast ping forces neighbours to
+ * respond and populate the cache before we read it.
+ */
+async function primeArpCache(): Promise<void> {
+  const platform = os.platform();
+
+  try {
+    if (platform === 'darwin') {
+      // macOS: ping broadcast on all active interfaces (timeout 2s, 2 pings)
+      await execFileAsync('ping', ['-c', '2', '-W', '2000', '-t', '2', '224.0.0.1'], {
+        encoding: 'utf-8',
+        timeout: 5_000,
+      });
+    } else if (platform === 'linux') {
+      // Linux: ping broadcast (timeout 2s, 2 pings)
+      await execFileAsync('ping', ['-c', '2', '-W', '2', '-b', '255.255.255.255'], {
+        encoding: 'utf-8',
+        timeout: 5_000,
+      });
+    }
+    // Windows ARP cache is typically well-populated; skip priming.
+  } catch {
+    // Broadcast ping may fail (e.g. permission denied) — non-fatal, ARP table
+    // will still contain whatever was already cached.
+    logger.debug('ARP cache priming via broadcast ping failed (non-fatal)');
+  }
+}
+
+/**
  * Read the system ARP table by running `arp -a` and parsing the output.
  * Returns an array of { name, ip, mac } for each entry with a valid MAC.
  */
 async function readArpTable(): Promise<ArpDevice[]> {
+  // Prime the ARP cache so we get a complete picture of the LAN
+  await primeArpCache();
+
   const { stdout } = await execFileAsync('arp', ['-a'], {
     encoding: 'utf-8',
     timeout: 10_000,
