@@ -458,7 +458,7 @@ class HostDatabase extends EventEmitter {
       this.emit('scan-complete', allHosts.length);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Network sync error:', { error: message });
+      logger.error(`Network sync error: ${message}`);
     } finally {
       // Always clear scan flag and update timestamp, even if scan failed
       this.scanInProgress = false;

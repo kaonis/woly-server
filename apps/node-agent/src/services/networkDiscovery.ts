@@ -214,7 +214,7 @@ async function scanNetworkARP(): Promise<DiscoveredHost[]> {
     return hosts;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('Network scan error:', { error: message });
+    logger.error(`Network scan error: ${message}`);
     return [];
   }
 }
@@ -229,7 +229,7 @@ async function getMACAddress(ip: string): Promise<string | null> {
     return device ? formatMAC(device.mac) : null;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    logger.error(`Failed to get MAC for IP ${ip}:`, { error: message });
+    logger.error(`Failed to get MAC for IP ${ip}: ${message}`);
     return null;
   }
 }
