@@ -97,18 +97,15 @@ class SqliteDatabase {
       } else if (isInsert) {
         // INSERT queries - check for RETURNING clause
         if (sqliteQuery.includes('RETURNING')) {
-          // SQLite doesn't support RETURNING, so we need to get the last insert rowid
-          const queryWithoutReturning = sqliteQuery.replace(/RETURNING .*/i, '');
-          const stmt = this.db.prepare(queryWithoutReturning);
-          const info = params ? stmt.run(...params) : stmt.run();
-
-          // Get the inserted row (assumes primary key is id or rowid)
-          const selectStmt = this.db.prepare('SELECT * FROM nodes WHERE rowid = ?');
-          const rows = [selectStmt.get(info.lastInsertRowid)];
+          // SQLite 3.35+ (included in better-sqlite3 v9.4+) supports RETURNING natively
+          // better-sqlite3 v12.6.2 includes SQLite 3.47.2, so we can use RETURNING directly
+          // Use .all() for RETURNING queries as .run() doesn't return rows
+          const stmt = this.db.prepare(sqliteQuery);
+          const rows = params ? stmt.all(...params) : stmt.all();
 
           result = {
             rows,
-            rowCount: info.changes,
+            rowCount: rows.length,
           };
         } else {
           const stmt = this.db.prepare(sqliteQuery);
@@ -119,18 +116,16 @@ class SqliteDatabase {
           };
         }
       } else if (isUpdate || isDelete) {
-        // UPDATE/DELETE queries
+        // UPDATE/DELETE queries - SQLite 3.35+ supports RETURNING natively
+        const stmt = this.db.prepare(sqliteQuery);
         if (sqliteQuery.includes('RETURNING')) {
-          // Handle RETURNING for UPDATE/DELETE
-          const queryWithoutReturning = sqliteQuery.replace(/RETURNING .*/i, '');
-          const stmt = this.db.prepare(queryWithoutReturning);
-          const info = params ? stmt.run(...params) : stmt.run();
+          // Use native RETURNING support
+          const rows = params ? stmt.all(...params) : stmt.all();
           result = {
-            rows: [],
-            rowCount: info.changes,
+            rows,
+            rowCount: rows.length,
           };
         } else {
-          const stmt = this.db.prepare(sqliteQuery);
           const info = params ? stmt.run(...params) : stmt.run();
           result = {
             rows: [],
