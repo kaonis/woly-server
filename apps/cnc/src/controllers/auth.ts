@@ -2,6 +2,12 @@ import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import type { Request, Response } from 'express';
 import config from '../config';
 
+// Request body type for token issuance
+interface TokenRequestBody {
+  role?: 'operator' | 'admin';
+  sub?: string;
+}
+
 function unauthorized(res: Response, message: string): void {
   res.status(401).json({
     error: 'Unauthorized',
@@ -97,7 +103,7 @@ export class AuthController {
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
    */
-  issueToken(req: Request, res: Response): void {
+  issueToken = (req: Request, res: Response): void => {
     const bearerResult = getBearerToken(req);
     if (bearerResult.error === 'missing') {
       unauthorized(res, 'Missing Authorization header');
@@ -109,8 +115,9 @@ export class AuthController {
     }
     const accessToken = bearerResult.token!;
 
-    const requestedRoleRaw = (req.body && typeof req.body === 'object') ? (req.body as any).role : undefined;
-    const requestedRole = requestedRoleRaw === 'admin' ? 'admin' : 'operator';
+    // Parse and validate request body
+    const body = (req.body && typeof req.body === 'object' ? req.body : {}) as Partial<TokenRequestBody>;
+    const requestedRole = body.role === 'admin' ? 'admin' : 'operator';
 
     // Prevent privilege escalation: when admin role is requested but ADMIN_TOKENS is not configured,
     // use a generic error to avoid leaking configuration details to unauthenticated requests
@@ -129,10 +136,9 @@ export class AuthController {
       return;
     }
 
-    const requestedSubRaw = (req.body && typeof req.body === 'object') ? (req.body as any).sub : undefined;
     const sub =
-      typeof requestedSubRaw === 'string' && requestedSubRaw.trim().length > 0
-        ? requestedSubRaw.trim()
+      typeof body.sub === 'string' && body.sub.trim().length > 0
+        ? body.sub.trim()
         : `mobile:${randomUUID()}`;
 
     if (sub.length > 128) {
@@ -145,6 +151,6 @@ export class AuthController {
       token: minted.token,
       expiresAt: new Date(minted.exp * 1000).toISOString(),
     });
-  }
+  };
 }
 

@@ -48,6 +48,13 @@ jest.mock('../../utils/logger', () => {
   };
 });
 
+// Mock rate limiters to pass through
+jest.mock('../../middleware/rateLimiter', () => ({
+  authLimiter: (_req: any, _res: any, next: any) => next(),
+  strictAuthLimiter: (_req: any, _res: any, next: any) => next(),
+  apiLimiter: (_req: any, _res: any, next: any) => next(),
+}));
+
 import { lookupMacVendor } from '../../services/macVendorService';
 
 const mockLookup = lookupMacVendor as jest.MockedFunction<typeof lookupMacVendor>;

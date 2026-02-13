@@ -50,7 +50,13 @@ describe('SqliteDatabase', () => {
 
   describe('INSERT with RETURNING', () => {
     it('should return inserted row from nodes table', async () => {
-      const result = await db.query(
+      interface TestNodeRow {
+        id: string;
+        name: string;
+        status: string;
+      }
+
+      const result = await db.query<TestNodeRow>(
         'INSERT INTO test_nodes (id, name, status) VALUES ($1, $2, $3) RETURNING *',
         ['node-1', 'Test Node', 'online']
       );
@@ -63,7 +69,14 @@ describe('SqliteDatabase', () => {
     });
 
     it('should return inserted row from hosts table', async () => {
-      const result = await db.query(
+      interface TestHostRow {
+        id: number;
+        node_id: string;
+        name: string;
+        mac: string;
+      }
+
+      const result = await db.query<TestHostRow>(
         'INSERT INTO test_hosts (node_id, name, mac) VALUES ($1, $2, $3) RETURNING *',
         ['node-1', 'TestHost', '00:11:22:33:44:55']
       );
@@ -77,7 +90,13 @@ describe('SqliteDatabase', () => {
     });
 
     it('should return inserted row from commands table', async () => {
-      const result = await db.query(
+      interface TestCommandRow {
+        id: string;
+        node_id: string;
+        type: string;
+      }
+
+      const result = await db.query<TestCommandRow>(
         'INSERT INTO test_commands (id, node_id, type) VALUES ($1, $2, $3) RETURNING *',
         ['cmd-1', 'node-1', 'wake']
       );
@@ -114,7 +133,13 @@ describe('SqliteDatabase', () => {
     });
 
     it('should return updated rows', async () => {
-      const result = await db.query(
+      interface TestNodeRow {
+        id: string;
+        name: string;
+        status: string;
+      }
+
+      const result = await db.query<TestNodeRow>(
         'UPDATE test_nodes SET status = $1 WHERE id = $2 RETURNING *',
         ['online', 'node-1']
       );
@@ -126,7 +151,13 @@ describe('SqliteDatabase', () => {
     });
 
     it('should return multiple updated rows', async () => {
-      const result = await db.query(
+      interface TestNodeRow {
+        id: string;
+        name: string;
+        status: string;
+      }
+
+      const result = await db.query<TestNodeRow>(
         'UPDATE test_nodes SET status = $1 RETURNING *',
         ['online']
       );
@@ -176,7 +207,13 @@ describe('SqliteDatabase', () => {
     });
 
     it('should return deleted row', async () => {
-      const result = await db.query(
+      interface TestNodeRow {
+        id: string;
+        name: string;
+        status: string;
+      }
+
+      const result = await db.query<TestNodeRow>(
         'DELETE FROM test_nodes WHERE id = $1 RETURNING *',
         ['node-1']
       );
@@ -192,7 +229,13 @@ describe('SqliteDatabase', () => {
     });
 
     it('should return multiple deleted rows', async () => {
-      const result = await db.query(
+      interface TestNodeRow {
+        id: string;
+        name: string;
+        status: string;
+      }
+
+      const result = await db.query<TestNodeRow>(
         'DELETE FROM test_nodes WHERE status = $1 RETURNING *',
         ['offline']
       );
@@ -203,7 +246,7 @@ describe('SqliteDatabase', () => {
       expect(result.rowCount).toBe(2);
 
       // Verify only online node remains
-      const checkResult = await db.query('SELECT * FROM test_nodes');
+      const checkResult = await db.query<TestNodeRow>('SELECT * FROM test_nodes');
       expect(checkResult.rows).toHaveLength(1);
       expect(checkResult.rows[0].status).toBe('online');
     });
@@ -231,7 +274,13 @@ describe('SqliteDatabase', () => {
 
   describe('PostgreSQL-style placeholders', () => {
     it('should convert $1, $2 placeholders to ? for SQLite', async () => {
-      const result = await db.query(
+      interface TestNodeRow {
+        id: string;
+        name: string;
+        status: string;
+      }
+
+      const result = await db.query<TestNodeRow>(
         'INSERT INTO test_nodes (id, name, status) VALUES ($1, $2, $3) RETURNING *',
         ['node-1', 'Test', 'online']
       );
@@ -250,7 +299,13 @@ describe('SqliteDatabase', () => {
     });
 
     it('should return rows for SELECT query', async () => {
-      const result = await db.query('SELECT * FROM test_nodes WHERE id = $1', ['node-1']);
+      interface TestNodeRow {
+        id: string;
+        name: string;
+        status: string;
+      }
+
+      const result = await db.query<TestNodeRow>('SELECT * FROM test_nodes WHERE id = $1', ['node-1']);
 
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0].id).toBe('node-1');
@@ -267,7 +322,14 @@ describe('SqliteDatabase', () => {
 
   describe('Edge cases', () => {
     it('should handle INSERT with AUTOINCREMENT primary key', async () => {
-      const result = await db.query(
+      interface TestHostRow {
+        id: number;
+        node_id: string;
+        name: string;
+        mac: string;
+      }
+
+      const result = await db.query<TestHostRow>(
         'INSERT INTO test_hosts (node_id, name, mac) VALUES ($1, $2, $3) RETURNING *',
         ['node-1', 'Host1', 'AA:BB:CC:DD:EE:FF']
       );
@@ -278,7 +340,13 @@ describe('SqliteDatabase', () => {
     });
 
     it('should handle case-insensitive INSERT keyword', async () => {
-      const result = await db.query(
+      interface TestNodeRow {
+        id: string;
+        name: string;
+        status: string;
+      }
+
+      const result = await db.query<TestNodeRow>(
         'insert into test_nodes (id, name, status) values ($1, $2, $3) RETURNING *',
         ['node-lower', 'Lower Case', 'online']
       );
@@ -288,7 +356,14 @@ describe('SqliteDatabase', () => {
     });
 
     it('should handle table names with underscores', async () => {
-      const result = await db.query(
+      interface TestHostRow {
+        id: number;
+        node_id: string;
+        name: string;
+        mac: string;
+      }
+
+      const result = await db.query<TestHostRow>(
         'INSERT INTO test_hosts (node_id, name, mac) VALUES ($1, $2, $3) RETURNING *',
         ['node-1', 'UnderscoreTest', '11:22:33:44:55:66']
       );
