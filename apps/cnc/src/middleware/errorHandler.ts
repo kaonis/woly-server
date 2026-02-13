@@ -6,14 +6,17 @@ import { Request, Response, NextFunction } from 'express';
 import logger from '../utils/logger';
 
 export function errorHandler(
-  err: Error,
+  err: unknown,
   req: Request,
   res: Response,
   _next: NextFunction
 ): void {
+  const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+  const errorStack = err instanceof Error ? err.stack : undefined;
+  
   logger.error('Unhandled error', {
-    error: err.message,
-    stack: err.stack,
+    error: errorMessage,
+    stack: errorStack,
     path: req.path,
     method: req.method,
   });

@@ -8,6 +8,7 @@ import { mkdirSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import config from '../config';
 import logger from '../utils/logger';
+import type { DatabaseQueryResult } from './connection';
 
 class SqliteDatabase {
   private db: Database.Database | null = null;
@@ -67,7 +68,7 @@ class SqliteDatabase {
     }
   }
 
-  async query(text: string, params?: any[]): Promise<any> {
+  async query<T = unknown>(text: string, params?: unknown[]): Promise<DatabaseQueryResult<T>> {
     if (!this.db) {
       throw new Error('Database not connected');
     }
@@ -84,14 +85,14 @@ class SqliteDatabase {
       const isUpdate = trimmedQuery.startsWith('UPDATE');
       const isDelete = trimmedQuery.startsWith('DELETE');
 
-      let result: any;
+      let result: DatabaseQueryResult<T>;
 
       if (isSelect) {
         // SELECT queries return rows
         const stmt = this.db.prepare(sqliteQuery);
         const rows = params ? stmt.all(...params) : stmt.all();
         result = {
-          rows,
+          rows: rows as T[],
           rowCount: rows.length,
         };
       } else if (isInsert) {
@@ -104,14 +105,14 @@ class SqliteDatabase {
           const rows = params ? stmt.all(...params) : stmt.all();
 
           result = {
-            rows,
+            rows: rows as T[],
             rowCount: rows.length,
           };
         } else {
           const stmt = this.db.prepare(sqliteQuery);
           const info = params ? stmt.run(...params) : stmt.run();
           result = {
-            rows: [],
+            rows: [] as T[],
             rowCount: info.changes,
           };
         }
@@ -122,13 +123,13 @@ class SqliteDatabase {
           // Use native RETURNING support
           const rows = params ? stmt.all(...params) : stmt.all();
           result = {
-            rows,
+            rows: rows as T[],
             rowCount: rows.length,
           };
         } else {
           const info = params ? stmt.run(...params) : stmt.run();
           result = {
-            rows: [],
+            rows: [] as T[],
             rowCount: info.changes,
           };
         }
@@ -136,7 +137,7 @@ class SqliteDatabase {
         // Other queries (CREATE, DROP, etc.)
         this.db.exec(sqliteQuery);
         result = {
-          rows: [],
+          rows: [] as T[],
           rowCount: 0,
         };
       }
@@ -151,7 +152,7 @@ class SqliteDatabase {
     }
   }
 
-  async getClient(): Promise<any> {
+  async getClient(): Promise<{ query: SqliteDatabase['query']; release: () => void }> {
     // SQLite doesn't use pooled clients, so return a mock client
     return {
       query: this.query.bind(this),
@@ -159,7 +160,7 @@ class SqliteDatabase {
     };
   }
 
-  getPool(): any {
+  getPool(): Database.Database | null {
     // Return the database instance for compatibility
     return this.db;
   }

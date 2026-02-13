@@ -195,22 +195,27 @@ export class HostsController {
       const result = await this.commandRouter.routeWakeCommand(fqn, { idempotencyKey });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Failed to wake host', { fqn: req.params.fqn, error });
 
       // Determine appropriate status code
       let statusCode = 500;
-      if (error.message?.includes('not found')) {
-        statusCode = 404;
-      } else if (error.message?.includes('offline')) {
-        statusCode = 503;
-      } else if (error.message?.includes('timeout')) {
-        statusCode = 504;
+      let errorMessage = 'Failed to wake host';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        if (error.message.includes('not found')) {
+          statusCode = 404;
+        } else if (error.message.includes('offline')) {
+          statusCode = 503;
+        } else if (error.message.includes('timeout')) {
+          statusCode = 504;
+        }
       }
 
       res.status(statusCode).json({
         error: statusCode === 500 ? 'Internal Server Error' : 'Service Unavailable',
-        message: error.message || 'Failed to wake host',
+        message: errorMessage,
       });
     }
   }
@@ -310,22 +315,27 @@ export class HostsController {
         success: true,
         message: 'Host updated successfully',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Failed to update host', { fqn: req.params.fqn, error });
 
       // Determine appropriate status code
       let statusCode = 500;
-      if (error.message?.includes('not found')) {
-        statusCode = 404;
-      } else if (error.message?.includes('offline')) {
-        statusCode = 503;
-      } else if (error.message?.includes('timeout')) {
-        statusCode = 504;
+      let errorMessage = 'Failed to update host';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        if (error.message.includes('not found')) {
+          statusCode = 404;
+        } else if (error.message.includes('offline')) {
+          statusCode = 503;
+        } else if (error.message.includes('timeout')) {
+          statusCode = 504;
+        }
       }
 
       res.status(statusCode).json({
         error: statusCode === 500 ? 'Internal Server Error' : 'Service Unavailable',
-        message: error.message || 'Failed to update host',
+        message: errorMessage,
       });
     }
   }
@@ -403,22 +413,27 @@ export class HostsController {
         success: true,
         message: 'Host deleted successfully',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Failed to delete host', { fqn: req.params.fqn, error });
 
       // Determine appropriate status code
       let statusCode = 500;
-      if (error.message?.includes('not found')) {
-        statusCode = 404;
-      } else if (error.message?.includes('offline')) {
-        statusCode = 503;
-      } else if (error.message?.includes('timeout')) {
-        statusCode = 504;
+      let errorMessage = 'Failed to delete host';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        if (error.message.includes('not found')) {
+          statusCode = 404;
+        } else if (error.message.includes('offline')) {
+          statusCode = 503;
+        } else if (error.message.includes('timeout')) {
+          statusCode = 504;
+        }
       }
 
       res.status(statusCode).json({
         error: statusCode === 500 ? 'Internal Server Error' : 'Service Unavailable',
-        message: error.message || 'Failed to delete host',
+        message: errorMessage,
       });
     }
   }
@@ -514,15 +529,21 @@ export class HostsController {
 
       const result = await lookupMacVendor(mac);
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Log the full error object for stack/context
       logger.error('MAC vendor lookup failed', { mac: req.params.mac, error });
 
-      const statusCode = error.statusCode || 500;
+      // Type guard for error with statusCode property
+      const hasStatusCode = (err: unknown): err is { statusCode: number; message: string } =>
+        typeof err === 'object' && err !== null && 'statusCode' in err;
+
+      const statusCode = hasStatusCode(error) ? error.statusCode : 500;
+      const errorMessage = error instanceof Error ? error.message : 'Failed to lookup MAC vendor';
+
       if (statusCode === 429) {
         res.status(429).json({
           error: 'Too Many Requests',
-          message: error.message,
+          message: errorMessage,
         });
       } else {
         res.status(500).json({

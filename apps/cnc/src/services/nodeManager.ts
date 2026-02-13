@@ -310,8 +310,15 @@ export class NodeManager extends EventEmitter {
       return null;
     }
 
-    const kind = (value as any).kind;
-    const token = (value as any).token;
+    // Type guard for expected shape
+    const hasKindAndToken = (v: object): v is { kind: unknown; token: unknown } =>
+      'kind' in v && 'token' in v;
+
+    if (!hasKindAndToken(value)) {
+      return null;
+    }
+
+    const { kind, token } = value;
 
     if (kind === 'static-token' && typeof token === 'string' && token.length > 0) {
       // Re-validate just in case a caller bypassed the upgrade handler.

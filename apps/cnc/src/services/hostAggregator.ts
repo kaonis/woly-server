@@ -28,6 +28,9 @@ interface HostRemovedEvent {
   name: string;
 }
 
+// Internal row type including database ID
+type AggregatedHostRow = AggregatedHost & { id: number };
+
 export class HostAggregator extends EventEmitter {
   private isSqlite = config.dbType === 'sqlite';
 
@@ -39,8 +42,8 @@ export class HostAggregator extends EventEmitter {
   private async findHostRowByNodeAndName(
     nodeId: string,
     name: string
-  ): Promise<(AggregatedHost & { id: number }) | null> {
-    const result = await db.query(
+  ): Promise<AggregatedHostRow | null> {
+    const result = await db.query<AggregatedHostRow>(
       `SELECT
         ah.id,
         ah.node_id as "nodeId",
@@ -60,14 +63,14 @@ export class HostAggregator extends EventEmitter {
       [nodeId, name]
     );
 
-    return result.rows[0] || null;
+    return result.rows[0] ?? null;
   }
 
   private async findHostRowByNodeAndMac(
     nodeId: string,
     mac: string
-  ): Promise<(AggregatedHost & { id: number }) | null> {
-    const result = await db.query(
+  ): Promise<AggregatedHostRow | null> {
+    const result = await db.query<AggregatedHostRow>(
       `SELECT
         ah.id,
         ah.node_id as "nodeId",
@@ -89,7 +92,7 @@ export class HostAggregator extends EventEmitter {
       [nodeId, mac]
     );
 
-    return result.rows[0] || null;
+    return result.rows[0] ?? null;
   }
 
   private async deleteOtherHostsByNodeAndMac(
@@ -393,7 +396,7 @@ export class HostAggregator extends EventEmitter {
    */
   async getAllHosts(): Promise<AggregatedHost[]> {
     try {
-      const result = await db.query(`
+      const result = await db.query<AggregatedHost>(`
         SELECT
           ah.node_id as "nodeId",
           ah.name,
@@ -425,7 +428,7 @@ export class HostAggregator extends EventEmitter {
    */
   async getHostsByNode(nodeId: string): Promise<AggregatedHost[]> {
     try {
-      const result = await db.query(
+      const result = await db.query<AggregatedHost>(
         `SELECT
           ah.node_id as "nodeId",
           ah.name,
@@ -460,7 +463,7 @@ export class HostAggregator extends EventEmitter {
    */
   async getHostByFQN(fullyQualifiedName: string): Promise<AggregatedHost | null> {
     try {
-      const result = await db.query(
+      const result = await db.query<AggregatedHost>(
         `SELECT
           ah.node_id as "nodeId",
           ah.name,
@@ -479,7 +482,7 @@ export class HostAggregator extends EventEmitter {
         [fullyQualifiedName]
       );
 
-      return result.rows[0] || null;
+      return result.rows[0] ?? null;
     } catch (error) {
       logger.error('Failed to get host by FQN', {
         fullyQualifiedName,
@@ -514,7 +517,13 @@ export class HostAggregator extends EventEmitter {
         FROM aggregated_hosts
       `;
 
-      const overallResult = await db.query(overallQuery);
+      interface OverallStatsRow {
+        total: string | number;
+        awake: string | number;
+        asleep: string | number;
+      }
+
+      const overallResult = await db.query<OverallStatsRow>(overallQuery);
 
       // Get stats by location (database-specific)
       const locationQuery = this.isSqlite ? `
@@ -535,22 +544,28 @@ export class HostAggregator extends EventEmitter {
         ORDER BY location
       `;
 
-      const locationResult = await db.query(locationQuery);
+      interface LocationStatsRow {
+        location: string;
+        total: string | number;
+        awake: string | number;
+      }
+
+      const locationResult = await db.query<LocationStatsRow>(locationQuery);
 
       const overall = overallResult.rows[0];
       const byLocation: Record<string, { total: number; awake: number }> = {};
 
-      locationResult.rows.forEach((row: any) => {
+      locationResult.rows.forEach((row) => {
         byLocation[row.location] = {
-          total: parseInt(row.total, 10),
-          awake: parseInt(row.awake || '0', 10),
+          total: parseInt(String(row.total), 10),
+          awake: parseInt(String(row.awake || '0'), 10),
         };
       });
 
       return {
-        total: parseInt(overall.total, 10),
-        awake: parseInt(overall.awake, 10),
-        asleep: parseInt(overall.asleep, 10),
+        total: parseInt(String(overall.total), 10),
+        awake: parseInt(String(overall.awake), 10),
+        asleep: parseInt(String(overall.asleep), 10),
         byLocation,
       };
     } catch (error) {

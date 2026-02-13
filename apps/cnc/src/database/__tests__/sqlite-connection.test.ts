@@ -50,7 +50,13 @@ describe('SqliteDatabase', () => {
 
   describe('INSERT with RETURNING', () => {
     it('should return inserted row from nodes table', async () => {
-      const result = await db.query(
+      interface TestNodeRow {
+        id: string;
+        name: string;
+        status: string;
+      }
+
+      const result = await db.query<TestNodeRow>(
         'INSERT INTO test_nodes (id, name, status) VALUES ($1, $2, $3) RETURNING *',
         ['node-1', 'Test Node', 'online']
       );
@@ -63,7 +69,13 @@ describe('SqliteDatabase', () => {
     });
 
     it('should return inserted row from hosts table', async () => {
-      const result = await db.query(
+      interface TestHostRow {
+        node_id: string;
+        name: string;
+        mac: string;
+      }
+
+      const result = await db.query<TestHostRow>(
         'INSERT INTO test_hosts (node_id, name, mac) VALUES ($1, $2, $3) RETURNING *',
         ['node-1', 'TestHost', '00:11:22:33:44:55']
       );
@@ -77,7 +89,13 @@ describe('SqliteDatabase', () => {
     });
 
     it('should return inserted row from commands table', async () => {
-      const result = await db.query(
+      interface TestCommandRow {
+        id: string;
+        node_id: string;
+        type: string;
+      }
+
+      const result = await db.query<TestCommandRow>(
         'INSERT INTO test_commands (id, node_id, type) VALUES ($1, $2, $3) RETURNING *',
         ['cmd-1', 'node-1', 'wake']
       );
@@ -114,7 +132,13 @@ describe('SqliteDatabase', () => {
     });
 
     it('should return updated rows', async () => {
-      const result = await db.query(
+      interface TestNodeRow {
+        id: string;
+        name: string;
+        status: string;
+      }
+
+      const result = await db.query<TestNodeRow>(
         'UPDATE test_nodes SET status = $1 WHERE id = $2 RETURNING *',
         ['online', 'node-1']
       );
@@ -126,7 +150,13 @@ describe('SqliteDatabase', () => {
     });
 
     it('should return multiple updated rows', async () => {
-      const result = await db.query(
+      interface TestNodeRow {
+        id: string;
+        name: string;
+        status: string;
+      }
+
+      const result = await db.query<TestNodeRow>(
         'UPDATE test_nodes SET status = $1 RETURNING *',
         ['online']
       );

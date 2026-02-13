@@ -7,6 +7,20 @@ import config from '../config';
 import { Node, NodeRegistration } from '../types';
 import logger from '../utils/logger';
 
+// Database row shape for nodes table
+interface NodeRow {
+  id: string;
+  name: string;
+  location: string;
+  public_url: string | null;
+  status: 'online' | 'offline';
+  last_heartbeat: string | Date;
+  capabilities: string | unknown[];
+  metadata: string | Record<string, unknown>;
+  created_at: string | Date;
+  updated_at: string | Date;
+}
+
 export class NodeModel {
   private static isSqlite = config.dbType === 'sqlite';
 
@@ -41,7 +55,7 @@ export class NodeModel {
     `;
 
     const capabilities = this.isSqlite ? '[]' : [];
-    const result = await db.query(query, [
+    const result = await db.query<NodeRow>(query, [
       nodeId,
       name,
       location,
@@ -77,7 +91,7 @@ export class NodeModel {
    */
   static async findById(nodeId: string): Promise<Node | null> {
     const query = 'SELECT * FROM nodes WHERE id = $1';
-    const result = await db.query(query, [nodeId]);
+    const result = await db.query<NodeRow>(query, [nodeId]);
 
     if (result.rows.length === 0) {
       return null;
@@ -91,7 +105,7 @@ export class NodeModel {
    */
   static async findAll(): Promise<Node[]> {
     const query = 'SELECT * FROM nodes ORDER BY location, name';
-    const result = await db.query(query);
+    const result = await db.query<NodeRow>(query);
     return result.rows.map(this.mapRowToNode);
   }
 
@@ -119,15 +133,15 @@ export class NodeModel {
       RETURNING id
     `;
 
-    const result = await db.query(query);
+    const result = await db.query<NodeRow>(query);
 
     // Get affected node IDs for SQLite (since it doesn't support RETURNING)
     let affectedIds: string[] = [];
     if (this.isSqlite && result.rowCount > 0) {
-      const selectResult = await db.query(`SELECT id FROM nodes WHERE status = 'offline'`);
-      affectedIds = selectResult.rows.map((r: any) => r.id);
+      const selectResult = await db.query<{ id: string }>(`SELECT id FROM nodes WHERE status = 'offline'`);
+      affectedIds = selectResult.rows.map((r) => r.id);
     } else if (result.rows) {
-      affectedIds = result.rows.map((r: any) => r.id);
+      affectedIds = result.rows.map((r) => r.id);
     }
 
     if (result.rowCount > 0) {
@@ -159,7 +173,7 @@ export class NodeModel {
    */
   static async getOfflineNodes(): Promise<Node[]> {
     const query = 'SELECT * FROM nodes WHERE status = \'offline\'';
-    const result = await db.query(query);
+    const result = await db.query<NodeRow>(query);
     return result.rows.map(this.mapRowToNode);
   }
 
@@ -180,17 +194,23 @@ export class NodeModel {
       FROM nodes
     `;
 
-    const result = await db.query(query);
+    interface StatusCountRow {
+      online: string | number;
+      offline: string | number;
+    }
+
+    const result = await db.query<StatusCountRow>(query);
+    const row = result.rows[0];
     return {
-      online: parseInt(result.rows[0].online || '0', 10),
-      offline: parseInt(result.rows[0].offline || '0', 10),
+      online: parseInt(String(row.online || '0'), 10),
+      offline: parseInt(String(row.offline || '0'), 10),
     };
   }
 
   /**
    * Map database row to Node type
    */
-  private static mapRowToNode(row: any): Node {
+  private static mapRowToNode(row: NodeRow): Node {
     // SQLite stores JSON as TEXT, PostgreSQL as JSONB
     const metadata = typeof row.metadata === 'string' 
       ? JSON.parse(row.metadata) 
@@ -203,7 +223,7 @@ export class NodeModel {
       id: row.id,
       name: row.name,
       location: row.location,
-      publicUrl: row.public_url,
+      publicUrl: row.public_url ?? undefined,
       status: row.status,
       lastHeartbeat: new Date(row.last_heartbeat),
       capabilities,
