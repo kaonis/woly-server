@@ -13,7 +13,7 @@ import logger from '../utils/logger';
 // Validation schema for updateHost request body
 const updateHostBodySchema = z.object({
   name: z.string().min(1).optional(),
-  mac: z.string().regex(/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/).optional(),
+  mac: z.string().regex(MAC_ADDRESS_PATTERN).optional(),
   ip: z.string().ip().optional(),
   status: hostStatusSchema.optional(),
 }).strict();

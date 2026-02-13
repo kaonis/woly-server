@@ -287,7 +287,7 @@ describe('HostsController.updateHost', () => {
     });
 
     it('should reject invalid MAC address format (missing colons)', async () => {
-      const req = createMockRequest({ mac: 'AABBCCDDEEFF' });
+      const req = createMockRequest({ mac: 'AABBCCDDEE' });  // Too short
       const res = createMockResponse();
 
       await controller.updateHost(req, res);
@@ -302,14 +302,34 @@ describe('HostsController.updateHost', () => {
       expect(mockCommandRouter.routeUpdateHostCommand).not.toHaveBeenCalled();
     });
 
-    it('should reject invalid MAC address format (dashes instead of colons)', async () => {
+    it('should accept valid MAC address format (dashes instead of colons)', async () => {
+      mockCommandRouter.routeUpdateHostCommand.mockResolvedValueOnce({ success: true });
+
       const req = createMockRequest({ mac: 'AA-BB-CC-DD-EE-FF' });
       const res = createMockResponse();
 
       await controller.updateHost(req, res);
 
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(mockCommandRouter.routeUpdateHostCommand).not.toHaveBeenCalled();
+      expect(mockCommandRouter.routeUpdateHostCommand).toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Host updated successfully',
+      });
+    });
+
+    it('should accept valid MAC address format (no separators)', async () => {
+      mockCommandRouter.routeUpdateHostCommand.mockResolvedValueOnce({ success: true });
+
+      const req = createMockRequest({ mac: 'AABBCCDDEEFF' });
+      const res = createMockResponse();
+
+      await controller.updateHost(req, res);
+
+      expect(mockCommandRouter.routeUpdateHostCommand).toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Host updated successfully',
+      });
     });
 
     it('should reject invalid MAC address format (too short)', async () => {
