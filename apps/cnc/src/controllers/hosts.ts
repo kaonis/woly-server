@@ -213,8 +213,26 @@ export class HostsController {
         }
       }
 
+      // Map status code to appropriate error title
+      let errorTitle: string;
+      switch (statusCode) {
+        case 404:
+          errorTitle = 'Not Found';
+          break;
+        case 503:
+          errorTitle = 'Service Unavailable';
+          break;
+        case 504:
+          errorTitle = 'Gateway Timeout';
+          break;
+        case 500:
+        default:
+          errorTitle = 'Internal Server Error';
+          break;
+      }
+
       res.status(statusCode).json({
-        error: statusCode === 500 ? 'Internal Server Error' : 'Service Unavailable',
+        error: errorTitle,
         message: errorMessage,
       });
     }
@@ -333,8 +351,26 @@ export class HostsController {
         }
       }
 
+      // Map status code to appropriate error title
+      let errorTitle: string;
+      switch (statusCode) {
+        case 404:
+          errorTitle = 'Not Found';
+          break;
+        case 503:
+          errorTitle = 'Service Unavailable';
+          break;
+        case 504:
+          errorTitle = 'Gateway Timeout';
+          break;
+        case 500:
+        default:
+          errorTitle = 'Internal Server Error';
+          break;
+      }
+
       res.status(statusCode).json({
-        error: statusCode === 500 ? 'Internal Server Error' : 'Service Unavailable',
+        error: errorTitle,
         message: errorMessage,
       });
     }
@@ -431,8 +467,26 @@ export class HostsController {
         }
       }
 
+      // Map status code to appropriate error title
+      let errorTitle: string;
+      switch (statusCode) {
+        case 404:
+          errorTitle = 'Not Found';
+          break;
+        case 503:
+          errorTitle = 'Service Unavailable';
+          break;
+        case 504:
+          errorTitle = 'Gateway Timeout';
+          break;
+        case 500:
+        default:
+          errorTitle = 'Internal Server Error';
+          break;
+      }
+
       res.status(statusCode).json({
-        error: statusCode === 500 ? 'Internal Server Error' : 'Service Unavailable',
+        error: errorTitle,
         message: errorMessage,
       });
     }

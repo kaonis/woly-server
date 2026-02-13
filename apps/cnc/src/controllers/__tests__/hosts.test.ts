@@ -455,7 +455,7 @@ describe('HostsController.updateHost', () => {
 
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Service Unavailable',
+        error: 'Not Found',
         message: 'Host not found: testhost@location',
       });
     });
@@ -489,7 +489,7 @@ describe('HostsController.updateHost', () => {
 
       expect(res.status).toHaveBeenCalledWith(504);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Service Unavailable',
+        error: 'Gateway Timeout',
         message: 'Command timeout after 30000ms',
       });
     });

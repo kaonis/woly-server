@@ -201,6 +201,15 @@ export class NodeModel {
 
     const result = await db.query<StatusCountRow>(query);
     const row = result.rows[0];
+    
+    // Handle empty table case
+    if (!row) {
+      return {
+        online: 0,
+        offline: 0,
+      };
+    }
+    
     return {
       online: parseInt(String(row.online || '0'), 10),
       offline: parseInt(String(row.offline || '0'), 10),

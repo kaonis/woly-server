@@ -562,6 +562,16 @@ export class HostAggregator extends EventEmitter {
         };
       });
 
+      // Handle empty table case
+      if (!overall) {
+        return {
+          total: 0,
+          awake: 0,
+          asleep: 0,
+          byLocation,
+        };
+      }
+
       return {
         total: parseInt(String(overall.total), 10),
         awake: parseInt(String(overall.awake), 10),
