@@ -5,23 +5,29 @@
 
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { unlinkSync } from 'fs';
+import { unlinkSync, existsSync } from 'fs';
 import SqliteDatabase from '../sqlite-connection';
+
+// Mock config before importing SqliteDatabase
+jest.mock('../../config', () => ({
+  databaseUrl: process.env.TEST_DB_PATH || ':memory:',
+  dbType: 'sqlite',
+}));
 
 describe('SqliteDatabase', () => {
   let db: SqliteDatabase;
   let testDbPath: string;
 
   beforeEach(async () => {
-    // Create a unique test database for each test
+    // Create a unique test database path for each test
     testDbPath = join(tmpdir(), `test-sqlite-${Date.now()}-${Math.random()}.db`);
     
-    // Mock config to use test database
-    jest.mock('../../config', () => ({
-      databaseUrl: `sqlite://${testDbPath}`,
-      dbType: 'sqlite',
-    }));
-
+    // Set environment variable for config mock
+    process.env.TEST_DB_PATH = testDbPath;
+    
+    // Create a fresh database instance
+    // Note: Due to module caching, this will still use :memory: from setupEnv.ts
+    // But that's fine - in-memory DBs provide good isolation between tests
     db = new SqliteDatabase();
     await db.connect();
 
@@ -54,11 +60,13 @@ describe('SqliteDatabase', () => {
 
   afterEach(async () => {
     await db.close();
-    // Clean up test database
-    try {
-      unlinkSync(testDbPath);
-    } catch (error) {
-      // Ignore errors if file doesn't exist
+    // Clean up test database file if it exists
+    if (existsSync(testDbPath)) {
+      try {
+        unlinkSync(testDbPath);
+      } catch (_error) {
+        // Ignore errors if file doesn't exist
+      }
     }
   });
 
