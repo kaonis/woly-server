@@ -3,6 +3,21 @@ import logger from '../utils/logger';
 import type { CommandRecord, CommandState } from '../types';
 import config from '../config';
 
+// Database row shape for commands table
+interface CommandRow {
+  id: string;
+  node_id: string;
+  type: string;
+  payload: string | unknown;
+  idempotency_key: string | null;
+  state: CommandState;
+  error: string | null;
+  created_at: string | Date;
+  updated_at: string | Date;
+  sent_at: string | Date | null;
+  completed_at: string | Date | null;
+}
+
 function isSqlite(): boolean {
   return config.dbType === 'sqlite';
 }
@@ -27,7 +42,7 @@ function deserializePayload(value: unknown): unknown {
   }
 }
 
-function rowToRecord(row: any): CommandRecord {
+function rowToRecord(row: CommandRow): CommandRecord {
   return {
     id: String(row.id),
     nodeId: String(row.node_id),
@@ -101,7 +116,7 @@ export class CommandModel {
           RETURNING *
         `;
 
-      const result = await db.query(query, [
+      const result = await db.query<CommandRow>(query, [
         id,
         nodeId,
         type,
@@ -201,7 +216,7 @@ export class CommandModel {
   }
 
   static async findById(id: string): Promise<CommandRecord | null> {
-    const result = await db.query('SELECT * FROM commands WHERE id = $1', [id]);
+    const result = await db.query<CommandRow>('SELECT * FROM commands WHERE id = $1', [id]);
     if (!result.rows.length) {
       return null;
     }
@@ -209,7 +224,7 @@ export class CommandModel {
   }
 
   static async findByIdempotencyKey(nodeId: string, idempotencyKey: string): Promise<CommandRecord | null> {
-    const result = await db.query(
+    const result = await db.query<CommandRow>(
       'SELECT * FROM commands WHERE node_id = $1 AND idempotency_key = $2 ORDER BY created_at DESC LIMIT 1',
       [nodeId, idempotencyKey]
     );
@@ -224,14 +239,14 @@ export class CommandModel {
     const nodeId = params?.nodeId ?? null;
 
     if (nodeId) {
-      const result = await db.query(
+      const result = await db.query<CommandRow>(
         'SELECT * FROM commands WHERE node_id = $1 ORDER BY created_at DESC LIMIT $2',
         [nodeId, limit]
       );
       return result.rows.map(rowToRecord);
     }
 
-    const result = await db.query('SELECT * FROM commands ORDER BY created_at DESC LIMIT $1', [limit]);
+    const result = await db.query<CommandRow>('SELECT * FROM commands ORDER BY created_at DESC LIMIT $1', [limit]);
     return result.rows.map(rowToRecord);
   }
 

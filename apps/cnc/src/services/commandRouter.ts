@@ -6,8 +6,17 @@ import { HostAggregator } from './hostAggregator';
 import logger from '../utils/logger';
 import { CommandModel } from '../models/Command';
 import config from '../config';
+import type { HostStatus } from '@kaonis/woly-protocol';
 
 type DispatchCommand = Extract<CncCommand, { commandId: string }>;
+
+// Host update data structure from API
+interface HostUpdateData {
+  name?: string;
+  mac?: string;
+  ip?: string;
+  status?: HostStatus;
+}
 
 /**
  * CommandRouter
@@ -140,7 +149,7 @@ export class CommandRouter extends EventEmitter {
    */
   async routeUpdateHostCommand(
     fqn: string,
-    hostData: any,
+    hostData: HostUpdateData,
     options?: { idempotencyKey?: string | null }
   ): Promise<CommandResult> {
     logger.info(`Routing update-host command for ${fqn}`);

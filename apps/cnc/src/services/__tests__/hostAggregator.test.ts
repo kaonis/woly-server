@@ -252,11 +252,11 @@ describe('HostAggregator', () => {
       expect(renamed!.mac).toBe('AA:BB:CC:DD:EE:10');
 
       // Ensure only one row exists for (node, mac).
-      const countResult = await db.query(
+      const countResult = await db.query<{ count: string | number }>(
         'SELECT COUNT(*) as count FROM aggregated_hosts WHERE node_id = $1 AND mac = $2',
         ['test-node-2', 'AA:BB:CC:DD:EE:10']
       );
-      expect(parseInt(countResult.rows[0].count, 10)).toBe(1);
+      expect(parseInt(String(countResult.rows[0].count), 10)).toBe(1);
     });
   });
 
@@ -338,11 +338,11 @@ describe('HostAggregator', () => {
       // Remove one by name; expect all rows with same MAC are deleted.
       await hostAggregator.onHostRemoved({ nodeId, name: 'Router' });
 
-      const countResult = await db.query(
+      const countResult = await db.query<{ count: string | number }>(
         'SELECT COUNT(*) as count FROM aggregated_hosts WHERE node_id = $1 AND mac = $2',
         [nodeId, 'AA:BB:CC:DD:EE:20']
       );
-      expect(parseInt(countResult.rows[0].count, 10)).toBe(0);
+      expect(parseInt(String(countResult.rows[0].count), 10)).toBe(0);
     });
 
     it('should handle removal of non-existent host', async () => {

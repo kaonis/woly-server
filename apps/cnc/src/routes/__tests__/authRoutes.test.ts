@@ -31,6 +31,7 @@ jest.mock('../../config', () => ({
 // Mock rate limiters to pass through
 jest.mock('../../middleware/rateLimiter', () => ({
   authLimiter: (_req: any, _res: any, next: any) => next(),
+  strictAuthLimiter: (_req: any, _res: any, next: any) => next(),
   apiLimiter: (_req: any, _res: any, next: any) => next(),
 }));
 

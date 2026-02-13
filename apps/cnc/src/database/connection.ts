@@ -8,12 +8,18 @@ import config from '../config';
 import logger from '../utils/logger';
 import SqliteDatabase from './sqlite-connection';
 
+// Query result type compatible with both PostgreSQL and SQLite
+export interface DatabaseQueryResult<T = unknown> {
+  rows: T[];
+  rowCount: number;
+}
+
 // Database interface for type safety
 interface IDatabase {
   connect(): Promise<void>;
-  query(text: string, params?: any[]): Promise<any>;
-  getClient(): Promise<any>;
-  getPool(): any;
+  query<T = unknown>(text: string, params?: unknown[]): Promise<DatabaseQueryResult<T>>;
+  getClient(): Promise<PoolClient | { query: IDatabase['query']; release: () => void }>;
+  getPool(): Pool | unknown;
   close(): Promise<void>;
 }
 
@@ -45,13 +51,16 @@ class PostgresDatabase implements IDatabase {
     }
   }
 
-  async query(text: string, params?: any[]): Promise<any> {
+  async query<T = unknown>(text: string, params?: unknown[]): Promise<DatabaseQueryResult<T>> {
     const start = Date.now();
     try {
       const result = await this.pool.query(text, params);
       const duration = Date.now() - start;
       logger.debug('Executed query', { text, duration, rows: result.rowCount });
-      return result;
+      return {
+        rows: result.rows as T[],
+        rowCount: result.rowCount ?? 0,
+      };
     } catch (error) {
       logger.error('Query error', { text, error });
       throw error;
