@@ -12,7 +12,7 @@
     "init-db": "ts-node src/init-db.ts",
     "test": "npm run test:preflight && jest",
     "test:watch": "npm run test:preflight && jest --watch",
-    "test:ci": "npm run test:preflight && jest",
+    "test:ci": "npm run test:preflight && jest --ci --coverage --maxWorkers=2",
     "test:coverage": "npm run test:preflight && jest --coverage",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",

@@ -1,5 +1,10 @@
 module.exports = {
   preset: 'ts-jest',
+  transform: {
+    '^.+\\.ts$': ['ts-jest', {
+      tsconfig: 'tsconfig.test.json',
+    }],
+  },
   testEnvironment: 'node',
   setupFiles: ['<rootDir>/src/test/setupEnv.ts'],
   setupFilesAfterEnv: ['<rootDir>/src/test/setupDb.ts'],
@@ -11,6 +16,14 @@ module.exports = {
     '!src/**/__tests__/**',
     '!src/swagger.ts',
   ],
+  coverageThreshold: {
+    global: {
+      branches: 50,
+      functions: 50,
+      lines: 50,
+      statements: 50
+    }
+  },
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   moduleFileExtensions: ['ts', 'js', 'json'],

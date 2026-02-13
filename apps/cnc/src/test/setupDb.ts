@@ -9,3 +9,7 @@ beforeAll(async () => {
   const schema = readFileSync(schemaPath, 'utf-8');
   await db.query(schema);
 });
+
+afterAll(async () => {
+  await db.close();
+});
