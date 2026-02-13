@@ -1,4 +1,4 @@
-import { authLimiter, apiLimiter } from '../rateLimiter';
+import { authLimiter, apiLimiter, strictAuthLimiter } from '../rateLimiter';
 
 // Mock the logger to avoid console output during tests
 jest.mock('../../utils/logger', () => ({
@@ -10,6 +10,22 @@ jest.mock('../../utils/logger', () => ({
 describe('Rate Limiter Middleware', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('strictAuthLimiter', () => {
+    it('should be defined and be a function', () => {
+      expect(strictAuthLimiter).toBeDefined();
+      expect(typeof strictAuthLimiter).toBe('function');
+    });
+
+    it('should be configured as Express middleware', () => {
+      // Express middleware functions should have at least 3 parameters (req, res, next)
+      expect(strictAuthLimiter.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('should not be the same as authLimiter', () => {
+      expect(strictAuthLimiter).not.toBe(authLimiter);
+    });
   });
 
   describe('authLimiter', () => {
@@ -37,10 +53,13 @@ describe('Rate Limiter Middleware', () => {
   });
 
   describe('Rate limiter exports', () => {
-    it('should export both authLimiter and apiLimiter', () => {
+    it('should export strictAuthLimiter, authLimiter and apiLimiter', () => {
+      expect(strictAuthLimiter).toBeTruthy();
       expect(authLimiter).toBeTruthy();
       expect(apiLimiter).toBeTruthy();
+      expect(strictAuthLimiter).not.toBe(authLimiter);
       expect(authLimiter).not.toBe(apiLimiter);
+      expect(strictAuthLimiter).not.toBe(apiLimiter);
     });
   });
 });

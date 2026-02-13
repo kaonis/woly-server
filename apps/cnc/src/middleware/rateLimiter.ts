@@ -3,6 +3,48 @@ import { logger } from '../utils/logger';
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
+// Configurable auth rate limit parameters with validation
+const parsePositiveInt = (value: string, defaultValue: number): number => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed) || parsed <= 0) {
+    logger.warn(
+      `Invalid rate limit config value "${value}", using default ${defaultValue}`,
+    );
+    return defaultValue;
+  }
+  return parsed;
+};
+
+const AUTH_RATE_LIMIT_WINDOW_MS = parsePositiveInt(
+  process.env.AUTH_RATE_LIMIT_WINDOW_MS || '',
+  900000,
+); // 15 minutes default
+const AUTH_RATE_LIMIT_MAX = parsePositiveInt(
+  process.env.AUTH_RATE_LIMIT_MAX || '',
+  5,
+); // 5 attempts default
+
+/**
+ * Strict authentication endpoint rate limiter
+ * Very strict limit to prevent brute-force attacks on token exchange
+ * Default: 5 requests per 15 minutes per IP (configurable via env vars)
+ */
+export const strictAuthLimiter = rateLimit({
+  windowMs: AUTH_RATE_LIMIT_WINDOW_MS,
+  limit: AUTH_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logger.warn(
+      `Strict auth rate limit exceeded for IP: ${req.ip} on path: ${req.path}`,
+    );
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Too many authentication attempts, please try again later',
+    });
+  },
+});
+
 /**
  * Authentication endpoint rate limiter
  * Strict limit to prevent brute-force attacks on token exchange

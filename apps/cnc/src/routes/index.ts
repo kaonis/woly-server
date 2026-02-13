@@ -11,7 +11,7 @@ import { NodeManager } from '../services/nodeManager';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
 import { authenticateJwt, authorizeRoles } from '../middleware/auth';
-import { authLimiter, apiLimiter } from '../middleware/rateLimiter';
+import { apiLimiter, strictAuthLimiter } from '../middleware/rateLimiter';
 
 export function createRoutes(
   nodeManager: NodeManager,
@@ -27,7 +27,7 @@ export function createRoutes(
   const authController = new AuthController();
 
   // Public API routes with rate limiting
-  router.post('/auth/token', authLimiter, (req, res) => authController.issueToken(req, res));
+  router.post('/auth/token', strictAuthLimiter, (req, res) => authController.issueToken(req, res));
 
   // Route group protection
   router.use('/nodes', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
