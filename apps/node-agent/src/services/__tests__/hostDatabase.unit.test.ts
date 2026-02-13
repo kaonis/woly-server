@@ -152,7 +152,8 @@ describe('HostDatabase', () => {
       expect(newHost.mac).toBe('AA:BB:CC:DD:EE:FF');
       expect(newHost.ip).toBe('192.168.1.200');
       expect(newHost.status).toBe('asleep');
-      expect(newHost.discovered).toBe(1);
+      expect(newHost.discovered).toBe(0);
+      expect(newHost.pingResponsive).toBe(null);
 
       // Verify it's in the database
       const retrieved = await db.getHost('TestHost');
