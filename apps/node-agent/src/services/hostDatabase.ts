@@ -207,7 +207,7 @@ class HostDatabase extends EventEmitter {
   addHost(name: string, mac: string, ip: string): Promise<Host> {
     return new Promise((resolve, reject) => {
       const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered, pingResponsive)
-                   VALUES(?, ?, ?, ?, datetime('now'), 1, NULL)`;
+                   VALUES(?, ?, ?, ?, datetime('now'), 0, NULL)`;
       try {
         const formattedMac = networkDiscovery.formatMAC(mac);
         this.db.prepare(sql).run(name, formattedMac, ip, 'asleep');
@@ -218,8 +218,8 @@ class HostDatabase extends EventEmitter {
           ip,
           status: 'asleep',
           lastSeen: new Date().toISOString(),
-          discovered: 1,
-          pingResponsive: undefined,
+          discovered: 0,
+          pingResponsive: null,
         });
       } catch (err) {
         const error = err as Error;
