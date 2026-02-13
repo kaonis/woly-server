@@ -3,12 +3,26 @@ import { logger } from '../utils/logger';
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
-// Configurable auth rate limit parameters
-const AUTH_RATE_LIMIT_WINDOW_MS = parseInt(
-  process.env.AUTH_RATE_LIMIT_WINDOW_MS || '900000',
-  10,
+// Configurable auth rate limit parameters with validation
+const parsePositiveInt = (value: string, defaultValue: number): number => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed) || parsed <= 0) {
+    logger.warn(
+      `Invalid rate limit config value "${value}", using default ${defaultValue}`,
+    );
+    return defaultValue;
+  }
+  return parsed;
+};
+
+const AUTH_RATE_LIMIT_WINDOW_MS = parsePositiveInt(
+  process.env.AUTH_RATE_LIMIT_WINDOW_MS || '',
+  900000,
 ); // 15 minutes default
-const AUTH_RATE_LIMIT_MAX = parseInt(process.env.AUTH_RATE_LIMIT_MAX || '5', 10); // 5 attempts default
+const AUTH_RATE_LIMIT_MAX = parsePositiveInt(
+  process.env.AUTH_RATE_LIMIT_MAX || '',
+  5,
+); // 5 attempts default
 
 /**
  * Strict authentication endpoint rate limiter
