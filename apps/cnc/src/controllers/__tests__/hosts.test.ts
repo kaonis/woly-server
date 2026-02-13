@@ -286,7 +286,7 @@ describe('HostsController.updateHost', () => {
       expect(mockCommandRouter.routeUpdateHostCommand).not.toHaveBeenCalled();
     });
 
-    it('should reject invalid MAC address format (missing colons)', async () => {
+    it('should reject invalid MAC address format (too short - 10 characters)', async () => {
       const req = createMockRequest({ mac: 'AABBCCDDEE' });  // Too short
       const res = createMockResponse();
 
