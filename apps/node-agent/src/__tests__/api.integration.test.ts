@@ -94,8 +94,11 @@ describe('API Integration Tests', () => {
       expect(response.body).toHaveProperty('ip');
     });
 
-    it('should return 204 for non-existent host', async () => {
-      await request(app).get('/hosts/NONEXISTENT').expect(204);
+    it('should return 404 for non-existent host', async () => {
+      const response = await request(app).get('/hosts/NONEXISTENT').expect(404);
+      
+      expect(response.body).toHaveProperty('error', 'Not Found');
+      expect(response.body).toHaveProperty('message', "Host 'NONEXISTENT' not found");
     });
   });
 
@@ -169,8 +172,11 @@ describe('API Integration Tests', () => {
       expect(wol.wake).toHaveBeenCalled();
     });
 
-    it('should return 204 for non-existent host', async () => {
-      await request(app).post('/hosts/wakeup/NONEXISTENT').expect(204);
+    it('should return 404 for non-existent host', async () => {
+      const response = await request(app).post('/hosts/wakeup/NONEXISTENT').expect(404);
+      
+      expect(response.body).toHaveProperty('error', 'Not Found');
+      expect(response.body).toHaveProperty('message', "Host 'NONEXISTENT' not found");
     });
 
     it('should handle WoL errors', async () => {

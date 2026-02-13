@@ -101,8 +101,19 @@ const getAllHosts = async (_req: Request, res: Response): Promise<void> => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Host'
- *       204:
+ *       404:
  *         description: Host not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: 'Not Found'
+ *                 message:
+ *                   type: string
+ *                   example: "Host 'PHANTOM-MBP' not found"
  *       401:
  *         description: Unauthorized - API key required (when NODE_API_KEY is configured)
  *         content:
@@ -122,7 +133,7 @@ const getHost = async (req: Request, res: Response): Promise<void> => {
   }
   const host = await hostDb.getHost(name);
   if (!host) {
-    res.sendStatus(204);
+    res.status(404).json({ error: 'Not Found', message: `Host '${name}' not found` });
     logger.info(`No host found with the name ${name}`);
     return;
   }
@@ -168,8 +179,19 @@ const getHost = async (req: Request, res: Response): Promise<void> => {
  *                 message:
  *                   type: string
  *                   example: Wake-on-LAN packet sent
- *       204:
+ *       404:
  *         description: Host not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: 'Not Found'
+ *                 message:
+ *                   type: string
+ *                   example: "Host 'PHANTOM-MBP' not found"
  *       401:
  *         description: Unauthorized - API key required (when NODE_API_KEY is configured)
  *         content:
@@ -192,7 +214,7 @@ const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
   const host = await hostDb.getHost(name);
 
   if (!host) {
-    res.sendStatus(204);
+    res.status(404).json({ error: 'Not Found', message: `Host '${name}' not found` });
     logger.info(`No host found with name ${name}`);
     return;
   }
