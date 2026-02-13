@@ -85,6 +85,18 @@ cd packages/protocol && npx tsc
 
 Output goes to `dist/`. Both `main` and `types` in package.json point there.
 
+## Testing
+
+```bash
+# From monorepo root
+npm test -w packages/protocol
+
+# Or directly
+cd packages/protocol && npm test
+```
+
+The package includes schema validation tests in `src/__tests__/schemas.test.ts`.
+
 ## Publishing to npm
 
 This package is also published to npm for the mobile app to consume.

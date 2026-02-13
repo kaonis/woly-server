@@ -11,7 +11,7 @@
 - Rate limiting, input validation, CORS, Helmet security headers
 - Interactive Swagger API docs at `/api-docs`
 - Structured Winston logging with file rotation
-- 240+ tests with 90%+ coverage
+- 240+ tests with 80%+ coverage
 
 ## Quick Start
 
