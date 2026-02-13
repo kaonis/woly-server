@@ -373,36 +373,57 @@ class HostDatabase extends EventEmitter {
       let updatedHostCount = 0;
       let awakeCount = 0;
 
-      // Process each discovered host
-      for (const host of discoveredHosts) {
+      // Ping all hosts in parallel with concurrency limiting
+      const pingConcurrency = config.network.pingConcurrency;
+      const hostsWithPingResults: Array<{
+        host: typeof discoveredHosts[0];
+        pingResponsive: number | null;
+        status: 'awake' | 'asleep';
+      }> = [];
+
+      // Process hosts in batches for concurrent pinging
+      for (let i = 0; i < discoveredHosts.length; i += pingConcurrency) {
+        const batch = discoveredHosts.slice(i, i + pingConcurrency);
+
+        const batchResults = await Promise.all(
+          batch.map(async (host) => {
+            // Determine if host is alive:
+            // - If found via ARP, it's responding to network requests (awake by default)
+            // - Always check ping responsiveness for additional status information
+            let isAlive = true; // ARP discovery means host is awake
+            let pingResponsive: number | null = null;
+
+            // Always check ping to track responsiveness
+            const pingResult = await networkDiscovery.isHostAlive(host.ip);
+            pingResponsive = pingResult ? 1 : 0;
+
+            if (config.network.usePingValidation) {
+              // If ping validation is enabled, use it to determine awake status
+              // (but this is not recommended as many devices block ping)
+              isAlive = pingResult;
+              if (!isAlive) {
+                logger.debug(
+                  `Host ${host.ip} found via ARP but did not respond to ping - marking as awake anyway`
+                );
+                // Even if ping fails, ARP response means it's awake
+                isAlive = true;
+              }
+            }
+
+            const status: 'awake' | 'asleep' = isAlive ? 'awake' : 'asleep';
+
+            return { host, pingResponsive, status };
+          })
+        );
+
+        hostsWithPingResults.push(...batchResults);
+      }
+
+      // Process database operations sequentially to avoid race conditions
+      for (const { host, pingResponsive, status } of hostsWithPingResults) {
         const formattedMac = networkDiscovery.formatMAC(host.mac);
 
-        // Determine if host is alive:
-        // - If found via ARP, it's responding to network requests (awake by default)
-        // - Always check ping responsiveness for additional status information
-        let isAlive = true; // ARP discovery means host is awake
-        let pingResponsive: number | null = null;
-
-        // Always check ping to track responsiveness
-        const pingResult = await networkDiscovery.isHostAlive(host.ip);
-        pingResponsive = pingResult ? 1 : 0;
-
-        if (config.network.usePingValidation) {
-          // If ping validation is enabled, use it to determine awake status
-          // (but this is not recommended as many devices block ping)
-          isAlive = pingResult;
-          if (!isAlive) {
-            logger.debug(
-              `Host ${host.ip} found via ARP but did not respond to ping - marking as awake anyway`
-            );
-            // Even if ping fails, ARP response means it's awake
-            isAlive = true;
-          }
-        }
-
-        const status = isAlive ? 'awake' : 'asleep';
-
-        if (isAlive) awakeCount++;
+        if (status === 'awake') awakeCount++;
 
         try {
           // Try to update existing host with status and ping responsiveness
