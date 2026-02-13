@@ -393,6 +393,76 @@ describe('HostDatabase', () => {
       expect(host).toBeDefined();
       expect(host?.mac).toBe('AA:BB:CC:DD:EE:FF');
     });
+
+    it('should ping hosts concurrently in batches', async () => {
+      // Create 25 mock hosts to test batching (with default concurrency of 10)
+      const mockDiscoveredHosts: DiscoveredHost[] = Array.from({ length: 25 }, (_, i) => ({
+        ip: `192.168.1.${100 + i}`,
+        mac: `AA:BB:CC:DD:EE:${i.toString(16).padStart(2, '0').toUpperCase()}`,
+        hostname: `Host${i}`,
+      }));
+
+      (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
+      (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
+        mac.toUpperCase().replace(/-/g, ':')
+      );
+
+      // Track call timing to verify concurrency
+      const pingCallTimes: number[] = [];
+      (networkDiscovery.isHostAlive as jest.Mock).mockImplementation(async () => {
+        pingCallTimes.push(Date.now());
+        // Simulate network delay
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return true;
+      });
+
+      await db.syncWithNetwork();
+
+      // Verify all hosts were pinged
+      expect(networkDiscovery.isHostAlive).toHaveBeenCalledTimes(25);
+
+      // Verify all hosts were added/updated
+      for (let i = 0; i < 25; i++) {
+        const host = await db.getHost(`Host${i}`);
+        expect(host).toBeDefined();
+        expect(host?.status).toBe('awake');
+        expect(host?.pingResponsive).toBe(1);
+      }
+    });
+
+    it('should handle mixed ping results in concurrent batches', async () => {
+      const mockDiscoveredHosts: DiscoveredHost[] = [
+        { ip: '192.168.1.100', mac: 'AA:BB:CC:DD:EE:01', hostname: 'Host1' },
+        { ip: '192.168.1.101', mac: 'AA:BB:CC:DD:EE:02', hostname: 'Host2' },
+        { ip: '192.168.1.102', mac: 'AA:BB:CC:DD:EE:03', hostname: 'Host3' },
+      ];
+
+      (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
+      (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
+        mac.toUpperCase().replace(/-/g, ':')
+      );
+
+      // Mock alternating ping results
+      (networkDiscovery.isHostAlive as jest.Mock)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true);
+
+      await db.syncWithNetwork();
+
+      // All hosts should be marked as awake (ARP discovery overrides ping)
+      const host1 = await db.getHost('Host1');
+      expect(host1?.status).toBe('awake');
+      expect(host1?.pingResponsive).toBe(1);
+
+      const host2 = await db.getHost('Host2');
+      expect(host2?.status).toBe('awake');
+      expect(host2?.pingResponsive).toBe(0);
+
+      const host3 = await db.getHost('Host3');
+      expect(host3?.status).toBe('awake');
+      expect(host3?.pingResponsive).toBe(1);
+    });
   });
 
   describe('Periodic scanning', () => {

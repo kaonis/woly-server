@@ -16,6 +16,7 @@ export const config = {
     scanInterval: parseInt(process.env.SCAN_INTERVAL || '300000', 10), // 5 minutes
     scanDelay: parseInt(process.env.SCAN_DELAY || '5000', 10), // 5 seconds
     pingTimeout: parseInt(process.env.PING_TIMEOUT || '2000', 10), // 2 seconds
+    pingConcurrency: parseInt(process.env.PING_CONCURRENCY || '10', 10), // 10 concurrent pings
     // Use ping validation: if true, ping each discovered host to verify it's awake
     // If false (default), ARP discovery alone indicates host is awake
     usePingValidation: process.env.USE_PING_VALIDATION === 'true',
