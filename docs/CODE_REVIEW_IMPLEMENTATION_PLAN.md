@@ -6,6 +6,36 @@
 
 ---
 
+## GitHub Issues
+
+All findings have been filed as GitHub issues:
+
+| Phase | Issue | Title |
+|-------|-------|-------|
+| **Bugs** | #76 | Fix HTTP 204 → 404 for not-found hosts |
+| **Bugs** | #77 | Fix incorrect `discovered` and `pingResponsive` in addHost |
+| **Bugs** | #78 | Fix SQLite RETURNING clause hardcoded to `nodes` table |
+| **Bugs** | #79 | Fix `usePingValidation` being a no-op |
+| **Bugs** | #80 | Fix seed data, JSDoc mismatch, FQN round-trip corruption |
+| **Security** | #81 | Add input validation on C&C updateHost request body |
+| **Security** | #82 | Add rate limiting to C&C auth token exchange endpoint |
+| **Security** | #83 | Restrict default CORS and rate-limit health endpoint |
+| **Code Quality** | #84 | Consolidate Joi → Zod for HTTP validation |
+| **Code Quality** | #85 | Extract scan orchestration from HostDatabase (SRP) |
+| **Code Quality** | #86 | Remove unused dependencies |
+| **Code Quality** | #87 | Reduce `any` usage in C&C |
+| **Code Quality** | #88 | Async NBT lookup, SQL dedup, isSqlite, cncClient TODOs |
+| **Code Quality** | #89 | Add PUT/DELETE REST endpoints for standalone mode |
+| **Performance** | #90 | Parallelize ping during network sync |
+| **Performance** | #91 | O(1) socket lookup, FQN index, command pruning, health checks |
+| **Testing** | #92 | C&C coverage thresholds, test infra, untested files |
+| **Testing** | #93 | Protocol coverage, CORS tests, raise thresholds |
+| **Docs** | #94 | Fix coverage claims, align versions, create C&C TESTING.md |
+
+Pre-existing issues that overlap: #55, #56, #57 (security), #63 (lint debt).
+
+---
+
 ## Executive Summary
 
 The WoLy server monorepo is a well-architected distributed Wake-on-LAN system with strong security foundations—parameterized SQL, Zod protocol validation, timing-safe token comparison, Helmet headers, and graceful shutdown handling. The codebase demonstrates thoughtful engineering across both the node-agent and C&C services.
