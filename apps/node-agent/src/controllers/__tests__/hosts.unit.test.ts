@@ -141,13 +141,17 @@ describe('hosts controller', () => {
       expect(mockRes.json).toHaveBeenCalledWith(mockHost);
     });
 
-    it('should return 204 for non-existent host', async () => {
+    it('should return 404 for non-existent host', async () => {
       mockReq.params = { name: 'NonExistent' };
       mockDb.getHost.mockResolvedValue(undefined);
 
       await hostsController.getHost(mockReq as Request, mockRes as Response);
 
-      expect(mockRes.sendStatus).toHaveBeenCalledWith(204);
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Not Found',
+        message: "Host 'NonExistent' not found",
+      });
     });
 
     it('should handle database lookup errors', async () => {
@@ -190,13 +194,17 @@ describe('hosts controller', () => {
       expect(wol.wake).toHaveBeenCalledWith('AA:BB:CC:DD:EE:FF', expect.any(Function));
     });
 
-    it('should return 204 when host not found', async () => {
+    it('should return 404 when host not found', async () => {
       mockReq.params = { name: 'NonExistent' };
       mockDb.getHost.mockResolvedValue(undefined);
 
       await hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
 
-      expect(mockRes.sendStatus).toHaveBeenCalledWith(204);
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Not Found',
+        message: "Host 'NonExistent' not found",
+      });
     });
 
     it('should handle WoL errors', async () => {
