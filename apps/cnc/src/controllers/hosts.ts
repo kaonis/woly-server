@@ -3,10 +3,20 @@
  */
 
 import { Request, Response } from 'express';
+import { z } from 'zod';
+import { hostStatusSchema } from '@kaonis/woly-protocol';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
 import { lookupMacVendor, MAC_ADDRESS_PATTERN } from '../services/macVendorService';
 import logger from '../utils/logger';
+
+// Validation schema for updateHost request body
+const updateHostBodySchema = z.object({
+  name: z.string().min(1).optional(),
+  mac: z.string().regex(/^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/).optional(),
+  ip: z.string().ip().optional(),
+  status: hostStatusSchema.optional(),
+}).strict();
 
 export class HostsController {
   constructor(
@@ -263,7 +273,19 @@ export class HostsController {
   async updateHost(req: Request, res: Response): Promise<void> {
     try {
       const fqn = req.params.fqn as string;
-      const hostData = req.body;
+      
+      // Validate request body
+      const parseResult = updateHostBodySchema.safeParse(req.body);
+      if (!parseResult.success) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid request body',
+          details: parseResult.error.errors,
+        });
+        return;
+      }
+
+      const hostData = parseResult.data;
       logger.info('Update host request received', { fqn });
 
       const idempotencyKeyHeader = req.header('Idempotency-Key');
