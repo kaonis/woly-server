@@ -362,7 +362,7 @@ describe('Host Routes Authentication and Authorization', () => {
       const response = await request(app)
         .put('/api/hosts/node1.example.com')
         .set('Authorization', `Bearer ${token}`)
-        .send({ displayName: 'Test' });
+        .send({ name: 'Test' });
 
       expect(response.status).toBe(403);
       expect(response.body).toMatchObject({
@@ -382,7 +382,7 @@ describe('Host Routes Authentication and Authorization', () => {
       const response = await request(app)
         .put('/api/hosts/node1.example.com')
         .set('Authorization', `Bearer ${token}`)
-        .send({ displayName: 'Test' });
+        .send({ name: 'Test' });
 
       // Will fail with service error since commandRouter returns failure
       expect(response.status).toBe(500);
