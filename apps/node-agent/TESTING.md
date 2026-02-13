@@ -10,10 +10,10 @@ The project uses **Jest** as the test framework with **ts-jest** for TypeScript 
 
 The project enforces the following minimum coverage thresholds:
 
-- **Statements**: 80%
-- **Branches**: 70%
-- **Functions**: 85%
-- **Lines**: 80%
+- **Statements**: 50%
+- **Branches**: 50%
+- **Functions**: 50%
+- **Lines**: 50%
 
 CI builds will fail if coverage drops below these thresholds.
 
@@ -88,7 +88,7 @@ npm run test:ci
 
 ## Runtime Prerequisites
 
-- Node.js v22+ is supported.
+- Node.js v24+ is supported.
 - `.nvmrc` provides a baseline local version for consistency, but newer Node versions are supported.
 - Test preflight verifies that local socket bind is allowed because Supertest-based suites require it.
 - If preflight fails on socket bind, run tests outside restricted/sandboxed execution environments.
@@ -269,10 +269,10 @@ Coverage is configured in `jest.config.js`:
 ```javascript
 coverageThreshold: {
   global: {
-    branches: 70,
-    functions: 85,
-    lines: 80,
-    statements: 80
+    branches: 50,
+    functions: 50,
+    lines: 50,
+    statements: 50
   }
 }
 ```

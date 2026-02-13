@@ -38,6 +38,6 @@ npm run build -w packages/protocol
 - TypeScript strict mode everywhere
 - Shared types live in `packages/protocol/src/index.ts`
 - Apps consume protocol via workspace link (`@kaonis/woly-protocol`)
-- Both apps use Express 5, Jest 30, Zod for validation
+- Both apps use Express 5 and Jest 30. Node-agent uses Joi for HTTP validation; C&C and protocol use Zod.
 - Each app has its own `.env` (not committed) — see `.env.example` in each app
 - Turborepo handles build ordering (protocol must build before apps)
