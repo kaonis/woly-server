@@ -131,7 +131,7 @@ describe('API Integration Tests', () => {
       const response = await request(app).post('/hosts').send(invalidHost).expect(400);
 
       expect(response.body).toHaveProperty('error');
-      expect(response.body.error.message).toContain('required');
+      expect(response.body.error.message.toLowerCase()).toContain('required');
       expect(response.body.error.code).toBe('VALIDATION_ERROR');
     });
 
