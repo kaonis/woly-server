@@ -8,7 +8,8 @@ The WoLy distributed system uses a shared protocol package (`@kaonis/woly-protoc
 
 **Package**: `@kaonis/woly-protocol`  
 **Purpose**: Shared TypeScript types and Zod runtime schemas for node ↔ C&C communication  
-**Current Version**: 1.1.0  
+**Current Package Version**: 1.1.0  
+**Current Protocol Version**: 1.0.0 (see `PROTOCOL_VERSION` constant)  
 **Location**: `packages/protocol/`
 
 ### Exports
@@ -95,7 +96,7 @@ This job **blocks** the main build if:
 #### Protocol Package Tests
 - Location: `packages/protocol/src/__tests__/contract.cross-repo.test.ts`
 - Coverage: All message/command types, JSON serialization, version validation
-- Runs: 90+ tests covering full protocol surface area
+- Runs: 90+ tests total (32 contract tests + ~58 schema unit tests) covering full protocol surface area
 
 #### Node Agent Contract Tests
 - Location: `apps/node-agent/src/__tests__/protocol.contract.unit.test.ts`
@@ -223,8 +224,8 @@ export const SUPPORTED_PROTOCOL_VERSIONS = ['2.0.0'];
 **Cause**: Apps use protocol types/schemas that were removed or changed
 
 **Fix**:
-1. Run `npm run test -w apps/node-agent -- --testPathPattern=protocol.contract`
-2. Run `npm run test -w apps/cnc -- --testPathPattern=protocol.contract`
+1. Run `npm run test -w apps/node-agent -- protocol.contract`
+2. Run `npm run test -w apps/cnc -- protocol.contract`
 3. Update app code to use new protocol API
 4. If breaking change is intentional, follow breaking change workflow
 
