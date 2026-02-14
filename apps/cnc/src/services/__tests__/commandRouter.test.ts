@@ -199,4 +199,35 @@ describe('CommandRouter', () => {
       });
     });
   });
+
+  describe('exponential backoff', () => {
+    it('should calculate backoff delay with exponential growth', () => {
+      // Access the private method via type assertion for testing
+      const router = commandRouter as any;
+      
+      // First retry (retryCount = 0): baseDelay * 2^0 = 1000ms
+      const delay0 = router.calculateBackoffDelay(0);
+      expect(delay0).toBeGreaterThanOrEqual(750); // baseDelay with -25% jitter
+      expect(delay0).toBeLessThanOrEqual(1250); // baseDelay with +25% jitter
+
+      // Second retry (retryCount = 1): baseDelay * 2^1 = 2000ms
+      const delay1 = router.calculateBackoffDelay(1);
+      expect(delay1).toBeGreaterThanOrEqual(1500);
+      expect(delay1).toBeLessThanOrEqual(2500);
+
+      // Third retry (retryCount = 2): baseDelay * 2^2 = 4000ms
+      const delay2 = router.calculateBackoffDelay(2);
+      expect(delay2).toBeGreaterThanOrEqual(3000);
+      expect(delay2).toBeLessThanOrEqual(5000);
+    });
+
+    it('should cap backoff delay at half of command timeout', () => {
+      const router = commandRouter as any;
+      const maxDelay = router.commandTimeout / 2;
+      
+      // Very high retry count should still be capped
+      const delay = router.calculateBackoffDelay(10);
+      expect(delay).toBeLessThanOrEqual(maxDelay);
+    });
+  });
 });

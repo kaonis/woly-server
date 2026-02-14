@@ -157,8 +157,8 @@ export class CommandModel {
     const query = isSqlite()
       ? `
         UPDATE commands
-        SET state = $2, sent_at = CURRENT_TIMESTAMP, retry_count = retry_count + 1
-        WHERE id = $1
+        SET state = ?, sent_at = CURRENT_TIMESTAMP, retry_count = retry_count + 1
+        WHERE id = ?
       `
       : `
         UPDATE commands
@@ -166,15 +166,15 @@ export class CommandModel {
         WHERE id = $1
       `;
 
-    await db.query(query, [id, 'sent']);
+    await db.query(query, isSqlite() ? ['sent', id] : [id, 'sent']);
   }
 
   static async markAcknowledged(id: string): Promise<void> {
     const query = isSqlite()
       ? `
         UPDATE commands
-        SET state = $2, completed_at = CURRENT_TIMESTAMP
-        WHERE id = $1
+        SET state = ?, completed_at = CURRENT_TIMESTAMP
+        WHERE id = ?
       `
       : `
         UPDATE commands
@@ -182,15 +182,15 @@ export class CommandModel {
         WHERE id = $1
       `;
 
-    await db.query(query, [id, 'acknowledged']);
+    await db.query(query, isSqlite() ? ['acknowledged', id] : [id, 'acknowledged']);
   }
 
   static async markFailed(id: string, errorMessage: string): Promise<void> {
     const query = isSqlite()
       ? `
         UPDATE commands
-        SET state = $2, error = $3, completed_at = CURRENT_TIMESTAMP
-        WHERE id = $1
+        SET state = ?, error = ?, completed_at = CURRENT_TIMESTAMP
+        WHERE id = ?
       `
       : `
         UPDATE commands
@@ -198,15 +198,15 @@ export class CommandModel {
         WHERE id = $1
       `;
 
-    await db.query(query, [id, 'failed', errorMessage]);
+    await db.query(query, isSqlite() ? ['failed', errorMessage, id] : [id, 'failed', errorMessage]);
   }
 
   static async markTimedOut(id: string, errorMessage: string): Promise<void> {
     const query = isSqlite()
       ? `
         UPDATE commands
-        SET state = $2, error = $3, completed_at = CURRENT_TIMESTAMP
-        WHERE id = $1
+        SET state = ?, error = ?, completed_at = CURRENT_TIMESTAMP
+        WHERE id = ?
       `
       : `
         UPDATE commands
@@ -214,7 +214,7 @@ export class CommandModel {
         WHERE id = $1
       `;
 
-    await db.query(query, [id, 'timed_out', errorMessage]);
+    await db.query(query, isSqlite() ? ['timed_out', errorMessage, id] : [id, 'timed_out', errorMessage]);
   }
 
   static async findById(id: string): Promise<CommandRecord | null> {
