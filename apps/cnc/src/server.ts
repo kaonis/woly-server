@@ -19,6 +19,11 @@ import { errorHandler } from './middleware/errorHandler';
 import { reconcileCommandsOnStartup, startCommandPruning, stopCommandPruning } from './services/commandReconciler';
 import { specs } from './swagger';
 
+function isAllowedCorsOrigin(origin: string, allowedOrigins: string[]): boolean {
+  if (allowedOrigins.includes('*')) return true;
+  return allowedOrigins.includes(origin);
+}
+
 class Server {
   private app: express.Application;
   private httpServer: ReturnType<typeof createServer>;
@@ -46,12 +51,15 @@ class Server {
         ? (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
             // Allow requests with no origin (mobile apps, curl, server-to-server)
             if (!origin) return callback(null, true);
-            const allowed = (process.env.CORS_ORIGINS || '').split(',').filter(Boolean);
-            if (allowed.includes(origin)) return callback(null, true);
-            callback(new Error(`Origin ${origin} not allowed by CORS`));
+            const allowed = isAllowedCorsOrigin(origin, config.corsOrigins);
+            if (!allowed) {
+              logger.warn('Blocked by CORS policy', { origin });
+            }
+            callback(null, allowed);
           }
         : '*',
       credentials: true,
+      optionsSuccessStatus: 204,
     }));
 
     // Body parsing

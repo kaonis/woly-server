@@ -91,6 +91,7 @@ export interface CommandRecord {
 export interface ServerConfig {
   port: number;
   nodeEnv: string;
+  corsOrigins: string[];
   dbType: string;
   databaseUrl: string;
   nodeAuthTokens: string[];

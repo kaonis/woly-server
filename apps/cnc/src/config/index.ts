@@ -41,6 +41,10 @@ function getEnvBoolean(key: string, defaultValue: boolean): boolean {
 export const config: ServerConfig = {
   port: getEnvNumber('PORT', 8080),
   nodeEnv: getEnvVar('NODE_ENV', 'development'),
+  corsOrigins: getEnvVarOptional('CORS_ORIGINS', '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean),
   dbType: getEnvVar('DB_TYPE', 'postgres'),
   databaseUrl: getEnvVar('DATABASE_URL'),
   nodeAuthTokens: getEnvVar('NODE_AUTH_TOKENS', '')
