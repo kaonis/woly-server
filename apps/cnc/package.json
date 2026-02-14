@@ -6,7 +6,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon --watch src --exec ts-node src/server.ts",
-    "build": "tsc",
+    "build": "tsc && cp src/database/*.sql dist/database/",
     "start": "node dist/server.js",
     "start-ts": "ts-node src/server.ts",
     "init-db": "ts-node src/init-db.ts",
