@@ -36,16 +36,19 @@ export function startCommandPruning(retentionDays: number): void {
     return;
   }
 
-  // Run initial pruning
-  pruneOldCommands(retentionDays);
+  // Run initial pruning (async, non-blocking)
+  pruneOldCommands(retentionDays).catch((error) => {
+    logger.error('Initial command pruning failed', { error, retentionDays });
+  });
 
   // Schedule periodic pruning every 24 hours
-  const intervalMs = 24 * 60 * 60 * 1000; // 24 hours
+  const intervalHours = 24;
+  const intervalMs = intervalHours * 60 * 60 * 1000;
   pruningInterval = setInterval(() => {
     pruneOldCommands(retentionDays);
   }, intervalMs);
 
-  logger.info('Command pruning scheduled', { retentionDays, intervalMs });
+  logger.info('Command pruning scheduled', { retentionDays, intervalHours });
 }
 
 export function stopCommandPruning(): void {
