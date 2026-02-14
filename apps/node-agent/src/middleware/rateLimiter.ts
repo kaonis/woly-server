@@ -3,7 +3,7 @@ import { logger } from '../utils/logger';
 
 /**
  * General API rate limiter
- * Allows 100 requests per 15 minutes per IP
+ * Allows 100 requests per 2 minutes per IP
  */
 export const apiLimiter = rateLimit({
   windowMs: 2 * 60 * 1000, // 2 minutes

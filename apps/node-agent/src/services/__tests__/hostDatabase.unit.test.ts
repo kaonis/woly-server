@@ -110,20 +110,19 @@ describe('HostDatabase', () => {
       }
     });
 
-    it('should seed initial hosts when table is empty', async () => {
-      // Wait for async seeding to complete
+    it('should initialize with empty database when no seed data', async () => {
+      // Wait for async initialization to complete
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       const hosts = await db.getAllHosts();
-      expect(hosts.length).toBeGreaterThan(0);
-
-      // Check for seed data - at least one seed host should exist
-      const hostNames = hosts.map((h) => h.name);
-      expect(hostNames).toContain('PHANTOM-MBP');
-      expect(hostNames).toContain('RASPBERRYPI');
+      // Since we removed seed data, database should be empty initially
+      expect(hosts.length).toBe(0);
     });
 
-    it('should not duplicate seed data on re-initialization', async () => {
+    it('should not duplicate data on re-initialization', async () => {
+      // Add a test host
+      await db.addHost('TestHost1', 'AA:BB:CC:DD:EE:01', '192.168.1.201');
+      
       const hostsBefore = await db.getAllHosts();
       const countBefore = hostsBefore.length;
 
@@ -131,13 +130,16 @@ describe('HostDatabase', () => {
       await db.initialize();
 
       const hostsAfter = await db.getAllHosts();
-      // Should not have more hosts than before
-      expect(hostsAfter.length).toBeLessThanOrEqual(countBefore + 1);
+      // Should have same count as before (re-initialization doesn't add data)
+      expect(hostsAfter.length).toBe(countBefore);
     });
   });
 
   describe('CRUD operations', () => {
     it('should retrieve all hosts', async () => {
+      // Add test host first since seed data is removed
+      await db.addHost('TestHost1', 'AA:BB:CC:DD:EE:01', '192.168.1.201');
+      
       const hosts = await db.getAllHosts();
 
       expect(Array.isArray(hosts)).toBe(true);
@@ -149,15 +151,15 @@ describe('HostDatabase', () => {
     });
 
     it('should retrieve single host by name', async () => {
-      // Wait for async seeding to complete
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Add test host explicitly
+      await db.addHost('TestHost2', 'AA:BB:CC:DD:EE:02', '192.168.1.202');
 
-      const host = await db.getHost('PHANTOM-MBP');
+      const host = await db.getHost('TestHost2');
 
       expect(host).toBeDefined();
-      expect(host?.name).toBe('PHANTOM-MBP');
-      expect(host?.mac).toBe('80:6D:97:60:39:08');
-      expect(host?.ip).toBe('192.168.1.147');
+      expect(host?.name).toBe('TestHost2');
+      expect(host?.mac).toBe('AA:BB:CC:DD:EE:02');
+      expect(host?.ip).toBe('192.168.1.202');
     });
 
     it('should return undefined for non-existent host', async () => {
@@ -257,34 +259,43 @@ describe('HostDatabase', () => {
 
   describe('Status management', () => {
     it('should update host status (awake/asleep)', async () => {
-      await db.updateHostStatus('PHANTOM-MBP', 'awake');
+      // Add test host first
+      await db.addHost('StatusTestHost', 'AA:BB:CC:DD:EE:03', '192.168.1.203');
+      
+      await db.updateHostStatus('StatusTestHost', 'awake');
 
-      const host = await db.getHost('PHANTOM-MBP');
+      const host = await db.getHost('StatusTestHost');
       expect(host?.status).toBe('awake');
 
-      await db.updateHostStatus('PHANTOM-MBP', 'asleep');
-      const hostAsleep = await db.getHost('PHANTOM-MBP');
+      await db.updateHostStatus('StatusTestHost', 'asleep');
+      const hostAsleep = await db.getHost('StatusTestHost');
       expect(hostAsleep?.status).toBe('asleep');
     });
 
     it('should update lastSeen timestamp on host update', async () => {
-      const hostBefore = await db.getHost('PHANTOM-MBP');
+      // Add test host first
+      await db.addHost('TimestampTestHost', 'AA:BB:CC:DD:EE:04', '192.168.1.204');
+      
+      const hostBefore = await db.getHost('TimestampTestHost');
       const lastSeenBefore = hostBefore?.lastSeen;
 
-      // Wait a bit to ensure timestamp difference
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait to ensure timestamp difference (SQLite uses second precision)
+      await new Promise((resolve) => setTimeout(resolve, 1100));
 
-      await db.updateHostSeen('80:6D:97:60:39:08', 'awake');
+      await db.updateHostSeen('AA:BB:CC:DD:EE:04', 'awake');
 
-      const hostAfter = await db.getHost('PHANTOM-MBP');
+      const hostAfter = await db.getHost('TimestampTestHost');
       expect(hostAfter?.lastSeen).not.toBe(lastSeenBefore);
       expect(hostAfter?.lastSeen).toBeTruthy();
     });
 
     it('should mark host as discovered when updating', async () => {
-      await db.updateHostSeen('80:6D:97:60:39:08', 'awake');
+      // Add test host first
+      await db.addHost('DiscoveredTestHost', 'AA:BB:CC:DD:EE:05', '192.168.1.205');
+      
+      await db.updateHostSeen('AA:BB:CC:DD:EE:05', 'awake');
 
-      const host = await db.getHost('PHANTOM-MBP');
+      const host = await db.getHost('DiscoveredTestHost');
       expect(host?.discovered).toBe(1);
       expect(host?.status).toBe('awake');
     });
@@ -298,9 +309,11 @@ describe('HostDatabase', () => {
 
   describe('Network synchronization', () => {
     it('should sync discovered hosts with database', async () => {
-      // Use a different MAC that matches seed data
+      // Add test host first
+      await db.addHost('SyncTestHost', 'AA:BB:CC:DD:EE:06', '192.168.1.206');
+      
       const mockDiscoveredHosts: DiscoveredHost[] = [
-        { ip: '192.168.1.147', mac: '80:6D:97:60:39:08', hostname: 'PHANTOM-MBP' },
+        { ip: '192.168.1.206', mac: 'AA:BB:CC:DD:EE:06', hostname: 'SyncTestHost' },
       ];
 
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
@@ -311,7 +324,7 @@ describe('HostDatabase', () => {
 
       await db.syncWithNetwork();
 
-      const host = await db.getHost('PHANTOM-MBP');
+      const host = await db.getHost('SyncTestHost');
       expect(host?.discovered).toBe(1);
       expect(host?.status).toBe('awake');
     });
@@ -336,8 +349,11 @@ describe('HostDatabase', () => {
     });
 
     it('should update existing hosts during sync', async () => {
+      // Add test host first
+      await db.addHost('UpdateSyncHost', 'AA:BB:CC:DD:EE:08', '192.168.1.208');
+      
       const mockDiscoveredHosts: DiscoveredHost[] = [
-        { ip: '192.168.1.147', mac: '80:6D:97:60:39:08', hostname: 'PHANTOM-MBP' },
+        { ip: '192.168.1.208', mac: 'AA:BB:CC:DD:EE:08', hostname: 'UpdateSyncHost' },
       ];
 
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
@@ -346,13 +362,14 @@ describe('HostDatabase', () => {
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(true);
 
-      const hostBefore = await db.getHost('PHANTOM-MBP');
+      const hostBefore = await db.getHost('UpdateSyncHost');
       const lastSeenBefore = hostBefore?.lastSeen;
 
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Wait to ensure timestamp difference (SQLite uses second precision)
+      await new Promise((resolve) => setTimeout(resolve, 1100));
       await db.syncWithNetwork();
 
-      const hostAfter = await db.getHost('PHANTOM-MBP');
+      const hostAfter = await db.getHost('UpdateSyncHost');
       expect(hostAfter?.lastSeen).not.toBe(lastSeenBefore);
     });
 
@@ -475,9 +492,9 @@ describe('HostDatabase', () => {
 
       await db.syncWithNetwork();
 
-      // Should not throw error
+      // Should not throw error (no data since seed data was removed)
       const hosts = await db.getAllHosts();
-      expect(hosts.length).toBeGreaterThan(0); // Seed data still present
+      expect(hosts.length).toBe(0);
     });
 
     it('should handle network discovery failures', async () => {
@@ -487,9 +504,9 @@ describe('HostDatabase', () => {
 
       await db.syncWithNetwork();
 
-      // Should handle error gracefully
+      // Should handle error gracefully (no data since seed data was removed)
       const hosts = await db.getAllHosts();
-      expect(hosts.length).toBeGreaterThan(0); // Seed data still present
+      expect(hosts.length).toBe(0);
     });
 
     it('should generate hostname from IP when no hostname available', async () => {
