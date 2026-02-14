@@ -461,6 +461,11 @@ describe('HostDatabase', () => {
         expect.stringContaining('found via ARP but did not respond to ping - marking as asleep')
       );
 
+      // Verify the host status is actually asleep
+      const host = await db.getHost('DebugLogHost');
+      expect(host?.status).toBe('asleep');
+      expect(host?.pingResponsive).toBe(0);
+
       // Reset config to default
       config.network.usePingValidation = false;
     });
