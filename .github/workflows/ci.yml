@@ -35,10 +35,10 @@ jobs:
       - name: Verify protocol compatibility in apps
         run: |
           echo "Verifying node-agent can consume protocol package..."
-          npm run test -w apps/node-agent -- --testPathPattern=protocol.contract
+          npm run test -w apps/node-agent -- protocol.contract
 
           echo "Verifying cnc can consume protocol package..."
-          npm run test -w apps/cnc -- --testPathPattern=protocol.contract
+          npm run test -w apps/cnc -- protocol.contract
 
   validate:
     name: Build, Lint, Typecheck, Test
