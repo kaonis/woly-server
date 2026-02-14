@@ -25,12 +25,12 @@ Owner: Platform Team
 - [x] Create and approve ADRs for token transport, shared protocol package, and command reliability.
 - [x] Maintain `docs/compatibility.md` with every release.
 - [x] Enforce CI gates for lint, tests, build, and typecheck.
-- [ ] Add contract-test placeholder in CI for shared protocol adoption.
+- [x] Add contract-test placeholder in CI for shared protocol adoption.
 
 Definition of done:
 
-- [ ] All docs merged and linked from README.
-- [ ] CI blocks PRs when lint/test/build/typecheck fail.
+- [x] All docs merged and linked from README.
+- [x] CI blocks PRs when lint/test/build/typecheck fail.
 
 ## Phase 1 - Node Session Auth and Reconnect
 
