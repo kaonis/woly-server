@@ -265,7 +265,7 @@ export class CommandRouter extends EventEmitter {
     if (record.state === 'acknowledged') {
       logger.debug('Command already acknowledged, returning cached result', {
         commandId: effectiveCommandId,
-        retryCount: record.retryCount,
+        totalAttempts: record.retryCount,
       });
       return {
         commandId: effectiveCommandId,
@@ -278,7 +278,7 @@ export class CommandRouter extends EventEmitter {
       logger.warn('Command in terminal state', {
         commandId: effectiveCommandId,
         state: record.state,
-        retryCount: record.retryCount,
+        totalAttempts: record.retryCount,
         maxRetries: this.maxRetries,
       });
       return {
@@ -303,12 +303,13 @@ export class CommandRouter extends EventEmitter {
         const pending = this.pendingCommands.get(effectiveCommandId);
         this.pendingCommands.delete(effectiveCommandId);
         
-        const error = new Error(`Command ${effectiveCommandId} timed out after ${this.commandTimeout}ms (retry ${record.retryCount}/${this.maxRetries})`);
+        const attemptNumber = record.retryCount + 1; // Current attempt number
+        const error = new Error(`Command ${effectiveCommandId} timed out after ${this.commandTimeout}ms (attempt ${attemptNumber}/${this.maxRetries})`);
         
         CommandModel.markTimedOut(effectiveCommandId, error.message).catch((err) => {
           logger.error('Failed to mark command as timed out', {
             commandId: effectiveCommandId,
-            retryCount: record.retryCount,
+            attemptNumber,
             error: err instanceof Error ? err.message : String(err)
           });
         });
@@ -329,12 +330,15 @@ export class CommandRouter extends EventEmitter {
       void (async () => {
         try {
           if (record.state === 'queued') {
-            // Apply exponential backoff for retries (retryCount > 0 means this is a retry)
+            // Apply exponential backoff for retries
+            // retryCount represents the number of previous send attempts
+            // 0 = first attempt (no delay), 1 = first retry (base delay), 2 = second retry (2x delay), etc.
             if (record.retryCount > 0) {
-              const backoffDelay = this.calculateBackoffDelay(record.retryCount - 1);
+              const attemptNumber = record.retryCount; // This will be the Nth retry
+              const backoffDelay = this.calculateBackoffDelay(attemptNumber - 1);
               logger.info('Applying exponential backoff before retry', {
                 commandId: effectiveCommandId,
-                retryCount: record.retryCount,
+                attemptNumber,
                 backoffDelayMs: Math.round(backoffDelay),
               });
               await new Promise((resolve) => setTimeout(resolve, backoffDelay));
@@ -342,10 +346,12 @@ export class CommandRouter extends EventEmitter {
 
             this.nodeManager.sendCommand(nodeId, payloadToSend);
             await CommandModel.markSent(effectiveCommandId);
+            
+            // Log after markSent to show the correct count (markSent increments it)
             logger.debug('Sent command to node', {
               commandId: effectiveCommandId,
               nodeId,
-              retryCount: record.retryCount + 1,
+              attemptNumber: record.retryCount + 1, // Will be incremented by markSent
               type: command.type,
             });
           } else {
@@ -364,7 +370,7 @@ export class CommandRouter extends EventEmitter {
           logger.error('Failed to send command', {
             commandId: effectiveCommandId,
             nodeId,
-            retryCount: record.retryCount,
+            attemptNumber: record.retryCount + 1, // Attempt that failed
             error: message,
           });
           
