@@ -65,6 +65,11 @@ describe('API Integration Tests', () => {
   });
 
   describe('GET /hosts', () => {
+    beforeAll(async () => {
+      // Add test hosts since seed data was removed
+      await db.addHost('TEST-HOST-1', 'AA:BB:CC:11:11:11', '192.168.1.101');
+    });
+
     it('should return 200 with hosts array', async () => {
       const response = await request(app).get('/hosts').expect(200).expect('Content-Type', /json/);
 
@@ -86,10 +91,15 @@ describe('API Integration Tests', () => {
   });
 
   describe('GET /hosts/:name', () => {
-    it('should return 200 with host object for existing host', async () => {
-      const response = await request(app).get('/hosts/PHANTOM-MBP').expect(200);
+    beforeAll(async () => {
+      // Add test host since seed data was removed
+      await db.addHost('TEST-GET-HOST', 'AA:BB:CC:22:22:22', '192.168.1.102');
+    });
 
-      expect(response.body.name).toBe('PHANTOM-MBP');
+    it('should return 200 with host object for existing host', async () => {
+      const response = await request(app).get('/hosts/TEST-GET-HOST').expect(200);
+
+      expect(response.body.name).toBe('TEST-GET-HOST');
       expect(response.body).toHaveProperty('mac');
       expect(response.body).toHaveProperty('ip');
     });
@@ -157,6 +167,11 @@ describe('API Integration Tests', () => {
   });
 
   describe('POST /hosts/wakeup/:name', () => {
+    beforeAll(async () => {
+      // Add test host for WoL tests since seed data was removed
+      await db.addHost('TEST-WOL-HOST', 'AA:BB:CC:33:33:33', '192.168.1.103');
+    });
+
     it('should send WoL packet for existing host', async () => {
       // Mock successful WoL
       (wol.wake as jest.Mock).mockImplementation(
@@ -165,10 +180,10 @@ describe('API Integration Tests', () => {
         }
       );
 
-      const response = await request(app).post('/hosts/wakeup/PHANTOM-MBP').expect(200);
+      const response = await request(app).post('/hosts/wakeup/TEST-WOL-HOST').expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.name).toBe('PHANTOM-MBP');
+      expect(response.body.name).toBe('TEST-WOL-HOST');
       expect(wol.wake).toHaveBeenCalled();
     });
 
@@ -187,7 +202,7 @@ describe('API Integration Tests', () => {
         }
       );
 
-      const response = await request(app).post('/hosts/wakeup/PHANTOM-MBP').expect(500);
+      const response = await request(app).post('/hosts/wakeup/TEST-WOL-HOST').expect(500);
 
       // Error handler wraps errors in error.message format
       expect(response.body).toHaveProperty('error');

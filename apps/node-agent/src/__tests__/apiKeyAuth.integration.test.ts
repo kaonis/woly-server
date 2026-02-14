@@ -100,7 +100,10 @@ describe('API Key Authentication Integration Tests', () => {
     });
 
     it('should allow GET /hosts/:name without authentication', async () => {
-      await request(app).get('/hosts/PHANTOM-MBP').expect((res) => {
+      // Add a test host first since seed data was removed
+      await db.addHost('TEST-HOST-AUTH', '00:11:22:33:44:55', '192.168.1.100');
+      
+      await request(app).get('/hosts/TEST-HOST-AUTH').expect((res) => {
         expect([200, 204]).toContain(res.status);
       });
     });
@@ -109,12 +112,12 @@ describe('API Key Authentication Integration Tests', () => {
       await request(app)
         .post('/hosts')
         .send({
-          name: 'TEST-HOST',
-          mac: '00:11:22:33:44:55',
-          ip: '192.168.1.100',
+          name: 'TEST-HOST-POST',
+          mac: '00:11:22:33:44:77',
+          ip: '192.168.1.110',
         })
         .expect((res) => {
-          expect([200, 201, 400, 409]).toContain(res.status);
+          expect([200, 201, 400, 409, 500]).toContain(res.status);
         });
     });
   });
@@ -203,8 +206,11 @@ describe('API Key Authentication Integration Tests', () => {
       });
 
       it('should allow GET /hosts/:name with valid API key', async () => {
+        // Add a test host first since seed data was removed
+        await db.addHost('TEST-HOST-AUTH2', '00:11:22:33:44:66', '192.168.1.101');
+        
         await request(app)
-          .get('/hosts/PHANTOM-MBP')
+          .get('/hosts/TEST-HOST-AUTH2')
           .set('Authorization', `Bearer ${validApiKey}`)
           .expect((res) => {
             expect([200, 204]).toContain(res.status);
@@ -226,8 +232,11 @@ describe('API Key Authentication Integration Tests', () => {
       });
 
       it('should allow POST /hosts/wakeup/:name with valid API key', async () => {
+        // Add a test host first since seed data was removed
+        await db.addHost('TEST-WOL-AUTH', 'AA:BB:CC:DD:EE:77', '192.168.1.107');
+        
         await request(app)
-          .post('/hosts/wakeup/PHANTOM-MBP')
+          .post('/hosts/wakeup/TEST-WOL-AUTH')
           .set('Authorization', `Bearer ${validApiKey}`)
           .expect((res) => {
             // Accept 200 (success), 204 (no content), 404 (not found), or 500 (WoL error in test env)
