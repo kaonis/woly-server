@@ -404,7 +404,7 @@ export class CommandRouter extends EventEmitter {
 
     return {
       hostname: parts[0],
-      location: parts[1].replace(/-/g, ' ') // Convert hyphens back to spaces
+      location: decodeURIComponent(parts[1]) // Decode URL-encoded location
     };
   }
 

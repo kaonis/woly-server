@@ -76,10 +76,10 @@ describe('HostAggregator', () => {
       expect(emittedEvent).not.toBeNull();
       expect(emittedEvent.nodeId).toBe('test-node-1');
       expect(emittedEvent.host.name).toBe('test-host-1');
-      expect(emittedEvent.fullyQualifiedName).toBe('test-host-1@Test-Location-test-node-1');
+      expect(emittedEvent.fullyQualifiedName).toBe('test-host-1@Test%20Location-test-node-1');
 
       // Verify it was inserted
-      const host = await hostAggregator.getHostByFQN('test-host-1@Test-Location-test-node-1');
+      const host = await hostAggregator.getHostByFQN('test-host-1@Test%20Location-test-node-1');
       expect(host).not.toBeNull();
       expect(host!.name).toBe('test-host-1');
       expect(host!.mac).toBe('AA:BB:CC:DD:EE:01');
@@ -102,7 +102,7 @@ describe('HostAggregator', () => {
       });
 
       // Verify first insertion
-      const firstCheck = await hostAggregator.getHostByFQN('test-host-update@Test-Location-test-node-1');
+      const firstCheck = await hostAggregator.getHostByFQN('test-host-update@Test%20Location-test-node-1');
       expect(firstCheck).not.toBeNull();
       expect(firstCheck!.ip).toBe('192.168.1.102');
       expect(firstCheck!.status).toBe('awake');
@@ -123,7 +123,7 @@ describe('HostAggregator', () => {
       });
 
       // Verify update
-      const host = await hostAggregator.getHostByFQN('test-host-update@Test-Location-test-node-1');
+      const host = await hostAggregator.getHostByFQN('test-host-update@Test%20Location-test-node-1');
       expect(host).not.toBeNull();
       expect(host!.ip).toBe('192.168.1.202');
       expect(host!.status).toBe('asleep');
@@ -207,7 +207,7 @@ describe('HostAggregator', () => {
 
       await hostAggregator.onHostUpdated(event);
 
-      const host = await hostAggregator.getHostByFQN('test-host-4@Test-Location-test-node-1');
+      const host = await hostAggregator.getHostByFQN('test-host-4@Test%20Location-test-node-1');
       expect(host).not.toBeNull();
     });
 
@@ -243,11 +243,11 @@ describe('HostAggregator', () => {
       });
 
       // Old FQN should no longer resolve.
-      const old = await hostAggregator.getHostByFQN('device-192-168-1-1@Home-Office-test-node-2');
+      const old = await hostAggregator.getHostByFQN('device-192-168-1-1@Home%20Office-test-node-2');
       expect(old).toBeNull();
 
       // New FQN should resolve.
-      const renamed = await hostAggregator.getHostByFQN('Router@Home-Office-test-node-2');
+      const renamed = await hostAggregator.getHostByFQN('Router@Home%20Office-test-node-2');
       expect(renamed).not.toBeNull();
       expect(renamed!.mac).toBe('AA:BB:CC:DD:EE:10');
 
@@ -290,7 +290,7 @@ describe('HostAggregator', () => {
 
       expect(emittedEvent).not.toBeNull();
 
-      const host = await hostAggregator.getHostByFQN('test-host-5@Test-Location-test-node-1');
+      const host = await hostAggregator.getHostByFQN('test-host-5@Test%20Location-test-node-1');
       expect(host).toBeNull();
     });
 
@@ -490,7 +490,7 @@ describe('HostAggregator', () => {
       };
 
       await hostAggregator.onHostDiscovered(event);
-      const host = await hostAggregator.getHostByFQN('test-host-11@Remote-Site-test-node-6');
+      const host = await hostAggregator.getHostByFQN('test-host-11@Remote%20Site-test-node-6');
 
       expect(host).not.toBeNull();
       expect(host!.name).toBe('test-host-11');
@@ -500,6 +500,51 @@ describe('HostAggregator', () => {
     it('should return null for non-existent FQN', async () => {
       const host = await hostAggregator.getHostByFQN('non-existent@location');
       expect(host).toBeNull();
+    });
+
+    it('should preserve hyphens in location names (no round-trip corruption)', async () => {
+      // Register test node with hyphenated location
+      await NodeModel.register({
+        nodeId: 'test-node-hyphen',
+        name: 'Test Node Hyphen',
+        location: 'sub-network',
+        authToken: 'token-hyphen',
+        metadata: {
+          version: '1.0.0',
+          platform: 'test',
+          protocolVersion: PROTOCOL_VERSION,
+          networkInfo: { subnet: '192.168.1.0/24', gateway: '192.168.1.1' }
+        }
+      });
+
+      // Test case for issue: locations with natural hyphens like "sub-network"
+      // should not be corrupted to "sub network" after round-trip
+      const event = {
+        nodeId: 'test-node-hyphen',
+        location: 'sub-network',
+        host: {
+          name: 'test-host-hyphen',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.250',
+          status: 'awake' as const,
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      };
+
+      await hostAggregator.onHostDiscovered(event);
+      
+      // FQN should have URL-encoded location
+      const host = await hostAggregator.getHostByFQN('test-host-hyphen@sub-network-test-node-hyphen');
+      
+      expect(host).not.toBeNull();
+      expect(host!.location).toBe('sub-network'); // Original location preserved
+      expect(host!.fullyQualifiedName).toBe('test-host-hyphen@sub-network-test-node-hyphen');
+      
+      // Clean up
+      await db.query('DELETE FROM aggregated_hosts WHERE node_id = $1', ['test-node-hyphen']);
+      await db.query('DELETE FROM nodes WHERE id = $1', ['test-node-hyphen']);
     });
   });
 
