@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import Joi from 'joi';
+import { z, ZodError } from 'zod';
 import { AppError } from './errorHandler';
 
 /**
@@ -8,29 +8,35 @@ import { AppError } from './errorHandler';
 export type ValidationTarget = 'body' | 'params' | 'query';
 
 /**
- * Creates a middleware that validates request data against a Joi schema
+ * Creates a middleware that validates request data against a Zod schema
  *
- * @param schema - Joi schema to validate against
+ * @param schema - Zod schema to validate against
  * @param target - Which part of the request to validate (body, params, or query)
  * @returns Express middleware function
  */
-export const validateRequest = (schema: Joi.ObjectSchema, target: ValidationTarget = 'body') => {
+export const validateRequest = (schema: z.ZodObject<z.ZodRawShape>, target: ValidationTarget = 'body') => {
   return (req: Request, _res: Response, next: NextFunction) => {
     const dataToValidate = req[target];
 
-    const { error, value } = schema.validate(dataToValidate, {
-      abortEarly: false, // Return all errors, not just the first one
-      stripUnknown: true, // Remove unknown fields
-    });
+    try {
+      // Parse and validate data with Zod
+      const value = schema.parse(dataToValidate);
 
-    if (error) {
-      const errorMessage = error.details.map((detail) => detail.message).join(', ');
-
-      throw new AppError(errorMessage, 400, 'VALIDATION_ERROR');
+      // Replace request data with validated and sanitized data
+      req[target] = value;
+      next();
+    } catch (error) {
+      if (error instanceof ZodError) {
+        // Format errors to match Joi format: comma-separated error messages with field paths
+        const errorMessage = error.errors
+          .map((err) => {
+            const path = err.path.length > 0 ? `"${err.path.join('.')}" ` : '';
+            return `${path}${err.message}`;
+          })
+          .join(', ');
+        throw new AppError(errorMessage, 400, 'VALIDATION_ERROR');
+      }
+      throw error;
     }
-
-    // Replace request data with validated and sanitized data
-    req[target] = value;
-    next();
   };
 };

@@ -28,6 +28,21 @@ jest.mock('../../config', () => ({
   },
 }));
 
+// Mock logger
+jest.mock('../../utils/logger', () => {
+  const mockLogger = {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  };
+  return {
+    __esModule: true,
+    logger: mockLogger,
+    default: mockLogger,
+  };
+});
+
 // Mock rate limiters to pass through
 jest.mock('../../middleware/rateLimiter', () => ({
   authLimiter: (_req: any, _res: any, next: any) => next(),

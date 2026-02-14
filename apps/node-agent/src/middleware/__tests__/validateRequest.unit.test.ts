@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import Joi from 'joi';
+import { z } from 'zod';
 import { validateRequest } from '../validateRequest';
 import { AppError } from '../errorHandler';
 
@@ -26,10 +26,10 @@ describe('validateRequest middleware', () => {
   });
 
   describe('body validation', () => {
-    const schema = Joi.object({
-      name: Joi.string().required(),
-      email: Joi.string().email().required(),
-      age: Joi.number().min(0).optional(),
+    const schema = z.object({
+      name: z.string(),
+      email: z.string().email(),
+      age: z.number().min(0).optional(),
     });
 
     it('should validate valid body data', () => {
@@ -101,7 +101,7 @@ describe('validateRequest middleware', () => {
       });
     });
 
-    it('should return all validation errors when abortEarly is false', () => {
+    it('should return all validation errors when multiple fields are invalid', () => {
       mockReq.body = {
         // Missing both name and email
         age: -5, // Invalid age
@@ -123,8 +123,8 @@ describe('validateRequest middleware', () => {
   });
 
   describe('params validation', () => {
-    const schema = Joi.object({
-      id: Joi.string().uuid().required(),
+    const schema = z.object({
+      id: z.string().uuid(),
     });
 
     it('should validate params when target is params', () => {
@@ -153,9 +153,9 @@ describe('validateRequest middleware', () => {
   });
 
   describe('query validation', () => {
-    const schema = Joi.object({
-      page: Joi.number().min(1).default(1),
-      limit: Joi.number().min(1).max(100).default(10),
+    const schema = z.object({
+      page: z.coerce.number().min(1).default(1),
+      limit: z.coerce.number().min(1).max(100).default(10),
     });
 
     it('should validate query parameters', () => {
@@ -168,7 +168,7 @@ describe('validateRequest middleware', () => {
       middleware(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
-      // Joi converts string numbers to numbers
+      // Zod coerces string numbers to numbers
       expect(mockReq.query.page).toBe(2);
       expect(mockReq.query.limit).toBe(20);
     });
@@ -187,8 +187,8 @@ describe('validateRequest middleware', () => {
 
   describe('default target', () => {
     it('should default to body validation when no target specified', () => {
-      const schema = Joi.object({
-        field: Joi.string().required(),
+      const schema = z.object({
+        field: z.string(),
       });
 
       mockReq.body = { field: 'value' };
