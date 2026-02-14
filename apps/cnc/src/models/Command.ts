@@ -12,6 +12,7 @@ interface CommandRow {
   idempotency_key: string | null;
   state: CommandState;
   error: string | null;
+  retry_count: number;
   created_at: string | Date;
   updated_at: string | Date;
   sent_at: string | Date | null;
@@ -51,6 +52,7 @@ function rowToRecord(row: CommandRow): CommandRecord {
     idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
     state: row.state as CommandState,
     error: row.error ? String(row.error) : null,
+    retryCount: Number(row.retry_count),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
     sentAt: row.sent_at ? new Date(row.sent_at) : null,
@@ -155,12 +157,12 @@ export class CommandModel {
     const query = isSqlite()
       ? `
         UPDATE commands
-        SET state = $2, sent_at = CURRENT_TIMESTAMP
+        SET state = $2, sent_at = CURRENT_TIMESTAMP, retry_count = retry_count + 1
         WHERE id = $1
       `
       : `
         UPDATE commands
-        SET state = $2, sent_at = NOW()
+        SET state = $2, sent_at = NOW(), retry_count = retry_count + 1
         WHERE id = $1
       `;
 

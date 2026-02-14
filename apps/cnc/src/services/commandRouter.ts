@@ -42,6 +42,8 @@ export class CommandRouter extends EventEmitter {
     timeout: NodeJS.Timeout;
   }>;
   readonly commandTimeout: number;
+  readonly maxRetries: number;
+  readonly retryBaseDelayMs: number;
 
   constructor(nodeManager: NodeManager, hostAggregator: HostAggregator) {
     super();
@@ -49,6 +51,8 @@ export class CommandRouter extends EventEmitter {
     this.hostAggregator = hostAggregator;
     this.pendingCommands = new Map();
     this.commandTimeout = config.commandTimeout;
+    this.maxRetries = config.commandMaxRetries;
+    this.retryBaseDelayMs = config.commandRetryBaseDelayMs;
 
     // Listen for command results from nodes
     this.nodeManager.on('command-result', this.handleCommandResult.bind(this));
@@ -259,6 +263,10 @@ export class CommandRouter extends EventEmitter {
 
     // Terminal states: return immediately for idempotent retries.
     if (record.state === 'acknowledged') {
+      logger.debug('Command already acknowledged, returning cached result', {
+        commandId: effectiveCommandId,
+        retryCount: record.retryCount,
+      });
       return {
         commandId: effectiveCommandId,
         success: true,
@@ -267,6 +275,12 @@ export class CommandRouter extends EventEmitter {
     }
 
     if (record.state === 'failed' || record.state === 'timed_out') {
+      logger.warn('Command in terminal state', {
+        commandId: effectiveCommandId,
+        state: record.state,
+        retryCount: record.retryCount,
+        maxRetries: this.maxRetries,
+      });
       return {
         commandId: effectiveCommandId,
         success: false,
@@ -289,11 +303,12 @@ export class CommandRouter extends EventEmitter {
         const pending = this.pendingCommands.get(effectiveCommandId);
         this.pendingCommands.delete(effectiveCommandId);
         
-        const error = new Error(`Command ${effectiveCommandId} timed out after ${this.commandTimeout}ms`);
+        const error = new Error(`Command ${effectiveCommandId} timed out after ${this.commandTimeout}ms (retry ${record.retryCount}/${this.maxRetries})`);
         
         CommandModel.markTimedOut(effectiveCommandId, error.message).catch((err) => {
           logger.error('Failed to mark command as timed out', {
             commandId: effectiveCommandId,
+            retryCount: record.retryCount,
             error: err instanceof Error ? err.message : String(err)
           });
         });
@@ -314,9 +329,25 @@ export class CommandRouter extends EventEmitter {
       void (async () => {
         try {
           if (record.state === 'queued') {
+            // Apply exponential backoff for retries (retryCount > 0 means this is a retry)
+            if (record.retryCount > 0) {
+              const backoffDelay = this.calculateBackoffDelay(record.retryCount - 1);
+              logger.info('Applying exponential backoff before retry', {
+                commandId: effectiveCommandId,
+                retryCount: record.retryCount,
+                backoffDelayMs: Math.round(backoffDelay),
+              });
+              await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+            }
+
             this.nodeManager.sendCommand(nodeId, payloadToSend);
             await CommandModel.markSent(effectiveCommandId);
-            logger.debug(`Sent command ${effectiveCommandId} to node ${nodeId}`);
+            logger.debug('Sent command to node', {
+              commandId: effectiveCommandId,
+              nodeId,
+              retryCount: record.retryCount + 1,
+              type: command.type,
+            });
           } else {
             logger.debug(`Command ${effectiveCommandId} already ${record.state}; not resending`);
           }
@@ -329,6 +360,13 @@ export class CommandRouter extends EventEmitter {
           const err = error instanceof Error ? error : new Error(message);
           
           await CommandModel.markFailed(effectiveCommandId, message);
+          
+          logger.error('Failed to send command', {
+            commandId: effectiveCommandId,
+            nodeId,
+            retryCount: record.retryCount,
+            error: message,
+          });
           
           // Reject all pending resolvers on send failure
           if (pending) {
@@ -347,21 +385,34 @@ export class CommandRouter extends EventEmitter {
    * @param result Command result
    */
   private handleCommandResult(result: CommandResult): void {
-    logger.debug(`Received command result: ${result.commandId}`);
+    logger.debug('Received command result', {
+      commandId: result.commandId,
+      success: result.success,
+      error: result.error,
+    });
 
     const pending = this.pendingCommands.get(result.commandId);
     
     // Always persist the result state, even if no pending resolver exists
     // (e.g., after a process restart or if the HTTP caller disconnected)
     if (result.success) {
-      CommandModel.markAcknowledged(result.commandId).catch((error) => {
+      CommandModel.markAcknowledged(result.commandId).then(() => {
+        logger.info('Command acknowledged', {
+          commandId: result.commandId,
+        });
+      }).catch((error) => {
         logger.error('Failed to mark command as acknowledged', {
           commandId: result.commandId,
           error: error instanceof Error ? error.message : String(error)
         });
       });
     } else {
-      CommandModel.markFailed(result.commandId, result.error || 'Command failed').catch((error) => {
+      CommandModel.markFailed(result.commandId, result.error || 'Command failed').then(() => {
+        logger.warn('Command failed', {
+          commandId: result.commandId,
+          error: result.error,
+        });
+      }).catch((error) => {
         logger.error('Failed to mark command as failed', {
           commandId: result.commandId,
           error: error instanceof Error ? error.message : String(error)
@@ -415,6 +466,23 @@ export class CommandRouter extends EventEmitter {
    */
   private generateCommandId(): string {
     return `cmd_${randomUUID()}`;
+  }
+
+  /**
+   * Calculate exponential backoff delay with jitter
+   * 
+   * @param retryCount Current retry attempt (0-based)
+   * @returns Delay in milliseconds
+   */
+  private calculateBackoffDelay(retryCount: number): number {
+    // Exponential backoff: baseDelay * 2^retryCount
+    // Add jitter (±25%) to prevent thundering herd
+    const exponentialDelay = this.retryBaseDelayMs * Math.pow(2, retryCount);
+    const jitter = exponentialDelay * 0.25 * (Math.random() * 2 - 1); // ±25%
+    const delayWithJitter = Math.max(0, exponentialDelay + jitter);
+    
+    // Cap at commandTimeout to ensure we don't delay longer than timeout
+    return Math.min(delayWithJitter, this.commandTimeout / 2);
   }
 
   /**

@@ -78,6 +78,8 @@ export const config: ServerConfig = {
   nodeTimeout: getEnvNumber('NODE_TIMEOUT', 90000),
   commandTimeout: getEnvNumber('COMMAND_TIMEOUT', 30000),
   commandRetentionDays: getEnvNumber('COMMAND_RETENTION_DAYS', 30),
+  commandMaxRetries: getEnvNumber('COMMAND_MAX_RETRIES', 3),
+  commandRetryBaseDelayMs: getEnvNumber('COMMAND_RETRY_BASE_DELAY_MS', 1000),
   logLevel: getEnvVar('LOG_LEVEL', 'info'),
 };
 
