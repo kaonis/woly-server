@@ -16,7 +16,7 @@ import { CommandRouter } from './services/commandRouter';
 import { createRoutes } from './routes';
 import { createWebSocketServer } from './websocket/server';
 import { errorHandler } from './middleware/errorHandler';
-import { reconcileCommandsOnStartup } from './services/commandReconciler';
+import { reconcileCommandsOnStartup, startCommandPruning, stopCommandPruning } from './services/commandReconciler';
 import { specs } from './swagger';
 
 class Server {
@@ -165,6 +165,9 @@ class Server {
       // Reconcile durable command state after restarts.
       await reconcileCommandsOnStartup({ commandTimeoutMs: config.commandTimeout });
 
+      // Start periodic command pruning
+      startCommandPruning(config.commandRetentionDays);
+
       // Start HTTP server
       this.httpServer.listen(config.port, () => {
         logger.info(`Server listening on port ${config.port}`);
@@ -188,6 +191,9 @@ class Server {
       this.httpServer.close(() => {
         logger.info('HTTP server closed');
       });
+
+      // Stop command pruning
+      stopCommandPruning();
 
       // Shutdown node manager
       this.nodeManager.shutdown();

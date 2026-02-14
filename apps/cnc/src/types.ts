@@ -108,5 +108,6 @@ export interface ServerConfig {
   nodeHeartbeatInterval: number;
   nodeTimeout: number;
   commandTimeout: number;
+  commandRetentionDays: number;
   logLevel: string;
 }

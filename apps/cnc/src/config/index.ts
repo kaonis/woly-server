@@ -77,6 +77,7 @@ export const config: ServerConfig = {
   nodeHeartbeatInterval: getEnvNumber('NODE_HEARTBEAT_INTERVAL', 30000),
   nodeTimeout: getEnvNumber('NODE_TIMEOUT', 90000),
   commandTimeout: getEnvNumber('COMMAND_TIMEOUT', 30000),
+  commandRetentionDays: getEnvNumber('COMMAND_RETENTION_DAYS', 30),
   logLevel: getEnvVar('LOG_LEVEL', 'info'),
 };
 
