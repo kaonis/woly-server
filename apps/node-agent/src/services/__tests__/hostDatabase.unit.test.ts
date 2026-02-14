@@ -5,12 +5,34 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { logger } from '../../utils/logger';
+import { config } from '../../config';
 
 // Mock network discovery module
 jest.mock('../networkDiscovery');
 
 // Mock logger
 jest.mock('../../utils/logger');
+
+// Mock config
+jest.mock('../../config', () => ({
+  config: {
+    server: {
+      port: 8082,
+      host: '0.0.0.0',
+      env: 'test',
+    },
+    network: {
+      scanInterval: 300000,
+      scanDelay: 5000,
+      pingTimeout: 2000,
+      pingConcurrency: 10,
+      usePingValidation: false, // Default value
+    },
+    logging: {
+      level: 'info',
+    },
+  },
+}));
 
 describe('HostDatabase', () => {
   let db: HostDatabase;
@@ -348,10 +370,104 @@ describe('HostDatabase', () => {
       await db.syncWithNetwork();
 
       const host = await db.getHost('OfflineHost');
-      // Host found via ARP is marked as awake even if ping fails
+      // Host found via ARP is marked as awake even if ping fails (default mode)
       expect(host?.status).toBe('awake');
       // But pingResponsive should be 0 (doesn't respond to ping)
       expect(host?.pingResponsive).toBe(0);
+    });
+
+    it('should use ARP-only status when usePingValidation=false (default)', async () => {
+      // Ensure usePingValidation is false (default)
+      config.network.usePingValidation = false;
+
+      const mockDiscoveredHosts: DiscoveredHost[] = [
+        { ip: '192.168.1.201', mac: 'AA:BB:CC:DD:EE:10', hostname: 'PingBlockedHost' },
+        { ip: '192.168.1.202', mac: 'AA:BB:CC:DD:EE:11', hostname: 'PingResponsiveHost' },
+      ];
+
+      (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
+      (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
+        mac.toUpperCase().replace(/-/g, ':')
+      );
+      // First host blocks ping, second responds
+      (networkDiscovery.isHostAlive as jest.Mock)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true);
+
+      await db.syncWithNetwork();
+
+      // Both hosts should be marked awake because ARP found them
+      const host1 = await db.getHost('PingBlockedHost');
+      expect(host1?.status).toBe('awake');
+      expect(host1?.pingResponsive).toBe(0);
+
+      const host2 = await db.getHost('PingResponsiveHost');
+      expect(host2?.status).toBe('awake');
+      expect(host2?.pingResponsive).toBe(1);
+    });
+
+    it('should use ping result for status when usePingValidation=true', async () => {
+      // Enable ping validation
+      config.network.usePingValidation = true;
+
+      const mockDiscoveredHosts: DiscoveredHost[] = [
+        { ip: '192.168.1.203', mac: 'AA:BB:CC:DD:EE:12', hostname: 'PingFailHost' },
+        { ip: '192.168.1.204', mac: 'AA:BB:CC:DD:EE:13', hostname: 'PingSuccessHost' },
+      ];
+
+      (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
+      (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
+        mac.toUpperCase().replace(/-/g, ':')
+      );
+      // First host fails ping, second succeeds
+      (networkDiscovery.isHostAlive as jest.Mock)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true);
+
+      await db.syncWithNetwork();
+
+      // First host should be asleep because ping failed
+      const host1 = await db.getHost('PingFailHost');
+      expect(host1?.status).toBe('asleep');
+      expect(host1?.pingResponsive).toBe(0);
+
+      // Second host should be awake because ping succeeded
+      const host2 = await db.getHost('PingSuccessHost');
+      expect(host2?.status).toBe('awake');
+      expect(host2?.pingResponsive).toBe(1);
+
+      // Reset config to default
+      config.network.usePingValidation = false;
+    });
+
+    it('should log debug message when ping fails with usePingValidation=true', async () => {
+      // Enable ping validation
+      config.network.usePingValidation = true;
+
+      const mockDiscoveredHosts: DiscoveredHost[] = [
+        { ip: '192.168.1.205', mac: 'AA:BB:CC:DD:EE:14', hostname: 'DebugLogHost' },
+      ];
+
+      (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
+      (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
+        mac.toUpperCase().replace(/-/g, ':')
+      );
+      (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(false);
+
+      await db.syncWithNetwork();
+
+      // Verify debug log was called
+      expect(logger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('found via ARP but did not respond to ping - marking as asleep')
+      );
+
+      // Verify the host status is actually asleep
+      const host = await db.getHost('DebugLogHost');
+      expect(host?.status).toBe('asleep');
+      expect(host?.pingResponsive).toBe(0);
+
+      // Reset config to default
+      config.network.usePingValidation = false;
     });
 
     it('should handle empty network scan results', async () => {

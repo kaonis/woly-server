@@ -388,9 +388,10 @@ class HostDatabase extends EventEmitter {
         const batchResults = await Promise.all(
           batch.map(async (host) => {
             // Determine if host is alive:
-            // - If found via ARP, it's responding to network requests (awake by default)
-            // - Always check ping responsiveness for additional status information
-            let isAlive = true; // ARP discovery means host is awake
+            // - ARP discovery is prerequisite (host appears in ARP table)
+            // - When usePingValidation=true, ping result determines final status
+            // - When usePingValidation=false, ARP presence alone means awake (default)
+            let isAlive: boolean;
             let pingResponsive: number | null = null;
 
             // Always check ping to track responsiveness
@@ -398,16 +399,17 @@ class HostDatabase extends EventEmitter {
             pingResponsive = pingResult ? 1 : 0;
 
             if (config.network.usePingValidation) {
-              // If ping validation is enabled, use it to determine awake status
-              // (but this is not recommended as many devices block ping)
+              // Ping validation enabled: ping result determines status
+              // (not recommended as many devices block ping)
               isAlive = pingResult;
               if (!isAlive) {
                 logger.debug(
-                  `Host ${host.ip} found via ARP but did not respond to ping - marking as awake anyway`
+                  `Host ${host.ip} found via ARP but did not respond to ping - marking as asleep`
                 );
-                // Even if ping fails, ARP response means it's awake
-                isAlive = true;
               }
+            } else {
+              // Default mode: ARP discovery means host is awake
+              isAlive = true;
             }
 
             const status: 'awake' | 'asleep' = isAlive ? 'awake' : 'asleep';
