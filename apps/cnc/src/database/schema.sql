@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS commands (
     idempotency_key VARCHAR(255),
     state VARCHAR(20) NOT NULL CHECK (state IN ('queued', 'sent', 'acknowledged', 'failed', 'timed_out')),
     error TEXT,
+    retry_count INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     sent_at TIMESTAMP,

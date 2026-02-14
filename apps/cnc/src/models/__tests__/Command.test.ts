@@ -105,5 +105,76 @@ describe('CommandModel', () => {
     const countNegative = await CommandModel.pruneOldCommands(-1);
     expect(countNegative).toBe(0);
   });
+
+  it('initializes retry_count to 0 for new commands', async () => {
+    const cmd = await CommandModel.enqueue({
+      id: 'cmd-retry-init',
+      nodeId: 'node-1',
+      type: 'wake',
+      payload: { type: 'wake', commandId: 'cmd-retry-init', data: { hostName: 'h', mac: 'm' } },
+      idempotencyKey: null,
+    });
+
+    expect(cmd.retryCount).toBe(0);
+  });
+
+  it('increments retry_count when markSent is called', async () => {
+    const cmd = await CommandModel.enqueue({
+      id: 'cmd-retry-inc',
+      nodeId: 'node-1',
+      type: 'wake',
+      payload: { type: 'wake', commandId: 'cmd-retry-inc', data: { hostName: 'h', mac: 'm' } },
+      idempotencyKey: null,
+    });
+
+    expect(cmd.retryCount).toBe(0);
+
+    await CommandModel.markSent('cmd-retry-inc');
+    const afterFirstSend = await CommandModel.findById('cmd-retry-inc');
+    expect(afterFirstSend?.retryCount).toBe(1);
+    expect(afterFirstSend?.state).toBe('sent');
+
+    // Mark as queued again (simulating a retry)
+    await db.query(`UPDATE commands SET state = 'queued' WHERE id = $1`, ['cmd-retry-inc']);
+
+    await CommandModel.markSent('cmd-retry-inc');
+    const afterSecondSend = await CommandModel.findById('cmd-retry-inc');
+    expect(afterSecondSend?.retryCount).toBe(2);
+  });
+
+  it('preserves retry_count when marking command as acknowledged', async () => {
+    const cmd = await CommandModel.enqueue({
+      id: 'cmd-retry-ack',
+      nodeId: 'node-1',
+      type: 'wake',
+      payload: { type: 'wake', commandId: 'cmd-retry-ack', data: { hostName: 'h', mac: 'm' } },
+      idempotencyKey: null,
+    });
+
+    await CommandModel.markSent('cmd-retry-ack');
+    await CommandModel.markAcknowledged('cmd-retry-ack');
+
+    const record = await CommandModel.findById('cmd-retry-ack');
+    expect(record?.state).toBe('acknowledged');
+    expect(record?.retryCount).toBe(1); // Should preserve the count from markSent
+  });
+
+  it('preserves retry_count when marking command as failed', async () => {
+    const cmd = await CommandModel.enqueue({
+      id: 'cmd-retry-fail',
+      nodeId: 'node-1',
+      type: 'wake',
+      payload: { type: 'wake', commandId: 'cmd-retry-fail', data: { hostName: 'h', mac: 'm' } },
+      idempotencyKey: null,
+    });
+
+    await CommandModel.markSent('cmd-retry-fail');
+    await CommandModel.markFailed('cmd-retry-fail', 'Test failure');
+
+    const record = await CommandModel.findById('cmd-retry-fail');
+    expect(record?.state).toBe('failed');
+    expect(record?.retryCount).toBe(1);
+    expect(record?.error).toBe('Test failure');
+  });
 });
 

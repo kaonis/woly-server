@@ -12,6 +12,7 @@ interface CommandRow {
   idempotency_key: string | null;
   state: CommandState;
   error: string | null;
+  retry_count: number;
   created_at: string | Date;
   updated_at: string | Date;
   sent_at: string | Date | null;
@@ -51,6 +52,7 @@ function rowToRecord(row: CommandRow): CommandRecord {
     idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
     state: row.state as CommandState,
     error: row.error ? String(row.error) : null,
+    retryCount: Number(row.retry_count),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
     sentAt: row.sent_at ? new Date(row.sent_at) : null,
@@ -155,24 +157,24 @@ export class CommandModel {
     const query = isSqlite()
       ? `
         UPDATE commands
-        SET state = $2, sent_at = CURRENT_TIMESTAMP
-        WHERE id = $1
+        SET state = ?, sent_at = CURRENT_TIMESTAMP, retry_count = retry_count + 1
+        WHERE id = ?
       `
       : `
         UPDATE commands
-        SET state = $2, sent_at = NOW()
+        SET state = $2, sent_at = NOW(), retry_count = retry_count + 1
         WHERE id = $1
       `;
 
-    await db.query(query, [id, 'sent']);
+    await db.query(query, isSqlite() ? ['sent', id] : [id, 'sent']);
   }
 
   static async markAcknowledged(id: string): Promise<void> {
     const query = isSqlite()
       ? `
         UPDATE commands
-        SET state = $2, completed_at = CURRENT_TIMESTAMP
-        WHERE id = $1
+        SET state = ?, completed_at = CURRENT_TIMESTAMP
+        WHERE id = ?
       `
       : `
         UPDATE commands
@@ -180,15 +182,15 @@ export class CommandModel {
         WHERE id = $1
       `;
 
-    await db.query(query, [id, 'acknowledged']);
+    await db.query(query, isSqlite() ? ['acknowledged', id] : [id, 'acknowledged']);
   }
 
   static async markFailed(id: string, errorMessage: string): Promise<void> {
     const query = isSqlite()
       ? `
         UPDATE commands
-        SET state = $2, error = $3, completed_at = CURRENT_TIMESTAMP
-        WHERE id = $1
+        SET state = ?, error = ?, completed_at = CURRENT_TIMESTAMP
+        WHERE id = ?
       `
       : `
         UPDATE commands
@@ -196,15 +198,15 @@ export class CommandModel {
         WHERE id = $1
       `;
 
-    await db.query(query, [id, 'failed', errorMessage]);
+    await db.query(query, isSqlite() ? ['failed', errorMessage, id] : [id, 'failed', errorMessage]);
   }
 
   static async markTimedOut(id: string, errorMessage: string): Promise<void> {
     const query = isSqlite()
       ? `
         UPDATE commands
-        SET state = $2, error = $3, completed_at = CURRENT_TIMESTAMP
-        WHERE id = $1
+        SET state = ?, error = ?, completed_at = CURRENT_TIMESTAMP
+        WHERE id = ?
       `
       : `
         UPDATE commands
@@ -212,7 +214,7 @@ export class CommandModel {
         WHERE id = $1
       `;
 
-    await db.query(query, [id, 'timed_out', errorMessage]);
+    await db.query(query, isSqlite() ? ['timed_out', errorMessage, id] : [id, 'timed_out', errorMessage]);
   }
 
   static async findById(id: string): Promise<CommandRecord | null> {

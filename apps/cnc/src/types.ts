@@ -80,6 +80,7 @@ export interface CommandRecord {
   idempotencyKey: string | null;
   state: CommandState;
   error: string | null;
+  retryCount: number;
   createdAt: Date;
   updatedAt: Date;
   sentAt: Date | null;
@@ -109,5 +110,7 @@ export interface ServerConfig {
   nodeTimeout: number;
   commandTimeout: number;
   commandRetentionDays: number;
+  commandMaxRetries: number;
+  commandRetryBaseDelayMs: number;
   logLevel: string;
 }
