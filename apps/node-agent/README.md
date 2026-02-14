@@ -421,6 +421,20 @@ apps/node-agent/
 └── Dockerfile
 ```
 
+## Documentation
+
+- [Compatibility Matrix](docs/compatibility.md) — Node ↔ C&C version compatibility
+- [Architecture Plan](ARCHITECTURE_PLAN.md) — Multi-phase evolution roadmap
+- [Implementation Checklist](IMPLEMENTATION_CHECKLIST.md) — Progress tracking
+- [Security](SECURITY.md) — Security considerations and practices
+- [Testing](TESTING.md) — Testing strategy and guidelines
+
+### Architecture Decision Records (ADRs)
+
+- [ADR 0001: Node Auth Token Transport](docs/adr/0001-node-auth-token-transport.md)
+- [ADR 0002: Shared Protocol Package](docs/adr/0002-shared-protocol-package.md)
+- [ADR 0003: Command Reliability and Idempotency](docs/adr/0003-command-reliability-and-idempotency.md)
+
 ## License
 
 Apache License 2.0 (see `LICENSE` in the repo root).
