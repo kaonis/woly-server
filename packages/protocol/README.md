@@ -134,3 +134,22 @@ npm publish --access public
 - The monorepo apps always use the workspace-linked source, so publishing is only needed when the mobile app needs updated types.
 - Publishing requires proper npm authentication and permissions for the `@kaonis` scope.
 - The `publishConfig.access: "public"` in package.json ensures scoped packages are published publicly.
+
+## Protocol Compatibility
+
+This package includes comprehensive contract tests to ensure protocol compatibility between node agents and the C&C backend.
+
+### Contract Tests
+
+- **Location**: `src/__tests__/contract.cross-repo.test.ts`
+- **Coverage**: 32+ test cases covering all message types, command types, JSON serialization, version negotiation, and error handling
+- **CI Enforcement**: Dedicated `protocol-compatibility` CI job runs before main validation
+
+### Documentation
+
+See [docs/PROTOCOL_COMPATIBILITY.md](../../docs/PROTOCOL_COMPATIBILITY.md) for:
+- Versioning policy and semantic versioning rules
+- Runtime version negotiation
+- Breaking change workflow
+- CI enforcement details
+- Troubleshooting guide

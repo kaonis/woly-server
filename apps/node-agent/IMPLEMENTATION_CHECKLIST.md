@@ -61,12 +61,13 @@ Definition of done:
 - [x] Replace local protocol types with `@kaonis/woly-protocol`.
 - [x] Remove duplicate protocol declarations.
 - [x] Add protocol version negotiation at connect.
-- [ ] Publish `@kaonis/woly-protocol` to shared registry and switch both repos from `file:` dependency to semver package dependency.
-- [ ] Add cross-repo contract tests.
+- [x] Add cross-repo contract tests.
+- [x] Add CI workflow to enforce protocol compatibility checks.
+- [ ] Publish `@kaonis/woly-protocol` to shared registry (monorepo uses workspace links; publishing only needed for external consumers like mobile app).
 
 Definition of done:
 
-- [ ] Protocol compatibility is enforced in CI.
+- [x] Protocol compatibility is enforced in CI.
 
 ## Phase 4 - Command Execution Reliability
 
