@@ -34,15 +34,19 @@ jest.mock('../../services/macVendorService', () => ({
 }));
 
 // Mock logger
-jest.mock('../../utils/logger', () => ({
-  __esModule: true,
-  default: {
+jest.mock('../../utils/logger', () => {
+  const mockLogger = {
     debug: jest.fn(),
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
-  },
-}));
+  };
+  return {
+    __esModule: true,
+    logger: mockLogger,
+    default: mockLogger,
+  };
+});
 
 import { lookupMacVendor } from '../../services/macVendorService';
 
