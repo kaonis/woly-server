@@ -279,6 +279,26 @@ export class CommandModel {
     const result = await db.query(query, [timeoutSeconds]);
     return typeof result.rowCount === 'number' ? result.rowCount : 0;
   }
+
+  static async pruneOldCommands(retentionDays: number): Promise<number> {
+    // Remove commands older than retentionDays
+    if (retentionDays <= 0) {
+      return 0;
+    }
+
+    const query = isSqlite()
+      ? `
+        DELETE FROM commands
+        WHERE datetime(created_at) < datetime('now', '-' || $1 || ' days')
+      `
+      : `
+        DELETE FROM commands
+        WHERE created_at < NOW() - ($1 || ' days')::INTERVAL
+      `;
+
+    const result = await db.query(query, [retentionDays]);
+    return typeof result.rowCount === 'number' ? result.rowCount : 0;
+  }
 }
 
 export default CommandModel;

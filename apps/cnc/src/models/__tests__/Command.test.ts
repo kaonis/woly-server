@@ -57,5 +57,53 @@ describe('CommandModel', () => {
     const record = await CommandModel.findById('cmd-stale');
     expect(record?.state).toBe('timed_out');
   });
+
+  it('prunes old commands beyond retention period', async () => {
+    // Create a command in the past
+    await CommandModel.enqueue({
+      id: 'cmd-old',
+      nodeId: 'node-1',
+      type: 'wake',
+      payload: { type: 'wake', commandId: 'cmd-old', data: { hostName: 'h', mac: 'm' } },
+      idempotencyKey: null,
+    });
+
+    // Make it old: set created_at 60 days in the past
+    await db.query(`UPDATE commands SET created_at = datetime('now', '-60 days') WHERE id = $1`, ['cmd-old']);
+
+    // Prune commands older than 30 days
+    const count = await CommandModel.pruneOldCommands(30);
+    expect(count).toBeGreaterThanOrEqual(1);
+
+    // Verify the command was deleted
+    const record = await CommandModel.findById('cmd-old');
+    expect(record).toBeNull();
+  });
+
+  it('does not prune recent commands', async () => {
+    // Create a recent command
+    await CommandModel.enqueue({
+      id: 'cmd-recent',
+      nodeId: 'node-1',
+      type: 'wake',
+      payload: { type: 'wake', commandId: 'cmd-recent', data: { hostName: 'h', mac: 'm' } },
+      idempotencyKey: null,
+    });
+
+    // Prune commands older than 30 days (this should not delete cmd-recent)
+    await CommandModel.pruneOldCommands(30);
+
+    // Verify the command still exists
+    const record = await CommandModel.findById('cmd-recent');
+    expect(record).not.toBeNull();
+  });
+
+  it('does not prune when retention days is zero or negative', async () => {
+    const countZero = await CommandModel.pruneOldCommands(0);
+    expect(countZero).toBe(0);
+
+    const countNegative = await CommandModel.pruneOldCommands(-1);
+    expect(countNegative).toBe(0);
+  });
 });
 

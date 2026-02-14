@@ -57,6 +57,7 @@ CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_node_id ON aggregated_hosts(node
 CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_status ON aggregated_hosts(status);
 CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_mac ON aggregated_hosts(mac);
 CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_location ON aggregated_hosts(location);
+CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_fqn ON aggregated_hosts(fully_qualified_name);
 CREATE INDEX IF NOT EXISTS idx_commands_node_state ON commands(node_id, state);
 CREATE INDEX IF NOT EXISTS idx_commands_created_at ON commands(created_at);
 
