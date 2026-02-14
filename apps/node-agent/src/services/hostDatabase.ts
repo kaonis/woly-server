@@ -68,14 +68,13 @@ class HostDatabase extends EventEmitter {
   }
 
   /**
-   * Initialize database with table and seed data
+   * Initialize database with table
    */
   async initialize(): Promise<void> {
     // Wait for database connection to be ready
     await this.ready;
 
     this.createTable();
-    this.seedInitialHosts();
     // Database is ready
   }
 
@@ -100,37 +99,6 @@ class HostDatabase extends EventEmitter {
       const error = err as Error;
       if (!error.message.includes('duplicate column')) {
         logger.warn('Could not add pingResponsive column:', { error: error.message });
-      }
-    }
-  }
-
-  /**
-   * Seed initial hosts if table is empty
-   */
-  seedInitialHosts(): void {
-    const hostTable = [
-      ['PHANTOM-MBP', '80:6D:97:60:39:08', '192.168.1.147', 'asleep', null, 0, null],
-      ['PHANTOM-NAS', 'BC:07:1D:DD:5B:9C', '192.168.1.5', 'asleep', null, 0, null],
-      ['RASPBERRYPI', 'B8:27:EB:B9:EF:D7', '192.168.1.6', 'asleep', null, 0, null],
-    ];
-
-    const countRow = this.db.prepare('SELECT COUNT(*) as count FROM hosts').get() as {
-      count: number;
-    };
-
-    if (countRow.count === 0) {
-      const insert = this.db.prepare(
-        `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered, pingResponsive)
-         VALUES(?,?,?,?,?,?,?)`
-      );
-
-      for (const host of hostTable) {
-        try {
-          insert.run(host);
-          logger.info(`Seeded host: ${host[0]}`);
-        } catch (error) {
-          logger.error('Seed error:', { error: (error as Error).message });
-        }
       }
     }
   }

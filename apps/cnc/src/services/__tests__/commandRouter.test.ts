@@ -80,7 +80,7 @@ describe('CommandRouter', () => {
       });
 
       await expect(
-        commandRouter.routeWakeCommand('test-host@Test-Location-test-cmd-node-1')
+        commandRouter.routeWakeCommand('test-host@Test%20Location-test-cmd-node-1')
       ).rejects.toThrow('offline');
     });
   });
@@ -159,7 +159,7 @@ describe('CommandRouter', () => {
       });
 
       await expect(
-        commandRouter.routeDeleteHostCommand('delete-host@Test-Location-test-cmd-node-3')
+        commandRouter.routeDeleteHostCommand('delete-host@Test%20Location-test-cmd-node-3')
       ).rejects.toThrow('offline');
     });
   });

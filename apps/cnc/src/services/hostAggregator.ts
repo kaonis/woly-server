@@ -590,9 +590,9 @@ export class HostAggregator extends EventEmitter {
 
   private buildFQN(name: string, location: string, nodeId?: string): string {
     // Format: hostname@location-nodeId (nodeId ensures uniqueness when same hostname exists on multiple nodes)
-    // Replace spaces in location with hyphens for cleaner FQN
-    const sanitizedLocation = location.replace(/\s+/g, '-');
-    return nodeId ? `${name}@${sanitizedLocation}-${nodeId}` : `${name}@${sanitizedLocation}`;
+    // URL-encode location to preserve natural hyphens and special characters
+    const encodedLocation = encodeURIComponent(location);
+    return nodeId ? `${name}@${encodedLocation}-${nodeId}` : `${name}@${encodedLocation}`;
   }
 
   private async insertHost(
