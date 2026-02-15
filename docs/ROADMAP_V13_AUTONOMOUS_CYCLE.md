@@ -1,6 +1,6 @@
 # Woly-Server Roadmap V13 (Autonomous Cycle)
 
-Date: 2026-02-15  
+Date: 2026-02-15
 Base: `docs/ROADMAP_V12_5H_AUTONOMOUS_LOOP.md`
 
 ## 1. Current State Audit
@@ -28,16 +28,16 @@ Recent capability improvements now in place:
 
 ## 3. Roadmap Items (V13)
 
-1. `#220` [Bug][Node Agent] Emit host lifecycle events for manual CRUD operations in agent mode.  
-2. `#221` [Testing] Add cross-service propagation coverage for manual host CRUD lifecycle.  
-3. `#222` [CI][DX] Add explicit cross-service smoke gate to local/CI validation workflow.  
+1. `#220` [Bug][Node Agent] Emit host lifecycle events for manual CRUD operations in agent mode.
+2. `#221` [Testing] Add cross-service propagation coverage for manual host CRUD lifecycle.
+3. `#222` [CI][DX] Add explicit cross-service smoke gate to local/CI validation workflow.
 4. `#223` [Observability][CNC] Expose command outcome metrics by command type and terminal state.
 
 ## 4. Execution Order
 
-1. **P1** `#220` (functional correctness bug; prerequisite for robust propagation testing)  
-2. **P2** `#221` (lock regression coverage after bug fix)  
-3. **P3** `#222` (enforce gate in workflow/docs)  
+1. **P1** `#220` (functional correctness bug; prerequisite for robust propagation testing)
+2. **P2** `#221` (lock regression coverage after bug fix)
+3. **P3** `#222` (enforce gate in workflow/docs)
 4. **P4** `#223` (observability enhancement)
 
 ## 5. Per-Issue Workflow
