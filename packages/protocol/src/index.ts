@@ -75,6 +75,42 @@ export interface CncCapabilitiesResponse {
   capabilities: CncFeatureCapabilities;
 }
 
+// --- Wake schedule API ---
+
+export type ScheduleFrequency = 'once' | 'daily' | 'weekly' | 'weekdays' | 'weekends';
+
+export interface WakeSchedule {
+  id: string;
+  hostName: string;
+  hostMac: string;
+  hostFqn: string;
+  scheduledTime: string;
+  timezone: string;
+  frequency: ScheduleFrequency;
+  enabled: boolean;
+  notifyOnWake: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastTriggered: string | null;
+  nextTrigger: string | null;
+}
+
+export interface CreateWakeScheduleRequest {
+  hostName: string;
+  hostMac: string;
+  hostFqn: string;
+  scheduledTime: string;
+  timezone?: string;
+  frequency: ScheduleFrequency;
+  enabled?: boolean;
+  notifyOnWake?: boolean;
+  nextTrigger?: string | null;
+}
+
+export type UpdateWakeScheduleRequest = Partial<CreateWakeScheduleRequest> & {
+  lastTriggered?: string | null;
+};
+
 // --- WebSocket message types ---
 
 export type NodeMessage =
@@ -165,6 +201,74 @@ export const cncCapabilitiesResponseSchema = z.object({
   supportedProtocolVersions: z.array(z.string().min(1)).min(1),
   capabilities: cncFeatureCapabilitiesSchema,
 });
+
+const isoTimestampSchema = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
+  message: 'Expected ISO-8601 timestamp',
+});
+
+export const scheduleFrequencySchema = z.enum([
+  'once',
+  'daily',
+  'weekly',
+  'weekdays',
+  'weekends',
+]);
+
+export const wakeScheduleSchema = z
+  .object({
+    id: z.string().min(1),
+    hostName: z.string().min(1),
+    hostMac: z.string().min(1),
+    hostFqn: z.string().min(1),
+    scheduledTime: isoTimestampSchema,
+    timezone: z.string().min(1),
+    frequency: scheduleFrequencySchema,
+    enabled: z.boolean(),
+    notifyOnWake: z.boolean(),
+    createdAt: isoTimestampSchema,
+    updatedAt: isoTimestampSchema,
+    lastTriggered: isoTimestampSchema.nullable(),
+    nextTrigger: isoTimestampSchema.nullable(),
+  })
+  .strict();
+
+export const wakeScheduleListResponseSchema = z
+  .object({
+    schedules: z.array(wakeScheduleSchema),
+  })
+  .strict();
+
+export const createWakeScheduleRequestSchema = z
+  .object({
+    hostName: z.string().min(1),
+    hostMac: z.string().min(1),
+    hostFqn: z.string().min(1),
+    scheduledTime: isoTimestampSchema,
+    timezone: z.string().min(1).default('UTC'),
+    frequency: scheduleFrequencySchema,
+    enabled: z.boolean().default(true),
+    notifyOnWake: z.boolean().default(true),
+    nextTrigger: isoTimestampSchema.nullable().optional(),
+  })
+  .strict();
+
+export const updateWakeScheduleRequestSchema = z
+  .object({
+    hostName: z.string().min(1).optional(),
+    hostMac: z.string().min(1).optional(),
+    hostFqn: z.string().min(1).optional(),
+    scheduledTime: isoTimestampSchema.optional(),
+    timezone: z.string().min(1).optional(),
+    frequency: scheduleFrequencySchema.optional(),
+    enabled: z.boolean().optional(),
+    notifyOnWake: z.boolean().optional(),
+    nextTrigger: isoTimestampSchema.nullable().optional(),
+    lastTriggered: isoTimestampSchema.nullable().optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field must be provided',
+  });
 
 const nodeMetadataSchema = z.object({
   version: z.string().min(1),

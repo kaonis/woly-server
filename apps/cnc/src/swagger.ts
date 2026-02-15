@@ -58,6 +58,10 @@ const options: swaggerJsdoc.Options = {
         description: 'Feature negotiation and version metadata',
       },
       {
+        name: 'Schedules',
+        description: 'Server-managed wake schedule CRUD endpoints',
+      },
+      {
         name: 'Admin',
         description: 'Administrative operations (requires admin role)',
       },
@@ -317,7 +321,7 @@ const options: swaggerJsdoc.Options = {
                 schedulesApi: {
                   type: 'boolean',
                   description: 'Whether server-managed wake schedule CRUD is available',
-                  example: false,
+                  example: true,
                 },
                 commandStatusStreaming: {
                   type: 'boolean',
@@ -325,6 +329,183 @@ const options: swaggerJsdoc.Options = {
                   example: false,
                 },
               },
+            },
+          },
+        },
+        ScheduleFrequency: {
+          type: 'string',
+          enum: ['once', 'daily', 'weekly', 'weekdays', 'weekends'],
+          description: 'Wake schedule recurrence frequency',
+          example: 'daily',
+        },
+        WakeSchedule: {
+          type: 'object',
+          required: [
+            'id',
+            'hostName',
+            'hostMac',
+            'hostFqn',
+            'scheduledTime',
+            'timezone',
+            'frequency',
+            'enabled',
+            'notifyOnWake',
+            'createdAt',
+            'updatedAt',
+            'lastTriggered',
+            'nextTrigger',
+          ],
+          properties: {
+            id: {
+              type: 'string',
+              description: 'Wake schedule identifier',
+              example: '8ca21661-2333-4af7-a78c-c8518caef5ee',
+            },
+            hostName: {
+              type: 'string',
+              description: 'Display host name',
+              example: 'Office-Mac',
+            },
+            hostMac: {
+              type: 'string',
+              description: 'Host MAC address',
+              example: '00:11:22:33:44:55',
+            },
+            hostFqn: {
+              type: 'string',
+              description: 'Fully-qualified host identity (hostname@location)',
+              example: 'Office-Mac@Home',
+            },
+            scheduledTime: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Anchor schedule time in ISO-8601 UTC',
+              example: '2026-02-16T08:00:00.000Z',
+            },
+            timezone: {
+              type: 'string',
+              description: 'IANA timezone used by client-side recurrence calculations',
+              example: 'America/New_York',
+            },
+            frequency: {
+              $ref: '#/components/schemas/ScheduleFrequency',
+            },
+            enabled: {
+              type: 'boolean',
+              description: 'Whether schedule is active',
+              example: true,
+            },
+            notifyOnWake: {
+              type: 'boolean',
+              description: 'Whether client should notify on wake execution',
+              example: true,
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-15T20:00:00.000Z',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-15T20:00:00.000Z',
+            },
+            lastTriggered: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              example: null,
+            },
+            nextTrigger: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              example: '2026-02-16T08:00:00.000Z',
+            },
+          },
+        },
+        CreateWakeScheduleRequest: {
+          type: 'object',
+          required: ['hostName', 'hostMac', 'hostFqn', 'scheduledTime', 'frequency'],
+          properties: {
+            hostName: {
+              type: 'string',
+              example: 'Office-Mac',
+            },
+            hostMac: {
+              type: 'string',
+              example: '00:11:22:33:44:55',
+            },
+            hostFqn: {
+              type: 'string',
+              example: 'Office-Mac@Home',
+            },
+            scheduledTime: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-16T08:00:00.000Z',
+            },
+            timezone: {
+              type: 'string',
+              example: 'UTC',
+            },
+            frequency: {
+              $ref: '#/components/schemas/ScheduleFrequency',
+            },
+            enabled: {
+              type: 'boolean',
+              example: true,
+            },
+            notifyOnWake: {
+              type: 'boolean',
+              example: true,
+            },
+            nextTrigger: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              example: '2026-02-16T08:00:00.000Z',
+            },
+          },
+        },
+        UpdateWakeScheduleRequest: {
+          type: 'object',
+          description: 'Partial update payload; at least one property is required',
+          properties: {
+            hostName: {
+              type: 'string',
+            },
+            hostMac: {
+              type: 'string',
+            },
+            hostFqn: {
+              type: 'string',
+            },
+            scheduledTime: {
+              type: 'string',
+              format: 'date-time',
+            },
+            timezone: {
+              type: 'string',
+            },
+            frequency: {
+              $ref: '#/components/schemas/ScheduleFrequency',
+            },
+            enabled: {
+              type: 'boolean',
+            },
+            notifyOnWake: {
+              type: 'boolean',
+            },
+            nextTrigger: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+            },
+            lastTriggered: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
             },
           },
         },

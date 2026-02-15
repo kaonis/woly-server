@@ -55,6 +55,28 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_commands_idempotency_key
 CREATE INDEX IF NOT EXISTS idx_commands_node_state ON commands(node_id, state);
 CREATE INDEX IF NOT EXISTS idx_commands_created_at ON commands(created_at);
 
+-- Wake schedules table
+CREATE TABLE IF NOT EXISTS wake_schedules (
+    id VARCHAR(255) PRIMARY KEY,
+    owner_sub VARCHAR(255) NOT NULL,
+    host_fqn VARCHAR(512) NOT NULL,
+    host_name VARCHAR(255) NOT NULL,
+    host_mac VARCHAR(17) NOT NULL,
+    scheduled_time TIMESTAMP NOT NULL,
+    timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+    frequency VARCHAR(20) NOT NULL CHECK (frequency IN ('once', 'daily', 'weekly', 'weekdays', 'weekends')),
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_on_wake BOOLEAN NOT NULL DEFAULT TRUE,
+    last_triggered TIMESTAMP,
+    next_trigger TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_wake_schedules_owner_sub ON wake_schedules(owner_sub);
+CREATE INDEX IF NOT EXISTS idx_wake_schedules_host_fqn ON wake_schedules(host_fqn);
+CREATE INDEX IF NOT EXISTS idx_wake_schedules_owner_host ON wake_schedules(owner_sub, host_fqn);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_nodes_status ON nodes(status);
 CREATE INDEX IF NOT EXISTS idx_nodes_last_heartbeat ON nodes(last_heartbeat);
@@ -86,5 +108,10 @@ CREATE TRIGGER update_aggregated_hosts_updated_at
 
 CREATE TRIGGER update_commands_updated_at
     BEFORE UPDATE ON commands
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_wake_schedules_updated_at
+    BEFORE UPDATE ON wake_schedules
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
