@@ -73,10 +73,10 @@ Definition of done:
 
 ## Phase 6 - Observability and Operations
 
-- [ ] Emit node count, command latency, timeout rate, and invalid payload rate metrics.
-- [ ] Propagate correlation IDs from API call to node response.
-- [ ] Add dashboards and alerts.
-- [ ] Publish incident runbooks.
+- [x] Emit node count, command latency, timeout rate, and invalid payload rate metrics.
+- [x] Propagate correlation IDs from API call to node response.
+- [x] Add dashboards and alerts.
+- [x] Publish incident runbooks.
 
 Definition of done:
-- [ ] Incident response can trace failures end-to-end quickly.
+- [x] Incident response can trace failures end-to-end quickly.

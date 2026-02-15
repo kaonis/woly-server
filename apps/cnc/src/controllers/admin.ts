@@ -7,12 +7,15 @@ import { NodeModel } from '../models/Node';
 import { CommandModel } from '../models/Command';
 import { HostAggregator } from '../services/hostAggregator';
 import { NodeManager } from '../services/nodeManager';
+import { CommandRouter } from '../services/commandRouter';
+import { runtimeMetrics } from '../services/runtimeMetrics';
 import logger from '../utils/logger';
 
 export class AdminController {
   constructor(
     private hostAggregator: HostAggregator,
-    private nodeManager?: NodeManager
+    private nodeManager?: NodeManager,
+    private commandRouter?: CommandRouter
   ) {}
   /**
    * @swagger
@@ -104,6 +107,10 @@ export class AdminController {
     try {
       const nodeCounts = await NodeModel.getStatusCounts();
       const hostStats = await this.hostAggregator.getStats();
+      const commandRouterStats =
+        this.commandRouter && typeof this.commandRouter.getStats === 'function'
+          ? this.commandRouter.getStats()
+          : undefined;
 
       res.json({
         nodes: nodeCounts,
@@ -114,6 +121,8 @@ export class AdminController {
               protocolValidationFailures: this.nodeManager.getProtocolValidationStats(),
             }
           : undefined,
+        commandRouter: commandRouterStats,
+        observability: runtimeMetrics.snapshot(),
         timestamp: new Date().toISOString(),
       });
     } catch (error) {

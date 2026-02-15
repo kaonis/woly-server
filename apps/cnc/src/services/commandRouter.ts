@@ -7,6 +7,7 @@ import logger from '../utils/logger';
 import { CommandModel } from '../models/Command';
 import config from '../config';
 import type { HostStatus } from '@kaonis/woly-protocol';
+import { runtimeMetrics } from './runtimeMetrics';
 
 type DispatchCommand = Extract<CncCommand, { commandId: string }>;
 
@@ -40,6 +41,7 @@ export class CommandRouter extends EventEmitter {
       reject: (error: Error) => void;
     }>;
     timeout: NodeJS.Timeout;
+    correlationId: string | null;
   }>;
   readonly commandTimeout: number;
   readonly maxRetries: number;
@@ -70,7 +72,7 @@ export class CommandRouter extends EventEmitter {
    */
   async routeWakeCommand(
     fqn: string,
-    options?: { idempotencyKey?: string | null }
+    options?: { idempotencyKey?: string | null; correlationId?: string | null }
   ): Promise<WakeupResponse> {
     logger.info(`Routing wake command for ${fqn}`);
 
@@ -102,7 +104,11 @@ export class CommandRouter extends EventEmitter {
     };
 
     // Send command and wait for result
-    const result = await this.executeCommand(nodeId, command, { idempotencyKey: options?.idempotencyKey ?? null });
+    const correlationId = options?.correlationId ?? null;
+    const result = await this.executeCommand(nodeId, command, {
+      idempotencyKey: options?.idempotencyKey ?? null,
+      correlationId,
+    });
 
     if (!result.success) {
       throw new Error(result.error || 'Wake command failed');
@@ -112,7 +118,8 @@ export class CommandRouter extends EventEmitter {
       success: true,
       message: `Wake-on-LAN packet sent to ${fqn}`,
       nodeId,
-      location
+      location,
+      correlationId: result.correlationId ?? correlationId ?? undefined,
     };
   }
 
@@ -123,7 +130,11 @@ export class CommandRouter extends EventEmitter {
    * @param immediate Whether to scan immediately
    * @returns Promise with command result
    */
-  async routeScanCommand(nodeId: string, immediate = true): Promise<CommandResult> {
+  async routeScanCommand(
+    nodeId: string,
+    immediate = true,
+    options?: { correlationId?: string | null }
+  ): Promise<CommandResult> {
     logger.info(`Routing scan command to node ${nodeId}`);
 
     // Check if node is online
@@ -141,7 +152,10 @@ export class CommandRouter extends EventEmitter {
     };
 
     // Send command and wait for result
-    return this.executeCommand(nodeId, command, { idempotencyKey: null });
+    return this.executeCommand(nodeId, command, {
+      idempotencyKey: null,
+      correlationId: options?.correlationId ?? null,
+    });
   }
 
   /**
@@ -154,7 +168,7 @@ export class CommandRouter extends EventEmitter {
   async routeUpdateHostCommand(
     fqn: string,
     hostData: HostUpdateData,
-    options?: { idempotencyKey?: string | null }
+    options?: { idempotencyKey?: string | null; correlationId?: string | null }
   ): Promise<CommandResult> {
     logger.info(`Routing update-host command for ${fqn}`);
 
@@ -186,7 +200,10 @@ export class CommandRouter extends EventEmitter {
     };
 
     // Send command and wait for result
-    return this.executeCommand(nodeId, command, { idempotencyKey: options?.idempotencyKey ?? null });
+    return this.executeCommand(nodeId, command, {
+      idempotencyKey: options?.idempotencyKey ?? null,
+      correlationId: options?.correlationId ?? null,
+    });
   }
 
   /**
@@ -197,7 +214,7 @@ export class CommandRouter extends EventEmitter {
    */
   async routeDeleteHostCommand(
     fqn: string,
-    options?: { idempotencyKey?: string | null }
+    options?: { idempotencyKey?: string | null; correlationId?: string | null }
   ): Promise<CommandResult> {
     logger.info(`Routing delete-host command for ${fqn}`);
 
@@ -226,7 +243,10 @@ export class CommandRouter extends EventEmitter {
     };
 
     // Send command and wait for result
-    const result = await this.executeCommand(nodeId, command, { idempotencyKey: options?.idempotencyKey ?? null });
+    const result = await this.executeCommand(nodeId, command, {
+      idempotencyKey: options?.idempotencyKey ?? null,
+      correlationId: options?.correlationId ?? null,
+    });
 
     // If successful, also remove from aggregated database
     if (result.success) {
@@ -249,7 +269,7 @@ export class CommandRouter extends EventEmitter {
   private async executeCommand(
     nodeId: string,
     command: DispatchCommand,
-    options: { idempotencyKey: string | null }
+    options: { idempotencyKey: string | null; correlationId: string | null }
   ): Promise<CommandResult> {
     const record = await CommandModel.enqueue({
       id: command.commandId,
@@ -271,6 +291,7 @@ export class CommandRouter extends EventEmitter {
         commandId: effectiveCommandId,
         success: true,
         timestamp: record.completedAt ?? record.updatedAt,
+        correlationId: options.correlationId ?? undefined,
       };
     }
 
@@ -286,6 +307,7 @@ export class CommandRouter extends EventEmitter {
         success: false,
         error: record.error ?? 'Command failed',
         timestamp: record.completedAt ?? record.updatedAt,
+        correlationId: options.correlationId ?? undefined,
       };
     }
 
@@ -302,6 +324,7 @@ export class CommandRouter extends EventEmitter {
       const timeout = setTimeout(() => {
         const pending = this.pendingCommands.get(effectiveCommandId);
         this.pendingCommands.delete(effectiveCommandId);
+        runtimeMetrics.recordCommandTimeout(effectiveCommandId);
         
         const attemptNumber = record.retryCount + 1; // Current attempt number
         const error = new Error(`Command ${effectiveCommandId} timed out after ${this.commandTimeout}ms (attempt ${attemptNumber}/${this.maxRetries})`);
@@ -325,6 +348,7 @@ export class CommandRouter extends EventEmitter {
       this.pendingCommands.set(effectiveCommandId, {
         resolvers: [{ resolve, reject }],
         timeout,
+        correlationId: options.correlationId,
       });
 
       void (async () => {
@@ -345,6 +369,11 @@ export class CommandRouter extends EventEmitter {
             }
 
             this.nodeManager.sendCommand(nodeId, payloadToSend);
+            runtimeMetrics.recordCommandDispatched(
+              effectiveCommandId,
+              command.type,
+              options.correlationId
+            );
             await CommandModel.markSent(effectiveCommandId);
             
             // Log after markSent to show the correct count (markSent increments it)
@@ -366,6 +395,7 @@ export class CommandRouter extends EventEmitter {
           const err = error instanceof Error ? error : new Error(message);
           
           await CommandModel.markFailed(effectiveCommandId, message);
+          runtimeMetrics.recordCommandResult(effectiveCommandId, false);
           
           logger.error('Failed to send command', {
             commandId: effectiveCommandId,
@@ -391,20 +421,25 @@ export class CommandRouter extends EventEmitter {
    * @param result Command result
    */
   private handleCommandResult(result: CommandResult): void {
+    runtimeMetrics.recordCommandResult(result.commandId, result.success);
     logger.debug('Received command result', {
       commandId: result.commandId,
       success: result.success,
       error: result.error,
+      correlationId: runtimeMetrics.lookupCorrelationId(result.commandId),
     });
 
     const pending = this.pendingCommands.get(result.commandId);
     
     // Always persist the result state, even if no pending resolver exists
     // (e.g., after a process restart or if the HTTP caller disconnected)
+    const correlationId =
+      pending?.correlationId ?? runtimeMetrics.lookupCorrelationId(result.commandId) ?? undefined;
     if (result.success) {
       CommandModel.markAcknowledged(result.commandId).then(() => {
         logger.info('Command acknowledged', {
           commandId: result.commandId,
+          correlationId,
         });
       }).catch((error) => {
         logger.error('Failed to mark command as acknowledged', {
@@ -417,6 +452,7 @@ export class CommandRouter extends EventEmitter {
         logger.warn('Command failed', {
           commandId: result.commandId,
           error: result.error,
+          correlationId,
         });
       }).catch((error) => {
         logger.error('Failed to mark command as failed', {
@@ -437,7 +473,7 @@ export class CommandRouter extends EventEmitter {
 
     if (result.success) {
       for (const resolver of pending.resolvers) {
-        resolver.resolve(result);
+        resolver.resolve({ ...result, correlationId });
       }
       return;
     }
