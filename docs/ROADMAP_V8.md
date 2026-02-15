@@ -6,17 +6,19 @@ Scope: New autonomous cycle after V7 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `8627fb8` (PR #183).
-- Active execution branch: `feat/150-eslint10-compatibility-checkpoint-3`.
+- `master` synced at merge commit `86524fa` (PR #184).
+- Active execution branch: `feat/185-manual-ci-audit-command`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
+- #185 `[CI] Add local manual-only run audit command`
 
 ### CI snapshot
 - Repository workflows remain in temporary manual-only mode (`workflow_dispatch` only).
 - GitHub CodeQL default setup remains disabled (`state: not-configured`).
 - Workflow timeout cap standard (`timeout-minutes: 8`) is enforced across manual workflows (PR #183).
+- Local manual-only run audit command is being implemented in issue #185.
 - Latest manual ESLint10 watchdog run succeeded: `22037969724` (2026-02-15).
 - Latest local validation gate passed on 2026-02-15:
   - `npm run lint`
@@ -70,6 +72,18 @@ Acceptance criteria:
 
 Status: `Completed` (2026-02-15, PR #183)
 
+### Phase 5: Local manual-only run audit automation
+Issue: #185  
+Labels: `priority:medium`, `developer-experience`, `technical-debt`
+
+Acceptance criteria:
+- Add a local command to audit recent workflow runs for unexpected non-manual events.
+- Support timestamp-scoped checks for weekly review windows.
+- Document command usage in manual CI operations guidance.
+- Validate local gate remains green.
+
+Status: `In Progress` (2026-02-15)
+
 ## 3. Execution Loop Rules
 
 For each phase:
@@ -96,3 +110,5 @@ For each phase:
 - 2026-02-15: Created issue #182 and started branch `fix/182-ci-timeout-caps` to enforce 8-minute manual workflow job timeouts.
 - 2026-02-15: Merged issue #182 via PR #183 and enforced 8-minute timeout caps on all manual workflows.
 - 2026-02-15: Ran another ESLint 10 compatibility checkpoint for issue #150; blocker unchanged (`@typescript-eslint/*@8.55.0` peer range `^8.57 || ^9`).
+- 2026-02-15: Merged issue #150 checkpoint refresh via PR #184 with blocker still unchanged.
+- 2026-02-15: Created issue #185 and started branch `feat/185-manual-ci-audit-command` for local manual-run audit automation.

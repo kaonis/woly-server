@@ -51,6 +51,16 @@ gh run list --limit 20
 gh run view <run-id> --log-failed
 ```
 
+Run structured local audit for weekly review windows:
+
+```bash
+# Example: only runs created after previous review timestamp
+npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --fail-on-unexpected
+
+# JSON output for logs or automation
+npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --json
+```
+
 ## Rollback Criteria (Re-enable Automatic Runs)
 
 Re-enable automatic CI only when all of the following are true:
@@ -68,7 +78,7 @@ Re-enable automatic CI only when all of the following are true:
 Weekly checklist:
 
 1. Confirm no unexpected automatic workflow runs since previous review:
-   - `gh run list --limit 50`
+   - `npm run ci:audit:manual -- --since <previous-review-iso> --fail-on-unexpected`
 2. Verify manual-only policy still matches budget and throughput needs:
    - count merges since last review
    - count manually dispatched runs since last review
