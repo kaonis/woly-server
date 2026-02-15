@@ -97,7 +97,7 @@ Acceptance criteria:
 - App wiring and agent/controller scan paths use `ScanOrchestrator` without behavior regressions.
 - Unit/integration coverage remains above threshold and green.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15 via PR #118)
 
 ### Phase 6: Code review quality debt burn-down
 Issue: #88  
@@ -109,7 +109,7 @@ Acceptance criteria:
 - Introduce centralized `isSqlite` capability on the DB abstraction and use it in touched call sites.
 - Resolve node-agent `cncClient` registration TODO placeholders for version/subnet/gateway metadata.
 
-Status: `Planned`
+Status: `In Progress` (2026-02-15)
 
 ## 3. Execution Loop Rules for V1
 
@@ -146,4 +146,7 @@ For each issue phase:
 - 2026-02-15: Merged PR #117 (`fix: add standalone REST update/delete host endpoints (#89)`).
 - 2026-02-15: Verified post-merge `master` CI and CodeQL runs are green.
 - 2026-02-15: Started Phase 5 implementation on issue #85 (`feat/85-scan-orchestrator`).
-- Next: Open and merge PR for #85, then continue Phase 6 on #88.
+- 2026-02-15: Merged PR #118 (`feat: extract node-agent scan orchestration service (#85)`).
+- 2026-02-15: Verified post-merge `master` CI and CodeQL runs are green.
+- 2026-02-15: Started Phase 6 implementation on issue #88 (`fix/88-code-review-quality`).
+- Next: Open and merge PR for #88.

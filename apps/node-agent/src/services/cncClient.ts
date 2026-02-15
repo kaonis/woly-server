@@ -1,6 +1,8 @@
 import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 import os from 'os';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
 import { ZodError } from 'zod';
@@ -18,6 +20,30 @@ import {
   SUPPORTED_PROTOCOL_VERSIONS,
 } from '@kaonis/woly-protocol';
 import { logger } from '../utils/logger';
+
+const FALLBACK_NETWORK_INFO = {
+  subnet: '0.0.0.0/0',
+  gateway: '0.0.0.0',
+};
+
+function getNodeAgentVersion(): string {
+  try {
+    const packageJsonPath = join(__dirname, '../../package.json');
+    const packageJsonRaw = readFileSync(packageJsonPath, 'utf-8');
+    const packageJson = JSON.parse(packageJsonRaw) as { version?: unknown };
+    if (typeof packageJson.version === 'string' && packageJson.version.trim().length > 0) {
+      return packageJson.version;
+    }
+  } catch (error) {
+    logger.warn('Failed to resolve node-agent version from package.json', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return '0.0.0';
+}
+
+const NODE_AGENT_VERSION = getNodeAgentVersion();
 
 /**
  * C&C Client Service
@@ -149,6 +175,8 @@ export class CncClient extends EventEmitter {
    * Register node with C&C backend
    */
   private register(): void {
+    const networkInfo = this.resolveNetworkInfo();
+
     const registration: NodeRegistration = {
       nodeId: agentConfig.nodeId,
       name: agentConfig.nodeId,
@@ -156,18 +184,50 @@ export class CncClient extends EventEmitter {
       // authToken intentionally omitted — already validated during WS upgrade.
       publicUrl: agentConfig.publicUrl || undefined,
       metadata: {
-        version: '1.0.0', // TODO: Get from package.json
+        version: NODE_AGENT_VERSION,
         platform: os.platform(),
         protocolVersion: PROTOCOL_VERSION,
-        networkInfo: {
-          subnet: '0.0.0.0/0', // TODO: Get actual subnet
-          gateway: '0.0.0.0', // TODO: Get actual gateway
-        },
+        networkInfo,
       },
     };
 
     this.send({ type: 'register', data: registration });
     logger.info('Sent registration to C&C', { nodeId: agentConfig.nodeId });
+  }
+
+  private resolveNetworkInfo(): { subnet: string; gateway: string } {
+    const interfaces = os.networkInterfaces();
+
+    for (const interfaceEntries of Object.values(interfaces)) {
+      for (const iface of interfaceEntries ?? []) {
+        const family = String(iface.family).toUpperCase();
+        const isIpv4 = family === 'IPV4' || family === '4';
+
+        if (!isIpv4 || iface.internal) {
+          continue;
+        }
+
+        const subnet = iface.cidr && iface.cidr.trim().length > 0 ? iface.cidr : `${iface.address}/24`;
+        const gateway = this.deriveGatewayFromAddress(iface.address);
+        return { subnet, gateway };
+      }
+    }
+
+    return FALLBACK_NETWORK_INFO;
+  }
+
+  private deriveGatewayFromAddress(address: string): string {
+    const octets = address.split('.');
+    if (octets.length !== 4) {
+      return FALLBACK_NETWORK_INFO.gateway;
+    }
+
+    const parsed = octets.map((octet) => Number.parseInt(octet, 10));
+    if (parsed.some((octet) => Number.isNaN(octet) || octet < 0 || octet > 255)) {
+      return FALLBACK_NETWORK_INFO.gateway;
+    }
+
+    return `${parsed[0]}.${parsed[1]}.${parsed[2]}.1`;
   }
 
   /**

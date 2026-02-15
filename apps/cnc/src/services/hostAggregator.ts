@@ -7,7 +7,6 @@
 
 import { EventEmitter } from 'events';
 import db from '../database/connection';
-import config from '../config';
 import { logger } from '../utils/logger';
 import { Host, AggregatedHost } from '../types';
 
@@ -31,21 +30,7 @@ interface HostRemovedEvent {
 // Internal row type including database ID
 type AggregatedHostRow = AggregatedHost & { id: number };
 
-export class HostAggregator extends EventEmitter {
-  private isSqlite = config.dbType === 'sqlite';
-
-  constructor() {
-    super();
-  }
-
-  // Internal row shape used for reconciliation/deduping. External API types do not expose `id`.
-  private async findHostRowByNodeAndName(
-    nodeId: string,
-    name: string
-  ): Promise<AggregatedHostRow | null> {
-    const result = await db.query<AggregatedHostRow>(
-      `SELECT
-        ah.id,
+const HOST_SELECT_COLUMNS = `
         ah.node_id as "nodeId",
         ah.name,
         ah.mac,
@@ -58,6 +43,27 @@ export class HostAggregator extends EventEmitter {
         ah.ping_responsive as "pingResponsive",
         ah.created_at as "createdAt",
         ah.updated_at as "updatedAt"
+`;
+
+const HOST_SELECT_COLUMNS_WITH_ID = `
+        ah.id,${HOST_SELECT_COLUMNS}
+`;
+
+export class HostAggregator extends EventEmitter {
+  private readonly isSqlite = db.isSqlite;
+
+  constructor() {
+    super();
+  }
+
+  // Internal row shape used for reconciliation/deduping. External API types do not expose `id`.
+  private async findHostRowByNodeAndName(
+    nodeId: string,
+    name: string
+  ): Promise<AggregatedHostRow | null> {
+    const result = await db.query<AggregatedHostRow>(
+      `SELECT
+${HOST_SELECT_COLUMNS_WITH_ID}
       FROM aggregated_hosts ah
       WHERE ah.node_id = $1 AND ah.name = $2`,
       [nodeId, name]
@@ -72,19 +78,7 @@ export class HostAggregator extends EventEmitter {
   ): Promise<AggregatedHostRow | null> {
     const result = await db.query<AggregatedHostRow>(
       `SELECT
-        ah.id,
-        ah.node_id as "nodeId",
-        ah.name,
-        ah.mac,
-        ah.ip,
-        ah.status,
-        ah.last_seen as "lastSeen",
-        ah.location,
-        ah.fully_qualified_name as "fullyQualifiedName",
-        ah.discovered,
-        ah.ping_responsive as "pingResponsive",
-        ah.created_at as "createdAt",
-        ah.updated_at as "updatedAt"
+${HOST_SELECT_COLUMNS_WITH_ID}
       FROM aggregated_hosts ah
       WHERE ah.node_id = $1 AND ah.mac = $2
       ORDER BY ah.updated_at DESC, ah.id DESC
@@ -398,18 +392,7 @@ export class HostAggregator extends EventEmitter {
     try {
       const result = await db.query<AggregatedHost>(`
         SELECT
-          ah.node_id as "nodeId",
-          ah.name,
-          ah.mac,
-          ah.ip,
-          ah.status,
-          ah.last_seen as "lastSeen",
-          ah.location,
-          ah.fully_qualified_name as "fullyQualifiedName",
-          ah.discovered,
-          ah.ping_responsive as "pingResponsive",
-          ah.created_at as "createdAt",
-          ah.updated_at as "updatedAt"
+${HOST_SELECT_COLUMNS}
         FROM aggregated_hosts ah
         ORDER BY ah.fully_qualified_name
       `);
@@ -430,18 +413,7 @@ export class HostAggregator extends EventEmitter {
     try {
       const result = await db.query<AggregatedHost>(
         `SELECT
-          ah.node_id as "nodeId",
-          ah.name,
-          ah.mac,
-          ah.ip,
-          ah.status,
-          ah.last_seen as "lastSeen",
-          ah.location,
-          ah.fully_qualified_name as "fullyQualifiedName",
-          ah.discovered,
-          ah.ping_responsive as "pingResponsive",
-          ah.created_at as "createdAt",
-          ah.updated_at as "updatedAt"
+${HOST_SELECT_COLUMNS}
         FROM aggregated_hosts ah
         WHERE ah.node_id = $1
         ORDER BY ah.name`,
@@ -465,18 +437,7 @@ export class HostAggregator extends EventEmitter {
     try {
       const result = await db.query<AggregatedHost>(
         `SELECT
-          ah.node_id as "nodeId",
-          ah.name,
-          ah.mac,
-          ah.ip,
-          ah.status,
-          ah.last_seen as "lastSeen",
-          ah.location,
-          ah.fully_qualified_name as "fullyQualifiedName",
-          ah.discovered,
-          ah.ping_responsive as "pingResponsive",
-          ah.created_at as "createdAt",
-          ah.updated_at as "updatedAt"
+${HOST_SELECT_COLUMNS}
         FROM aggregated_hosts ah
         WHERE ah.fully_qualified_name = $1`,
         [fullyQualifiedName]

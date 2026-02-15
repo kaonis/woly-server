@@ -1,5 +1,5 @@
 import { promises as dns } from 'dns';
-import { execFile, execFileSync } from 'child_process';
+import { execFile } from 'child_process';
 import os from 'os';
 import ping from 'ping';
 import { config } from '../config';
@@ -17,7 +17,7 @@ import { DiscoveredHost } from '../types';
 function execFileAsync(
   cmd: string,
   args: string[],
-  opts: { encoding?: BufferEncoding; timeout?: number },
+  opts: { encoding?: BufferEncoding; timeout?: number; windowsHide?: boolean },
   { rejectOnNonZero = false }: { rejectOnNonZero?: boolean } = {}
 ): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
@@ -171,22 +171,22 @@ async function reverseDNSLookup(ip: string): Promise<string | null> {
 /**
  * Try to get hostname via NetBIOS (Windows) or other OS-specific methods
  * @param {string} ip - IP address to lookup
- * @returns {string|null} Hostname or null if lookup fails
+ * @returns {Promise<string|null>} Hostname or null if lookup fails
  */
-function getHostnameViaNBT(ip: string): string | null {
+async function getHostnameViaNBT(ip: string): Promise<string | null> {
   try {
     const platform = os.platform();
 
     if (platform === 'win32') {
       // Windows: Use nbtstat to get NetBIOS name
-      const output = execFileSync('nbtstat', ['-A', ip], {
+      const { stdout } = await execFileAsync('nbtstat', ['-A', ip], {
         encoding: 'utf-8',
         timeout: 2000,
         windowsHide: true,
       });
 
       // Parse output for computer name (look for <00> UNIQUE which is the workstation name)
-      const lines = output.split('\n');
+      const lines = stdout.split('\n');
       for (const line of lines) {
         const match = line.match(/^\s+(\S+)\s+<00>\s+UNIQUE/i);
         if (match && match[1]) {
@@ -196,19 +196,19 @@ function getHostnameViaNBT(ip: string): string | null {
     } else if (platform === 'linux') {
       // Linux: Try nmblookup if available
       try {
-        const output = execFileSync('nmblookup', ['-A', ip], {
+        const { stdout } = await execFileAsync('nmblookup', ['-A', ip], {
           encoding: 'utf-8',
           timeout: 2000,
         });
-        const match = output.match(/^\s+(\S+)\s+<00>/m);
+        const match = stdout.match(/^\s+(\S+)\s+<00>/m);
         if (match && match[1]) {
           return match[1].trim();
         }
-      } catch (e) {
+      } catch {
         // nmblookup not available
       }
     }
-  } catch (error) {
+  } catch {
     // NetBIOS lookup failed (timeout or device doesn't respond)
   }
   return null;
@@ -251,7 +251,7 @@ async function scanNetworkARP(): Promise<DiscoveredHost[]> {
 
       // Fallback 2: Try NetBIOS/NBT lookup (works well on Windows networks)
       if (!hostname) {
-        hostname = getHostnameViaNBT(device.ip);
+        hostname = await getHostnameViaNBT(device.ip);
       }
 
       return {

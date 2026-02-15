@@ -11,6 +11,7 @@ import logger from '../utils/logger';
 import type { DatabaseQueryResult } from './connection';
 
 class SqliteDatabase {
+  public readonly isSqlite = true;
   private db: Database.Database | null = null;
   private dbPath: string;
 
