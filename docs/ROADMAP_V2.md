@@ -6,8 +6,8 @@ Scope: Continue autonomous delivery on `kaonis/woly-server` after V1 completion.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `woly-server` synced with `origin/master` at merge commit `336f309` (PR #120).
-- Active execution branch for next phase: `feat/63-node-agent-lint-type-hygiene`.
+- `woly-server` synced with `origin/master` at merge commit `6e05237` (PR #121).
+- Active execution branch for next phase: `feat/55-websocket-message-rate-limit`.
 
 ### GitHub issues snapshot (`kaonis/woly-server`)
 - Open issues reviewed on 2026-02-15.
@@ -21,8 +21,8 @@ Scope: Continue autonomous delivery on `kaonis/woly-server` after V1 completion.
   - #51 `[C&C] Phase 6: Observability and operations`
 
 ### CI snapshot
-- Recent merged PRs on 2026-02-15: #118, #119, #120.
-- Post-merge checks on `master` for #120 are green (CI + CodeQL).
+- Recent merged PRs on 2026-02-15: #118, #119, #120, #121.
+- Post-merge checks on `master` for #121 are green (CI + CodeQL).
 
 ### Local gate health (`woly-server`)
 - `npm run typecheck`: pass.
@@ -55,7 +55,7 @@ Acceptance criteria:
 - Replace `any` at command boundaries with typed payload handling or narrowed `unknown`.
 - Keep lint noise near zero with documented exceptions only if necessary.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #121)
 
 ### Phase 3: C&C WebSocket abuse controls
 Issues:
@@ -67,7 +67,7 @@ Acceptance criteria:
 - Add per-IP connection limits.
 - Validate behavior under normal traffic and abusive traffic tests.
 
-Status: `Planned`
+Status: `In Progress` (2026-02-15)
 
 ### Phase 4: Node-agent production CORS tightening
 Issue: #57  
@@ -114,4 +114,6 @@ For each issue phase:
 - 2026-02-15: Completed #46 implementation with local gate green (`npx tsc --noEmit`, `npx jest --ci --coverage --passWithNoTests` in `apps/node-agent`).
 - 2026-02-15: Merged #46 via PR #120; verified post-merge `master` checks green.
 - 2026-02-15: Started Phase 2 branch for #63 (`feat/63-node-agent-lint-type-hygiene`) and added zero-warning lint gate enforcement in `apps/node-agent`.
-- Next: Open PR for #63, merge after CI, then start #55/#56.
+- 2026-02-15: Merged #63 via PR #121; verified post-merge `master` checks green.
+- 2026-02-15: Started Phase 3 issue #55 on branch `feat/55-websocket-message-rate-limit`.
+- Next: Open PR for #55, merge after CI, then implement #56.

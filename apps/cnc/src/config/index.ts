@@ -78,6 +78,7 @@ export const config: ServerConfig = {
   wsSessionTokenIssuer: getEnvVar('WS_SESSION_TOKEN_ISSUER', getEnvVar('JWT_ISSUER', 'woly-cnc')),
   wsSessionTokenAudience: getEnvVar('WS_SESSION_TOKEN_AUDIENCE', 'woly-ws-node'),
   wsSessionTokenTtlSeconds: getEnvNumber('WS_SESSION_TOKEN_TTL_SECONDS', 300),
+  wsMessageRateLimitPerSecond: getEnvNumber('WS_MESSAGE_RATE_LIMIT_PER_SECOND', 100),
   nodeHeartbeatInterval: getEnvNumber('NODE_HEARTBEAT_INTERVAL', 30000),
   nodeTimeout: getEnvNumber('NODE_TIMEOUT', 90000),
   commandTimeout: getEnvNumber('COMMAND_TIMEOUT', 30000),
@@ -106,6 +107,10 @@ if (config.wsSessionTokenSecrets.length === 0) {
 
 if (!Number.isFinite(config.wsSessionTokenTtlSeconds) || config.wsSessionTokenTtlSeconds <= 0) {
   throw new Error('WS_SESSION_TOKEN_TTL_SECONDS must be a finite number > 0');
+}
+
+if (!Number.isFinite(config.wsMessageRateLimitPerSecond) || config.wsMessageRateLimitPerSecond <= 0) {
+  throw new Error('WS_MESSAGE_RATE_LIMIT_PER_SECOND must be a finite number > 0');
 }
 
 if (!Number.isFinite(config.jwtTtlSeconds) || config.jwtTtlSeconds <= 0) {

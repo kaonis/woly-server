@@ -33,12 +33,18 @@ interface NodeConnection {
 }
 
 type DispatchCommand = Extract<CncCommand, { commandId: string }>;
+type MessageRateWindow = {
+  windowStartMs: number;
+  count: number;
+};
 
 export class NodeManager extends EventEmitter {
   private connections: Map<string, NodeConnection> = new Map();
   private heartbeatCheckInterval?: NodeJS.Timeout;
   private hostAggregator: HostAggregator;
   private pendingUpgradeAuth: WeakMap<WebSocket, WsUpgradeAuthContext> = new WeakMap();
+  private messageRateWindows: WeakMap<WebSocket, MessageRateWindow> = new WeakMap();
+  private readonly wsMessageRateLimitPerSecond = Math.max(config.wsMessageRateLimitPerSecond, 1);
   private protocolValidationFailureCounts: Map<string, number> = new Map();
   private protocolValidationFailureTotal = 0;
 
@@ -61,9 +67,22 @@ export class NodeManager extends EventEmitter {
       return;
     }
     this.pendingUpgradeAuth.set(ws, parsed);
+    this.messageRateWindows.set(ws, {
+      windowStartMs: Date.now(),
+      count: 0,
+    });
 
     // Wait for registration message
     ws.on('message', async (data: WebSocket.Data) => {
+      if (!this.consumeInboundMessageBudget(ws)) {
+        logger.warn('WebSocket message rate limit exceeded', {
+          nodeId: this.getConnectionBySocket(ws)?.nodeId,
+          limitPerSecond: this.wsMessageRateLimitPerSecond,
+        });
+        ws.close(4408, 'Message rate limit exceeded');
+        return;
+      }
+
       let parsedPayload: unknown;
       try {
         parsedPayload = JSON.parse(data.toString());
@@ -100,6 +119,7 @@ export class NodeManager extends EventEmitter {
 
     ws.on('close', async () => {
       this.pendingUpgradeAuth.delete(ws);
+      this.messageRateWindows.delete(ws);
       const connection = this.getConnectionBySocket(ws);
       
       if (connection) {
@@ -505,6 +525,21 @@ export class NodeManager extends EventEmitter {
 
   private getConnectionBySocket(ws: WebSocket): NodeConnection | undefined {
     return Array.from(this.connections.values()).find((connection) => connection.ws === ws);
+  }
+
+  private consumeInboundMessageBudget(ws: WebSocket): boolean {
+    const now = Date.now();
+    const current = this.messageRateWindows.get(ws) ?? { windowStartMs: now, count: 0 };
+
+    if (now - current.windowStartMs >= 1000) {
+      current.windowStartMs = now;
+      current.count = 0;
+    }
+
+    current.count += 1;
+    this.messageRateWindows.set(ws, current);
+
+    return current.count <= this.wsMessageRateLimitPerSecond;
   }
 
   private extractMessageType(payload: unknown): string {
