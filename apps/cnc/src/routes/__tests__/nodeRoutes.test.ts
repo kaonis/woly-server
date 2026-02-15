@@ -357,6 +357,35 @@ describe('Node Routes Authentication', () => {
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('status', 'healthy');
       expect(response.body).toHaveProperty('version', CNC_VERSION);
+      expect(response.body.metrics?.commands?.outcomesByType).toEqual(
+        expect.objectContaining({
+          wake: expect.objectContaining({ acknowledged: 0, failed: 0, timedOut: 0 }),
+          scan: expect.objectContaining({ acknowledged: 0, failed: 0, timedOut: 0 }),
+          'update-host': expect.objectContaining({ acknowledged: 0, failed: 0, timedOut: 0 }),
+          'delete-host': expect.objectContaining({ acknowledged: 0, failed: 0, timedOut: 0 }),
+        })
+      );
+    });
+
+    it('exposes non-zero command outcome metrics on /api/health', async () => {
+      runtimeMetrics.recordCommandDispatched('cmd-health-wake', 'wake', null, 10);
+      runtimeMetrics.recordCommandResult('cmd-health-wake', true, 25, 'wake');
+      runtimeMetrics.recordCommandDispatched('cmd-health-scan', 'scan', null, 20);
+      runtimeMetrics.recordCommandResult('cmd-health-scan', false, 45, 'scan');
+      runtimeMetrics.recordCommandDispatched('cmd-health-update', 'update-host', null, 30);
+      runtimeMetrics.recordCommandTimeout('cmd-health-update', 70, 'update-host');
+
+      const response = await request(app).get('/api/health');
+
+      expect(response.status).toBe(200);
+      expect(response.body.metrics?.commands?.outcomesByType).toEqual(
+        expect.objectContaining({
+          wake: expect.objectContaining({ acknowledged: 1 }),
+          scan: expect.objectContaining({ failed: 1 }),
+          'update-host': expect.objectContaining({ timedOut: 1 }),
+          'delete-host': expect.objectContaining({ acknowledged: 0, failed: 0, timedOut: 0 }),
+        })
+      );
     });
 
     it('allows access to /api/metrics without authentication', async () => {
