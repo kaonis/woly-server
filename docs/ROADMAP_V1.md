@@ -28,8 +28,8 @@ Scope: `kaonis/woly-server` primary delivery, with regular compatibility checks 
 ### Local gate health (`woly-server`)
 - `npm run typecheck`: pass.
 - `npm run test:ci`: pass after native module rebuild.
-- Coverage baseline from `test:ci`:
-  - `apps/cnc`: 64.8% statements.
+- Coverage snapshot from latest `test:ci` (2026-02-15):
+  - `apps/cnc`: 85.73% statements (raised from prior 64.8% baseline).
   - `apps/node-agent`: 84.76% statements.
 - Note: raw root commands `npx tsc --noEmit` and `npx jest --ci --coverage --passWithNoTests` are not the canonical monorepo gates in this repo. Workspace gates are `npm run typecheck` and `npm run test:ci`.
 
@@ -109,7 +109,7 @@ Acceptance criteria:
 - Introduce centralized `isSqlite` capability on the DB abstraction and use it in touched call sites.
 - Resolve node-agent `cncClient` registration TODO placeholders for version/subnet/gateway metadata.
 
-Status: `In Progress` (2026-02-15)
+Status: `In Progress` (2026-02-15, test/coverage tranche completed; remaining scope tracked in #88)
 
 ## 3. Execution Loop Rules for V1
 
@@ -149,4 +149,6 @@ For each issue phase:
 - 2026-02-15: Merged PR #118 (`feat: extract node-agent scan orchestration service (#85)`).
 - 2026-02-15: Verified post-merge `master` CI and CodeQL runs are green.
 - 2026-02-15: Started Phase 6 implementation on issue #88 (`fix/88-code-review-quality`).
+- 2026-02-15: Expanded CNC unit test coverage across config/database/controllers/services (including `hosts`, `nodeManager`, and `commandRouter`) and raised `apps/cnc` statements coverage to 85.73%.
+- 2026-02-15: Re-validated local monorepo gates end-to-end (`npm run lint`, `npm run typecheck`, `npm run test:ci`, `npm run build`) with all checks green.
 - Next: Open and merge PR for #88.

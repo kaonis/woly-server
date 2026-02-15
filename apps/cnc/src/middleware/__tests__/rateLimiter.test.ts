@@ -1,65 +1,123 @@
-import { authLimiter, apiLimiter, strictAuthLimiter } from '../rateLimiter';
+import express from 'express';
+import request from 'supertest';
 
-// Mock the logger to avoid console output during tests
-jest.mock('../../utils/logger', () => ({
-  logger: {
-    warn: jest.fn(),
-  },
-}));
+type RateLimiterModule = {
+  authLimiter: express.RequestHandler;
+  apiLimiter: express.RequestHandler;
+  strictAuthLimiter: express.RequestHandler;
+};
 
-describe('Rate Limiter Middleware', () => {
-  beforeEach(() => {
+describe('cnc rateLimiter middleware', () => {
+  const originalEnv = process.env;
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    jest.resetModules();
     jest.clearAllMocks();
   });
 
-  describe('strictAuthLimiter', () => {
-    it('should be defined and be a function', () => {
-      expect(strictAuthLimiter).toBeDefined();
-      expect(typeof strictAuthLimiter).toBe('function');
-    });
-
-    it('should be configured as Express middleware', () => {
-      // Express middleware functions should have at least 3 parameters (req, res, next)
-      expect(strictAuthLimiter.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it('should not be the same as authLimiter', () => {
-      expect(strictAuthLimiter).not.toBe(authLimiter);
-    });
+  afterAll(() => {
+    process.env = originalEnv;
   });
 
-  describe('authLimiter', () => {
-    it('should be defined and be a function', () => {
-      expect(authLimiter).toBeDefined();
-      expect(typeof authLimiter).toBe('function');
+  const loadRateLimiter = (): RateLimiterModule & { warnSpy: jest.Mock } => {
+    let moduleUnderTest: RateLimiterModule | undefined;
+    const warnSpy = jest.fn();
+
+    jest.isolateModules(() => {
+      jest.doMock('../../utils/logger', () => ({
+        logger: {
+          warn: warnSpy,
+        },
+      }));
+
+      moduleUnderTest = require('../rateLimiter') as RateLimiterModule;
     });
 
-    it('should be configured as Express middleware', () => {
-      // Express middleware functions should have at least 3 parameters (req, res, next)
-      expect(authLimiter.length).toBeGreaterThanOrEqual(3);
+    if (!moduleUnderTest) {
+      throw new Error('failed to load rateLimiter module');
+    }
+
+    return { ...moduleUnderTest, warnSpy };
+  };
+
+  const createApp = (middleware: express.RequestHandler, path = '/limited') => {
+    const app = express();
+    app.use(path, middleware, (_req, res) => {
+      res.status(200).json({ ok: true });
     });
+    return app;
+  };
+
+  it('does not warn for empty env vars and still enforces strict auth defaults', async () => {
+    delete process.env.AUTH_RATE_LIMIT_MAX;
+    delete process.env.AUTH_RATE_LIMIT_WINDOW_MS;
+
+    const { strictAuthLimiter, warnSpy } = loadRateLimiter();
+    const app = createApp(strictAuthLimiter, '/auth/strict');
+
+    for (let i = 0; i < 5; i += 1) {
+      const response = await request(app).post('/auth/strict');
+      expect(response.status).toBe(200);
+    }
+
+    const limited = await request(app).post('/auth/strict');
+
+    expect(limited.status).toBe(429);
+    expect(limited.body).toMatchObject({
+      error: 'Too Many Requests',
+      message: 'Too many authentication attempts, please try again later',
+    });
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Strict auth rate limit exceeded'),
+    );
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('Invalid rate limit config value'),
+    );
   });
 
-  describe('apiLimiter', () => {
-    it('should be defined and be a function', () => {
-      expect(apiLimiter).toBeDefined();
-      expect(typeof apiLimiter).toBe('function');
-    });
+  it('warns when env vars are invalid and falls back to defaults', async () => {
+    process.env.AUTH_RATE_LIMIT_MAX = '-3';
+    process.env.AUTH_RATE_LIMIT_WINDOW_MS = 'invalid-ms';
 
-    it('should be configured as Express middleware', () => {
-      // Express middleware functions should have at least 3 parameters (req, res, next)
-      expect(apiLimiter.length).toBeGreaterThanOrEqual(3);
-    });
+    const { strictAuthLimiter, warnSpy } = loadRateLimiter();
+    const app = createApp(strictAuthLimiter, '/auth/strict');
+
+    for (let i = 0; i < 5; i += 1) {
+      await request(app).post('/auth/strict');
+    }
+
+    const limited = await request(app).post('/auth/strict');
+
+    expect(limited.status).toBe(429);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid rate limit config value'),
+    );
   });
 
-  describe('Rate limiter exports', () => {
-    it('should export strictAuthLimiter, authLimiter and apiLimiter', () => {
-      expect(strictAuthLimiter).toBeTruthy();
-      expect(authLimiter).toBeTruthy();
-      expect(apiLimiter).toBeTruthy();
-      expect(strictAuthLimiter).not.toBe(authLimiter);
-      expect(authLimiter).not.toBe(apiLimiter);
-      expect(strictAuthLimiter).not.toBe(apiLimiter);
+  it('enforces authLimiter in production and returns rate-limit error payload', async () => {
+    process.env.NODE_ENV = 'production';
+
+    const { authLimiter, apiLimiter } = loadRateLimiter();
+    const app = express();
+    app.use('/auth', authLimiter, (_req, res) => {
+      res.status(200).json({ ok: true });
+    });
+    app.use('/api', apiLimiter, (_req, res) => {
+      res.status(200).json({ ok: true });
+    });
+
+    for (let i = 0; i < 10; i += 1) {
+      const response = await request(app).post('/auth');
+      expect(response.status).toBe(200);
+    }
+
+    const limited = await request(app).post('/auth');
+
+    expect(limited.status).toBe(429);
+    expect(limited.body).toMatchObject({
+      error: 'Too Many Requests',
+      code: 'RATE_LIMIT_EXCEEDED',
     });
   });
 });

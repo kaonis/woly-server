@@ -1,80 +1,92 @@
-import { Request, Response, NextFunction } from 'express';
+import express from 'express';
+import request from 'supertest';
 import { apiLimiter, healthLimiter, scanLimiter, wakeLimiter } from '../rateLimiter';
 
-// Mock logger
 jest.mock('../../utils/logger', () => ({
   logger: {
     warn: jest.fn(),
   },
 }));
 
-describe('rateLimiter middleware', () => {
-  let mockReq: Partial<Request>;
-  let mockRes: Partial<Response>;
-  let mockNext: NextFunction;
+describe('node-agent rateLimiter middleware', () => {
+  const createApp = (
+    path: string,
+    middleware: express.RequestHandler,
+    method: 'get' | 'post'
+  ) => {
+    const app = express();
+    app.use(express.json());
+    app[method](path, middleware, (_req, res) => {
+      res.status(200).json({ ok: true });
+    });
+    return app;
+  };
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-
-    mockReq = {
-      ip: '127.0.0.1',
-      path: '/test',
-      method: 'POST',
-    };
-
-    mockRes = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
-      setHeader: jest.fn().mockReturnThis(),
-    };
-
-    mockNext = jest.fn();
+  it('exports middleware functions', () => {
+    expect(typeof apiLimiter).toBe('function');
+    expect(typeof healthLimiter).toBe('function');
+    expect(typeof scanLimiter).toBe('function');
+    expect(typeof wakeLimiter).toBe('function');
   });
 
-  describe('apiLimiter', () => {
-    it('should be defined', () => {
-      expect(apiLimiter).toBeDefined();
-      expect(typeof apiLimiter).toBe('function');
-    });
+  it('scanLimiter skips GET requests (cached read path)', async () => {
+    const app = createApp('/scan', scanLimiter, 'get');
 
-    it('should be a middleware function', () => {
-      // Rate limiters from express-rate-limit are middleware functions
-      expect(apiLimiter.length).toBeGreaterThanOrEqual(2);
-    });
+    for (let i = 0; i < 12; i += 1) {
+      const response = await request(app).get('/scan');
+      expect(response.status).toBe(200);
+    }
   });
 
-  describe('scanLimiter', () => {
-    it('should be defined', () => {
-      expect(scanLimiter).toBeDefined();
-      expect(typeof scanLimiter).toBe('function');
-    });
+  it('scanLimiter limits POST scan bursts and returns hint payload', async () => {
+    const app = createApp('/scan', scanLimiter, 'post');
 
-    it('should be a middleware function', () => {
-      // Rate limiters from express-rate-limit are middleware functions
-      expect(scanLimiter.length).toBeGreaterThanOrEqual(2);
-    });
-  });
+    for (let i = 0; i < 5; i += 1) {
+      const response = await request(app).post('/scan');
+      expect(response.status).toBe(200);
+    }
 
-  describe('wakeLimiter', () => {
-    it('should be defined', () => {
-      expect(wakeLimiter).toBeDefined();
-      expect(typeof wakeLimiter).toBe('function');
-    });
+    const limited = await request(app).post('/scan');
 
-    it('should be a middleware function', () => {
-      // Rate limiters from express-rate-limit are middleware functions
-      expect(wakeLimiter.length).toBeGreaterThanOrEqual(2);
+    expect(limited.status).toBe(429);
+    expect(limited.body).toMatchObject({
+      error: 'Too many scan requests. Network scanning is resource-intensive.',
+      retryAfter: '1 minute',
+      hint: 'Use GET /hosts to retrieve cached results instead',
     });
   });
 
-  describe('healthLimiter', () => {
-    it('should be defined', () => {
-      expect(healthLimiter).toBeDefined();
-      expect(typeof healthLimiter).toBe('function');
-    });
+  it('wakeLimiter throttles after 20 wake requests/minute', async () => {
+    const app = createApp('/wake', wakeLimiter, 'post');
 
-    it('should be a middleware function', () => {
-      expect(healthLimiter.length).toBeGreaterThanOrEqual(2);
+    for (let i = 0; i < 20; i += 1) {
+      const response = await request(app).post('/wake');
+      expect(response.status).toBe(200);
+    }
+
+    const limited = await request(app).post('/wake');
+
+    expect(limited.status).toBe(429);
+    expect(limited.body).toMatchObject({
+      error: 'Too many wake requests. Please wait before trying again.',
+      retryAfter: '1 minute',
+    });
+  });
+
+  it('healthLimiter throttles high-frequency health polling', async () => {
+    const app = createApp('/health', healthLimiter, 'get');
+
+    for (let i = 0; i < 60; i += 1) {
+      const response = await request(app).get('/health');
+      expect(response.status).toBe(200);
+    }
+
+    const limited = await request(app).get('/health');
+
+    expect(limited.status).toBe(429);
+    expect(limited.body).toMatchObject({
+      error: 'Too many health check requests. Please try again later.',
+      retryAfter: '1 minute',
     });
   });
 });

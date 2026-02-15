@@ -35,6 +35,7 @@ interface HostUpdateData {
 export class CommandRouter extends EventEmitter {
   private nodeManager: NodeManager;
   private hostAggregator: HostAggregator;
+  private readonly boundHandleCommandResult: (result: CommandResult) => void;
   private pendingCommands: Map<string, {
     resolvers: Array<{
       resolve: (result: CommandResult) => void;
@@ -57,7 +58,8 @@ export class CommandRouter extends EventEmitter {
     this.retryBaseDelayMs = config.commandRetryBaseDelayMs;
 
     // Listen for command results from nodes
-    this.nodeManager.on('command-result', this.handleCommandResult.bind(this));
+    this.boundHandleCommandResult = this.handleCommandResult.bind(this);
+    this.nodeManager.on('command-result', this.boundHandleCommandResult);
   }
 
   async reconcileStaleInFlight(): Promise<number> {
@@ -550,6 +552,7 @@ export class CommandRouter extends EventEmitter {
       }
     }
     this.pendingCommands.clear();
+    this.nodeManager.off('command-result', this.boundHandleCommandResult);
     this.removeAllListeners();
   }
 }

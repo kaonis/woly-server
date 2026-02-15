@@ -258,6 +258,132 @@ describe('HostAggregator', () => {
       );
       expect(parseInt(String(countResult.rows[0].count), 10)).toBe(1);
     });
+
+    it('should reconcile by name when MAC has changed and no MAC match exists', async () => {
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-2',
+        location: 'Home Office',
+        host: {
+          name: 'printer',
+          mac: 'AA:BB:CC:DD:EE:31',
+          ip: '192.168.1.31',
+          status: 'awake' as const,
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      await hostAggregator.onHostUpdated({
+        nodeId: 'test-node-2',
+        location: 'Home Office',
+        host: {
+          name: 'printer',
+          mac: 'AA:BB:CC:DD:EE:99',
+          ip: '192.168.1.32',
+          status: 'asleep' as const,
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: 0,
+        },
+      });
+
+      const host = await hostAggregator.getHostByFQN('printer@Home%20Office-test-node-2');
+      expect(host).not.toBeNull();
+      expect(host!.mac).toBe('AA:BB:CC:DD:EE:99');
+      expect(host!.status).toBe('asleep');
+    });
+
+    it('should delete duplicate rename target rows for same node+MAC', async () => {
+      const nodeId = 'test-node-2';
+      const location = 'Home Office';
+      const mac = 'AA:BB:CC:DD:EE:77';
+
+      await db.query(
+        `INSERT INTO aggregated_hosts
+          (node_id, name, mac, ip, status, last_seen, location, fully_qualified_name, discovered, ping_responsive)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [
+          nodeId,
+          'new-name',
+          mac,
+          '192.168.1.78',
+          'awake',
+          new Date().toISOString(),
+          location,
+          'new-name@Home%20Office-test-node-2',
+          1,
+          1,
+        ]
+      );
+
+      await db.query(
+        `INSERT INTO aggregated_hosts
+          (node_id, name, mac, ip, status, last_seen, location, fully_qualified_name, discovered, ping_responsive)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [
+          nodeId,
+          'old-name',
+          mac,
+          '192.168.1.77',
+          'awake',
+          new Date().toISOString(),
+          location,
+          'old-name@Home%20Office-test-node-2',
+          1,
+          1,
+        ]
+      );
+
+      await hostAggregator.onHostUpdated({
+        nodeId,
+        location,
+        host: {
+          name: 'new-name',
+          mac,
+          ip: '192.168.1.79',
+          status: 'asleep' as const,
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      const countResult = await db.query<{ count: string | number }>(
+        'SELECT COUNT(*) as count FROM aggregated_hosts WHERE node_id = $1 AND mac = $2',
+        [nodeId, mac]
+      );
+      expect(parseInt(String(countResult.rows[0].count), 10)).toBe(1);
+
+      const old = await hostAggregator.getHostByFQN('old-name@Home%20Office-test-node-2');
+      const renamed = await hostAggregator.getHostByFQN('new-name@Home%20Office-test-node-2');
+      expect(old).toBeNull();
+      expect(renamed).not.toBeNull();
+      expect(renamed!.ip).toBe('192.168.1.79');
+    });
+
+    it('should surface errors while processing host updates', async () => {
+      const querySpy = jest.spyOn(db, 'query').mockRejectedValueOnce(new Error('forced-update-failure'));
+      try {
+        await expect(
+          hostAggregator.onHostUpdated({
+            nodeId: 'test-node-1',
+            location: 'Test Location',
+            host: {
+              name: 'test-host-update-error',
+              mac: 'AA:BB:CC:DD:EE:AE',
+              ip: '192.168.1.210',
+              status: 'awake',
+              lastSeen: new Date().toISOString(),
+              discovered: 1,
+              pingResponsive: 1,
+            },
+          })
+        ).rejects.toThrow('forced-update-failure');
+      } finally {
+        querySpy.mockRestore();
+      }
+    });
   });
 
   describe('onHostRemoved', () => {
@@ -352,6 +478,20 @@ describe('HostAggregator', () => {
       });
       // Should not throw
     });
+
+    it('should surface errors while removing a host', async () => {
+      const querySpy = jest.spyOn(db, 'query').mockRejectedValueOnce(new Error('forced-remove-failure'));
+      try {
+        await expect(
+          hostAggregator.onHostRemoved({
+            nodeId: 'test-node-1',
+            name: 'host-remove-error',
+          })
+        ).rejects.toThrow('forced-remove-failure');
+      } finally {
+        querySpy.mockRestore();
+      }
+    });
   });
 
   describe('markNodeHostsUnreachable', () => {
@@ -394,6 +534,17 @@ describe('HostAggregator', () => {
       const hosts = await hostAggregator.getHostsByNode('test-node-2');
       expect(hosts.every(h => h.status === 'asleep')).toBe(true);
     });
+
+    it('should surface errors while marking node hosts unreachable', async () => {
+      const querySpy = jest.spyOn(db, 'query').mockRejectedValueOnce(new Error('forced-unreachable-failure'));
+      try {
+        await expect(hostAggregator.markNodeHostsUnreachable('test-node-2')).rejects.toThrow(
+          'forced-unreachable-failure'
+        );
+      } finally {
+        querySpy.mockRestore();
+      }
+    });
   });
 
   describe('removeNodeHosts', () => {
@@ -418,6 +569,17 @@ describe('HostAggregator', () => {
       const hosts = await hostAggregator.getHostsByNode('test-node-3');
       expect(hosts.length).toBe(0);
     });
+
+    it('should surface errors while removing all node hosts', async () => {
+      const querySpy = jest.spyOn(db, 'query').mockRejectedValueOnce(new Error('forced-remove-node-failure'));
+      try {
+        await expect(hostAggregator.removeNodeHosts('test-node-3')).rejects.toThrow(
+          'forced-remove-node-failure'
+        );
+      } finally {
+        querySpy.mockRestore();
+      }
+    });
   });
 
   describe('getAllHosts', () => {
@@ -441,6 +603,15 @@ describe('HostAggregator', () => {
 
       expect(hosts.length).toBeGreaterThan(0);
       expect(hosts.some(h => h.name === 'test-host-9')).toBe(true);
+    });
+
+    it('should surface errors while listing all hosts', async () => {
+      const querySpy = jest.spyOn(db, 'query').mockRejectedValueOnce(new Error('forced-get-all-failure'));
+      try {
+        await expect(hostAggregator.getAllHosts()).rejects.toThrow('forced-get-all-failure');
+      } finally {
+        querySpy.mockRestore();
+      }
     });
   });
 
@@ -470,6 +641,17 @@ describe('HostAggregator', () => {
     it('should return empty array for node with no hosts', async () => {
       const hosts = await hostAggregator.getHostsByNode('non-existent-node');
       expect(hosts.length).toBe(0);
+    });
+
+    it('should surface errors while listing hosts by node', async () => {
+      const querySpy = jest.spyOn(db, 'query').mockRejectedValueOnce(new Error('forced-get-by-node-failure'));
+      try {
+        await expect(hostAggregator.getHostsByNode('test-node-5')).rejects.toThrow(
+          'forced-get-by-node-failure'
+        );
+      } finally {
+        querySpy.mockRestore();
+      }
     });
   });
 
@@ -546,6 +728,15 @@ describe('HostAggregator', () => {
       await db.query('DELETE FROM aggregated_hosts WHERE node_id = $1', ['test-node-hyphen']);
       await db.query('DELETE FROM nodes WHERE id = $1', ['test-node-hyphen']);
     });
+
+    it('should surface errors while reading host by FQN', async () => {
+      const querySpy = jest.spyOn(db, 'query').mockRejectedValueOnce(new Error('forced-get-fqn-failure'));
+      try {
+        await expect(hostAggregator.getHostByFQN('host@loc')).rejects.toThrow('forced-get-fqn-failure');
+      } finally {
+        querySpy.mockRestore();
+      }
+    });
   });
 
   describe('getStats', () => {
@@ -589,6 +780,33 @@ describe('HostAggregator', () => {
       expect(stats.awake).toBeGreaterThanOrEqual(1);
       expect(stats.asleep).toBeGreaterThanOrEqual(1);
       expect(stats.byLocation['Stats Test']).toBeDefined();
+    });
+
+    it('should return zeroed stats when overall query yields no row', async () => {
+      const querySpy = jest.spyOn(db, 'query')
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 } as never)
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 } as never);
+
+      try {
+        const stats = await hostAggregator.getStats();
+        expect(stats).toEqual({
+          total: 0,
+          awake: 0,
+          asleep: 0,
+          byLocation: {},
+        });
+      } finally {
+        querySpy.mockRestore();
+      }
+    });
+
+    it('should surface errors while reading host stats', async () => {
+      const querySpy = jest.spyOn(db, 'query').mockRejectedValueOnce(new Error('forced-get-stats-failure'));
+      try {
+        await expect(hostAggregator.getStats()).rejects.toThrow('forced-get-stats-failure');
+      } finally {
+        querySpy.mockRestore();
+      }
     });
   });
 });

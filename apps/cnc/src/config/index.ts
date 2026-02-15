@@ -26,7 +26,16 @@ function getEnvVarOptional(key: string, defaultValue = ''): string {
 
 function getEnvNumber(key: string, defaultValue: number): number {
   const value = process.env[key];
-  return value ? parseInt(value, 10) : defaultValue;
+  if (value === undefined || value === '') {
+    return defaultValue;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid numeric environment variable: ${key}`);
+  }
+
+  return parsed;
 }
 
 function getEnvBoolean(key: string, defaultValue: boolean): boolean {
