@@ -84,3 +84,5 @@ For each phase:
 - 2026-02-15: Started Phase 3 issue #147 on branch `feat/147-zod-v4-migration-validation`.
 - 2026-02-15: Applied Zod v4 migration updates across protocol/C&C/node-agent (`zod` dependency majors, IP validation migration from `z.string().ip()` to `node:net` `isIP` refinements, `ZodError.errors` -> `ZodError.issues`).
 - 2026-02-15: Ran full local gates for #147 (`npm run typecheck`, `npm run test:ci`, `npm run lint`, `npm run build`) successfully.
+- 2026-02-15: Addressed PR #152 CI regression in node-agent validation messaging by normalizing missing-field errors back to `is required` semantics and adding unit coverage for the behavior.
+- 2026-02-15: Re-ran full local gates for #147 (`npm run typecheck`, `npm run test:ci`, `npm run lint`, `npm run build`) successfully after CI-fix patch.
