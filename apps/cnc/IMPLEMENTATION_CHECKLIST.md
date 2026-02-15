@@ -10,6 +10,10 @@ Owner: Platform Team
 - [x] Shared protocol adoption started on branch `feat/phase3-shared-protocol-adoption` to align with `woly-backend` Phase 3 rollout.
 - [x] Auth-path integration coverage now explicitly includes missing token, malformed token, invalid signature, expired token, and role-mismatch scenarios.
 
+## Checklist Reconciliation (2026-02-15)
+
+- [x] Phase 0 Definition-of-Done references audited for ADR/doc/CI discoverability.
+
 ## Phase 0 - Baseline and Safety Rails
 
 - [x] Create and approve ADRs for API auth, shared protocol package, and durable command lifecycle.
@@ -18,8 +22,8 @@ Owner: Platform Team
 - [x] Add schema-validation test gate in CI.
 
 Definition of done:
-- [ ] ADRs and compatibility docs merged and discoverable.
-- [ ] CI consistently blocks regressions.
+- [x] ADRs and compatibility docs merged and discoverable (`apps/cnc/docs/adr/`, `docs/compatibility.md`, `docs/PROTOCOL_COMPATIBILITY.md`, `docs/PROTOCOL_PUBLISH_WORKFLOW.md`).
+- [x] CI consistently blocks regressions (`.github/workflows/ci.yml` validate + protocol compatibility jobs, including schema gate).
 
 ## Phase 1 - API Authentication and Authorization
 

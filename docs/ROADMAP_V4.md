@@ -52,7 +52,7 @@ Acceptance criteria:
 - Document external release + rollback workflow.
 - Align checklist/docs state with publish decision.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #138)
 
 ## 3. Execution Loop Rules
 
@@ -79,3 +79,5 @@ For each phase:
 - 2026-02-15: Started Phase 3 issue #135 on branch `feat/135-protocol-publish-readiness-workflow`.
 - 2026-02-15: Added protocol external publish readiness + rollback workflow documentation and linked checklist/docs for decision-state clarity.
 - 2026-02-15: Ran local protocol gates for #135 (`npm run typecheck -w packages/protocol`, `npm run test:ci -w packages/protocol`) successfully.
+- 2026-02-15: Merged #135 via PR #138 and verified post-merge `master` checks green (CI + CodeQL).
+- 2026-02-15: V4 phase set completed; next cycle planned in `docs/ROADMAP_V5.md`.
