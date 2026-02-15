@@ -64,3 +64,7 @@ V20 is complete when all four items (`#242`, `#241`, `#150`, `#4`) are resolved 
 - 2026-02-15: Completed `#242` by adding `npm run deps:checkpoint:eslint10:post` with `--dry-run` and repeatable `--issue` targeting.
 - 2026-02-15: Added focused helper tests for checkpoint post argument parsing, issue resolution, and comment fan-out execution.
 - 2026-02-15: Posted ESLint10 checkpoint updates to both `#150` and `#4` via the new post helper command.
+- 2026-02-15: Completed scoped rolling policy audit for `#241`:
+  - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+- 2026-02-15: Added CI review log entry for this cycle and created follow-up review issue `#243`.
+- 2026-02-15: ESLint 10 status unchanged for `#150` after posted checkpoint payload (`2026-02-15T22:06:14Z`), still blocked by peer range `^8.57.0 || ^9.0.0`.
