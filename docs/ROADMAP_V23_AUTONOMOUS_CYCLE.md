@@ -64,3 +64,7 @@ V23 is complete when all four items (`#248`, `#247`, `#150`, `#4`) are resolved 
 - 2026-02-15: Completed `#248` by adding `npm run ci:cycle:run` to execute audit, follow-up issue creation, and dependency checkpoint posting in sequence.
 - 2026-02-15: Added cycle-orchestrator helper tests for parser/output extraction, sequence execution, and summary rendering.
 - 2026-02-15: Updated CI manual operations docs with dry-run and execution usage for the new orchestrator helper.
+- 2026-02-15: Completed `#247` using the cycle orchestrator:
+  - `npm run ci:cycle:run -- --after 247`
+  - Result: audit PASS, follow-up issue `#249` created, checkpoint comments posted to `#150` and `#4`.
+- 2026-02-15: Recorded V23 CI/dependency checkpoint entries with unchanged ESLint 10 blocker status (`^8.57.0 || ^9.0.0` peer range).
