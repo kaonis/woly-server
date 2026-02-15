@@ -52,17 +52,20 @@ Primary impact:
    Tracking issue: #148
 4. Wave D: ESLint 10 compatibility revisit  
    Tracking issue: #150
+5. Wave E: ESLint flat config migration precondition  
+   Tracking issue: #154
 
 ## 4. Decision Table (2026-02-15)
 
 | Dependency | Decision | Rationale | Tracking |
 |---|---|---|---|
-| ESLint v9 | Merge candidate | Compatible major with typescript-eslint v8 peer requirements | #146 |
+| ESLint v9 | Merged | Adopted with typescript-eslint v8 via PR #151 | #146 |
 | ESLint v10 | Deferred pending upstream compatibility | Still blocked: latest `@typescript-eslint/*@8.55.0` peers `eslint ^8.57.0 || ^9.0.0` | #150 |
-| typescript-eslint v8 | Merge candidate | Coupled with ESLint v9 upgrade under current compatibility constraints | #146 |
-| eslint-config-prettier v10 | Merge candidate | Companion lint stack upgrade with low runtime risk | #146 |
+| typescript-eslint v8 | Merged | Upgraded with ESLint v9 toolchain migration via PR #151 | #146 |
+| eslint-config-prettier v10 | Merged | Upgraded with ESLint v9 toolchain migration via PR #151 | #146 |
 | Zod v4 | Merged | Runtime schema compatibility validated across protocol/C&C/node-agent and merged via PR #152 | #147 |
 | npm v11 | Merged | Workspace tooling and CI remained stable; adopted via PR #17 | #148 |
+| ESLint flat config mode | In progress | Removes legacy `.eslintrc`/`ESLINT_USE_FLAT_CONFIG=false` dependency to clear ESLint 10 precondition | #154 |
 
 ## 5. Exit Criteria for #144
 
