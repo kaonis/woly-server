@@ -49,7 +49,7 @@ Acceptance criteria:
 - Install/build/test continue to pass.
 - No import/type regressions.
 
-Status: `In Progress`
+Status: `Completed` (2026-02-15 via PR #113)
 
 ### Phase 2: Testing hardening and coverage ratchet
 Issue: #93  
@@ -61,7 +61,7 @@ Acceptance criteria:
 - Coverage threshold raised to 60% in node-agent.
 - Preflight scripts aligned with Node 24+ requirement.
 
-Status: `Planned`
+Status: `In Progress`
 
 ### Phase 3: Cross-repo compatibility guardrails
 Issue: #112  
@@ -105,4 +105,7 @@ For each issue phase:
 - 2026-02-15: Completed initial status audit and created ROADMAP_V1.
 - 2026-02-15: Created issue #112 for explicit `woly` mobile compatibility smoke checks.
 - 2026-02-15: Started Phase 1 implementation on issue #86 (`fix/86-dependency-cleanup`).
-- Next: Open and merge PR for #86, then continue to #93.
+- 2026-02-15: Merged PR #113 (`fix: remove unused monorepo dependencies (#86)`).
+- 2026-02-15: Verified post-merge `master` CI and CodeQL runs are green.
+- 2026-02-15: Started Phase 2 implementation on issue #93 (`fix/93-testing-hardening`).
+- Next: Open and merge PR for #93, then continue to #112.
