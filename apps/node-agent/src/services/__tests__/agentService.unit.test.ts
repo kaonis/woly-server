@@ -29,6 +29,11 @@ jest.mock('../../config/agent', () => ({
     authToken: 'token',
     reconnectInterval: 1000,
     maxReconnectAttempts: 3,
+    hostUpdateDebounceMs: 50,
+    maxBufferedHostEvents: 10,
+    hostEventFlushBatchSize: 3,
+    initialSyncChunkSize: 2,
+    hostStaleAfterMs: 60_000,
   },
   validateAgentConfig: jest.fn(),
 }));
@@ -590,16 +595,24 @@ describe('AgentService command handlers', () => {
   });
 
   it('forwards host database events when active', async () => {
+    jest.useFakeTimers();
     await service.start();
     const dbEmitter = Object.assign(new EventEmitter(), {
       getAllHosts: jest.fn().mockResolvedValue([]),
     });
+    const removedHostName = 'REMOVED-HOST';
+    const updatedHost: Host = {
+      ...sampleHost,
+      name: 'UPDATED-HOST',
+      ip: '192.168.1.101',
+    };
 
     service.setHostDatabase((dbEmitter as unknown) as any);
     dbEmitter.emit('host-discovered', sampleHost);
-    dbEmitter.emit('host-updated', sampleHost);
-    dbEmitter.emit('host-removed', sampleHost.name);
+    dbEmitter.emit('host-updated', updatedHost);
+    dbEmitter.emit('host-removed', removedHostName);
     dbEmitter.emit('scan-complete', 9);
+    jest.advanceTimersByTime(50);
 
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'host-discovered' })
@@ -610,13 +623,87 @@ describe('AgentService command handlers', () => {
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'host-removed',
-        data: expect.objectContaining({ name: sampleHost.name }),
+        data: expect.objectContaining({ name: removedHostName }),
       })
     );
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'scan-complete',
         data: expect.objectContaining({ hostCount: 9 }),
+      })
+    );
+  });
+
+  it('buffers host events while disconnected and flushes after reconnect', async () => {
+    await service.start();
+    mockCncClient.isConnected.mockReturnValue(false);
+
+    service.sendHostDiscovered(sampleHost);
+    service.sendHostRemoved(sampleHost.name);
+
+    expect(mockCncClient.send).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'host-discovered' })
+    );
+    expect(mockCncClient.send).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'host-removed' })
+    );
+
+    mockCncClient.isConnected.mockReturnValue(true);
+    mockCncClient.emit('connected');
+    await Promise.resolve();
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'host-discovered' })
+    );
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'host-removed' })
+    );
+  });
+
+  it('debounces host-updated events and emits only the latest state', async () => {
+    jest.useFakeTimers();
+    await service.start();
+
+    const firstUpdate: Host = { ...sampleHost, ip: '192.168.1.100' };
+    const secondUpdate: Host = { ...sampleHost, ip: '192.168.1.123' };
+
+    service.sendHostUpdated(firstUpdate);
+    service.sendHostUpdated(secondUpdate);
+
+    expect(mockCncClient.send).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'host-updated' })
+    );
+
+    jest.advanceTimersByTime(50);
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'host-updated',
+        data: expect.objectContaining({ ip: '192.168.1.123' }),
+      })
+    );
+  });
+
+  it('flags stale hosts as asleep before sending to C&C', async () => {
+    await service.start();
+
+    const staleHost: Host = {
+      ...sampleHost,
+      status: 'awake',
+      pingResponsive: 1,
+      lastSeen: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    };
+
+    service.sendHostDiscovered(staleHost);
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'host-discovered',
+        data: expect.objectContaining({
+          name: staleHost.name,
+          status: 'asleep',
+          pingResponsive: 0,
+        }),
       })
     );
   });

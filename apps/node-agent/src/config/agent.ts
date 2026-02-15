@@ -58,6 +58,13 @@ export const agentConfig = {
   // Reconnection settings
   reconnectInterval: getEnvNumber('RECONNECT_INTERVAL', 5000), // 5 seconds
   maxReconnectAttempts: getEnvNumber('MAX_RECONNECT_ATTEMPTS', 0), // 0 = infinite
+
+  // Host event backpressure and data quality controls
+  hostUpdateDebounceMs: getEnvNumber('NODE_HOST_UPDATE_DEBOUNCE_MS', 500),
+  maxBufferedHostEvents: getEnvNumber('NODE_MAX_BUFFERED_HOST_EVENTS', 2000),
+  hostEventFlushBatchSize: getEnvNumber('NODE_HOST_EVENT_FLUSH_BATCH_SIZE', 100),
+  initialSyncChunkSize: getEnvNumber('NODE_INITIAL_SYNC_CHUNK_SIZE', 100),
+  hostStaleAfterMs: getEnvNumber('NODE_HOST_STALE_AFTER_MS', 15 * 60 * 1000),
 };
 
 /**
