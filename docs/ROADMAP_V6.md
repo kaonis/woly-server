@@ -12,9 +12,10 @@ Scope: New autonomous cycle after V5 completion.
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #144 `[Dependencies] Plan major dashboard upgrade wave (ESLint 10, TS-ESLint 8, Zod 4, npm 11)`
-- #146 `[Dependencies] Execute tooling major upgrade set (ESLint 10 + typescript-eslint 8)`
+- #146 `[Dependencies] Execute tooling major upgrade set (ESLint 9 + typescript-eslint 8)`
 - #147 `[Dependencies] Evaluate and stage Zod v4 migration across protocol and services`
 - #148 `[Dependencies] Evaluate npm 11 adoption and CI/runtime compatibility`
+- #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
 
 ### CI snapshot
 - Post-merge checks for `9b027df` are green (CI + CodeQL).
@@ -31,18 +32,18 @@ Acceptance criteria:
 - Produce explicit merge/defer decisions with rationale.
 - Link resulting execution issues for approved upgrade tracks.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #149)
 
 ### Phase 2: Tooling major upgrade execution
 Issue: #146  
 Labels: `priority:low`, `technical-debt`, `testing`
 
 Acceptance criteria:
-- Upgrade lint toolchain majors (ESLint 10 + typescript-eslint 8 family).
+- Upgrade lint toolchain to the currently compatible majors (ESLint 9 + typescript-eslint 8 family).
 - Keep lint/typecheck/test gates green across workspaces.
 - Document any lint rule/config migration adjustments.
 
-Status: `Pending`
+Status: `In Progress` (2026-02-15)
 
 ### Phase 3: Zod v4 migration validation
 Issue: #147  
@@ -76,3 +77,8 @@ For each phase:
 - 2026-02-15: Documented major dependency migration order, risk profile, and merge/defer decisions in `docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md`.
 - 2026-02-15: Posted dependency decision summary comment on issue #4 with links to #146, #147, and #148.
 - 2026-02-15: Ran local protocol gates for #144 (`npm run typecheck -w packages/protocol`, `npm run test:ci -w packages/protocol`) successfully.
+- 2026-02-15: Added follow-up issue #150 and narrowed Phase 2 execution scope to ESLint 9 + typescript-eslint 8 due current peer compatibility constraints.
+- 2026-02-15: Merged #144 via PR #149 and verified post-merge `master` checks green (CI + CodeQL).
+- 2026-02-15: Started Phase 2 issue #146 on branch `feat/146-tooling-major-upgrade-set`.
+- 2026-02-15: Upgraded lint tooling to ESLint 9 + typescript-eslint 8 + eslint-config-prettier 10 and stabilized ESLint v9 compatibility for current `.eslintrc` workflow.
+- 2026-02-15: Ran local root gates for #146 (`npm run lint`, `npm run typecheck`, `npm run test:ci`) successfully.

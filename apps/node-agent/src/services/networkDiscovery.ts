@@ -161,7 +161,7 @@ async function reverseDNSLookup(ip: string): Promise<string | null> {
       // Return first hostname, strip domain suffix if present
       return hostnames[0].split('.')[0];
     }
-  } catch (error) {
+  } catch (_error) {
     // Reverse lookup failed (common for devices without DNS entries)
     return null;
   }
