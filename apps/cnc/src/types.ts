@@ -35,12 +35,16 @@ export type {
   CncCommand,
   CommandResultPayload,
   CommandState,
+  CreateWakeScheduleRequest,
   ErrorResponse,
   HostPayload,
   HostStatus,
   NodeMessage,
   NodeRegistration,
   RegisteredCommandData,
+  ScheduleFrequency,
+  UpdateWakeScheduleRequest,
+  WakeSchedule,
 } from '@kaonis/woly-protocol';
 
 export interface CommandResult {

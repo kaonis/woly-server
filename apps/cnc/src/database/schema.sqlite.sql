@@ -51,6 +51,24 @@ CREATE TABLE IF NOT EXISTS commands (
     UNIQUE(node_id, idempotency_key)
 );
 
+-- Wake schedules table
+CREATE TABLE IF NOT EXISTS wake_schedules (
+    id TEXT PRIMARY KEY,
+    owner_sub TEXT NOT NULL,
+    host_fqn TEXT NOT NULL,
+    host_name TEXT NOT NULL,
+    host_mac TEXT NOT NULL,
+    scheduled_time DATETIME NOT NULL,
+    timezone TEXT NOT NULL DEFAULT 'UTC',
+    frequency TEXT NOT NULL CHECK(frequency IN ('once', 'daily', 'weekly', 'weekdays', 'weekends')),
+    enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0, 1)),
+    notify_on_wake INTEGER NOT NULL DEFAULT 1 CHECK(notify_on_wake IN (0, 1)),
+    last_triggered DATETIME,
+    next_trigger DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_nodes_status ON nodes(status);
 CREATE INDEX IF NOT EXISTS idx_nodes_last_heartbeat ON nodes(last_heartbeat);
@@ -61,6 +79,9 @@ CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_location ON aggregated_hosts(loc
 CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_fqn ON aggregated_hosts(fully_qualified_name);
 CREATE INDEX IF NOT EXISTS idx_commands_node_state ON commands(node_id, state);
 CREATE INDEX IF NOT EXISTS idx_commands_created_at ON commands(created_at);
+CREATE INDEX IF NOT EXISTS idx_wake_schedules_owner_sub ON wake_schedules(owner_sub);
+CREATE INDEX IF NOT EXISTS idx_wake_schedules_host_fqn ON wake_schedules(host_fqn);
+CREATE INDEX IF NOT EXISTS idx_wake_schedules_owner_host ON wake_schedules(owner_sub, host_fqn);
 
 -- Triggers for updated_at (SQLite version)
 CREATE TRIGGER IF NOT EXISTS update_nodes_updated_at
@@ -82,4 +103,11 @@ CREATE TRIGGER IF NOT EXISTS update_commands_updated_at
     FOR EACH ROW
 BEGIN
     UPDATE commands SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_wake_schedules_updated_at
+    AFTER UPDATE ON wake_schedules
+    FOR EACH ROW
+BEGIN
+    UPDATE wake_schedules SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;

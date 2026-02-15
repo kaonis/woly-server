@@ -1,12 +1,13 @@
 import express, { Express } from 'express';
 import request from 'supertest';
-import { cncCapabilitiesResponseSchema } from '@kaonis/woly-protocol';
+import { cncCapabilitiesResponseSchema, wakeScheduleListResponseSchema } from '@kaonis/woly-protocol';
 import { createRoutes } from '../index';
 import { NodeManager } from '../../services/nodeManager';
 import { HostAggregator } from '../../services/hostAggregator';
 import { CommandRouter } from '../../services/commandRouter';
 import { createToken } from './testUtils';
 import { NodeModel } from '../../models/Node';
+import db from '../../database/connection';
 
 jest.mock('../../config', () => ({
   __esModule: true,
@@ -44,8 +45,9 @@ describe('Mobile API compatibility smoke checks', () => {
   const now = Math.floor(Date.now() / 1000);
   const mockedNodeModel = NodeModel as jest.Mocked<typeof NodeModel>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
+    await db.query('DELETE FROM wake_schedules');
 
     mockedNodeModel.findAll.mockResolvedValue([
       {
@@ -236,6 +238,47 @@ describe('Mobile API compatibility smoke checks', () => {
       expect(response.body).toMatchObject({
         error: 'Unauthorized',
         code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+  });
+
+  describe('GET /api/schedules', () => {
+    const operatorJwt = createToken({
+      sub: 'mobile-client',
+      role: 'operator',
+      iss: 'test-issuer',
+      aud: 'test-audience',
+      exp: now + 3600,
+      nbf: now - 10,
+    });
+
+    it('returns schedule payload compatible with mobile schedule migration contract', async () => {
+      const createResponse = await request(app)
+        .post('/api/schedules')
+        .set('Authorization', `Bearer ${operatorJwt}`)
+        .send({
+          hostName: 'Office-Mac',
+          hostMac: '00:11:22:33:44:55',
+          hostFqn: 'Office-Mac@Home',
+          scheduledTime: '2026-02-16T08:00:00.000Z',
+          timezone: 'UTC',
+          frequency: 'daily',
+        });
+
+      expect(createResponse.status).toBe(201);
+
+      const response = await request(app)
+        .get('/api/schedules')
+        .set('Authorization', `Bearer ${operatorJwt}`);
+
+      expect(response.status).toBe(200);
+      expect(wakeScheduleListResponseSchema.safeParse(response.body).success).toBe(true);
+      expect(response.body.schedules).toHaveLength(1);
+      expect(response.body.schedules[0]).toMatchObject({
+        hostName: 'Office-Mac',
+        hostMac: '00:11:22:33:44:55',
+        hostFqn: 'Office-Mac@Home',
+        frequency: 'daily',
       });
     });
   });

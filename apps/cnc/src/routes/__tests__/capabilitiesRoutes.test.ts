@@ -90,7 +90,7 @@ describe('Capabilities Routes', () => {
       expect(response.body.capabilities).toEqual({
         scan: false,
         notesTagsPersistence: true,
-        schedulesApi: false,
+        schedulesApi: true,
         commandStatusStreaming: false,
       });
     });

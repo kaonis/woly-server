@@ -14,8 +14,8 @@ const CNC_FEATURE_CAPABILITIES = {
   scan: false,
   // Host metadata persistence is available through host update flows.
   notesTagsPersistence: true,
-  // Schedule API parity is tracked separately and not yet available.
-  schedulesApi: false,
+  // Schedule API CRUD is available server-side.
+  schedulesApi: true,
   // Mobile currently uses polling for command lifecycle visibility.
   commandStatusStreaming: false,
 } as const;

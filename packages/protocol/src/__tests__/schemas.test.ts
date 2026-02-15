@@ -3,6 +3,11 @@ import {
   hostStatusSchema,
   cncCapabilitiesResponseSchema,
   cncFeatureCapabilitiesSchema,
+  scheduleFrequencySchema,
+  wakeScheduleSchema,
+  wakeScheduleListResponseSchema,
+  createWakeScheduleRequestSchema,
+  updateWakeScheduleRequestSchema,
   commandStateSchema,
   errorResponseSchema,
   outboundNodeMessageSchema,
@@ -185,6 +190,115 @@ describe('cncFeatureCapabilitiesSchema', () => {
       commandStatusStreaming: true,
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('scheduleFrequencySchema', () => {
+  it.each(['once', 'daily', 'weekly', 'weekdays', 'weekends'])('accepts "%s"', (value) => {
+    expect(scheduleFrequencySchema.safeParse(value).success).toBe(true);
+  });
+
+  it('rejects unsupported values', () => {
+    expect(scheduleFrequencySchema.safeParse('monthly').success).toBe(false);
+  });
+});
+
+describe('wakeScheduleSchema', () => {
+  const validSchedule = {
+    id: 'sched-1',
+    hostName: 'office-pc',
+    hostMac: 'AA:BB:CC:DD:EE:FF',
+    hostFqn: 'office-pc@home-node',
+    scheduledTime: '2026-02-16T08:00:00.000Z',
+    timezone: 'America/New_York',
+    frequency: 'daily',
+    enabled: true,
+    notifyOnWake: true,
+    createdAt: '2026-02-15T08:00:00.000Z',
+    updatedAt: '2026-02-15T08:00:00.000Z',
+    lastTriggered: null,
+    nextTrigger: '2026-02-16T08:00:00.000Z',
+  };
+
+  it('accepts valid schedule payload', () => {
+    expect(wakeScheduleSchema.safeParse(validSchedule).success).toBe(true);
+  });
+
+  it('rejects invalid timestamp fields', () => {
+    expect(
+      wakeScheduleSchema.safeParse({ ...validSchedule, scheduledTime: 'not-a-date' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects unknown fields', () => {
+    expect(wakeScheduleSchema.safeParse({ ...validSchedule, extra: true }).success).toBe(false);
+  });
+});
+
+describe('wakeScheduleListResponseSchema', () => {
+  it('accepts schedule list responses', () => {
+    const result = wakeScheduleListResponseSchema.safeParse({
+      schedules: [
+        {
+          id: 'sched-1',
+          hostName: 'office-pc',
+          hostMac: 'AA:BB:CC:DD:EE:FF',
+          hostFqn: 'office-pc@home-node',
+          scheduledTime: '2026-02-16T08:00:00.000Z',
+          timezone: 'UTC',
+          frequency: 'daily',
+          enabled: true,
+          notifyOnWake: true,
+          createdAt: '2026-02-15T08:00:00.000Z',
+          updatedAt: '2026-02-15T08:00:00.000Z',
+          lastTriggered: null,
+          nextTrigger: null,
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('createWakeScheduleRequestSchema', () => {
+  it('applies defaults for timezone and flags', () => {
+    const result = createWakeScheduleRequestSchema.safeParse({
+      hostName: 'office-pc',
+      hostMac: 'AA:BB:CC:DD:EE:FF',
+      hostFqn: 'office-pc@home-node',
+      scheduledTime: '2026-02-16T08:00:00.000Z',
+      frequency: 'daily',
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.timezone).toBe('UTC');
+      expect(result.data.enabled).toBe(true);
+      expect(result.data.notifyOnWake).toBe(true);
+    }
+  });
+
+  it('rejects malformed payloads', () => {
+    expect(
+      createWakeScheduleRequestSchema.safeParse({
+        hostName: '',
+        hostMac: 'AA:BB:CC:DD:EE:FF',
+        hostFqn: 'office-pc@home-node',
+        scheduledTime: 'invalid-date',
+        frequency: 'daily',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('updateWakeScheduleRequestSchema', () => {
+  it('accepts partial updates', () => {
+    expect(updateWakeScheduleRequestSchema.safeParse({ enabled: false }).success).toBe(true);
+  });
+
+  it('rejects empty payloads', () => {
+    expect(updateWakeScheduleRequestSchema.safeParse({}).success).toBe(false);
   });
 });
 

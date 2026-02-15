@@ -8,6 +8,7 @@ import { AdminController } from '../controllers/admin';
 import { HostsController } from '../controllers/hosts';
 import { AuthController } from '../controllers/auth';
 import { CapabilitiesController } from '../controllers/capabilities';
+import { SchedulesController } from '../controllers/schedules';
 import { NodeManager } from '../services/nodeManager';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
@@ -30,6 +31,7 @@ export function createRoutes(
   const hostsController = new HostsController(hostAggregator, commandRouter);
   const authController = new AuthController();
   const capabilitiesController = new CapabilitiesController();
+  const schedulesController = new SchedulesController();
 
   // Public API routes with rate limiting
   router.post('/auth/token', strictAuthLimiter, (req, res) => authController.issueToken(req, res));
@@ -38,6 +40,7 @@ export function createRoutes(
   router.use('/nodes', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/hosts', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/capabilities', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
+  router.use('/schedules', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/admin', apiLimiter, authenticateJwt, authorizeRoles('admin'));
 
   // Node API routes (protected)
@@ -56,6 +59,10 @@ export function createRoutes(
   router.put('/hosts/:fqn', (req, res) => hostsController.updateHost(req, res));
   router.delete('/hosts/:fqn', (req, res) => hostsController.deleteHost(req, res));
   router.get('/capabilities', (req, res) => capabilitiesController.getCapabilities(req, res));
+  router.get('/schedules', (req, res) => schedulesController.listSchedules(req, res));
+  router.post('/schedules', (req, res) => schedulesController.createSchedule(req, res));
+  router.put('/schedules/:id', (req, res) => schedulesController.updateSchedule(req, res));
+  router.delete('/schedules/:id', (req, res) => schedulesController.deleteSchedule(req, res));
 
   // Admin API routes
   router.delete('/admin/nodes/:id', (req, res) => adminController.deleteNode(req, res));
