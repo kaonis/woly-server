@@ -30,7 +30,7 @@ Acceptance criteria:
 - Update checklist statuses to match verifiable repository state.
 - Add references to concrete docs/workflows for completed DoD items.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #142)
 
 ### Phase 2: Coverage ratchet policy and gate
 Issue: #140  
@@ -41,7 +41,7 @@ Acceptance criteria:
 - Configure tests/CI to fail when coverage regresses below baseline.
 - Publish phased plan for threshold increases.
 
-Status: `Pending`
+Status: `In Progress` (2026-02-15)
 
 ### Phase 3: Dependency dashboard triage workflow
 Issue: #141  
@@ -73,3 +73,7 @@ For each phase:
 - 2026-02-15: Started Phase 1 issue #139 on branch `feat/139-cnc-checklist-dod-reconciliation`.
 - 2026-02-15: Reconciled C&C Phase 0 Definition-of-Done checklist items with explicit ADR/docs/CI workflow references.
 - 2026-02-15: Ran local C&C gates for #139 (`npm run typecheck -w apps/cnc`, `npm run test:ci -w apps/cnc`) successfully.
+- 2026-02-15: Merged #139 via PR #142 and verified post-merge `master` checks green (CodeQL; CI not triggered for docs-only change).
+- 2026-02-15: Started Phase 2 issue #140 on branch `feat/140-cnc-coverage-ratchet-policy`.
+- 2026-02-15: Added C&C coverage-ratchet policy doc and raised Jest global coverage thresholds to a non-regression baseline gate.
+- 2026-02-15: Ran local C&C gates for #140 (`npm run typecheck -w apps/cnc`, `npm run test:ci -w apps/cnc`) successfully.
