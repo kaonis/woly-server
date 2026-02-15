@@ -6,13 +6,12 @@ Scope: New autonomous cycle after V7 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `ea6f0aa` (PR #177).
-- Active execution branch: `docs/178-roadmap-v8-bootstrap`.
+- `master` synced at merge commit `0afa905` (PR #180).
+- Active execution branch: `docs/179-manual-ci-review`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #178 `[Roadmap] Close V7 and bootstrap ROADMAP_V8`
 - #179 `[CI] Run weekly manual-only operations review log update`
 
 ### CI snapshot
@@ -36,7 +35,7 @@ Acceptance criteria:
 - Refresh V7 status audit and progress log after #176 merge.
 - Publish `docs/ROADMAP_V8.md` with current status and next phases.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #180)
 
 ### Phase 2: ESLint 10 compatibility unblock monitoring
 Issue: #150  
@@ -58,7 +57,7 @@ Acceptance criteria:
 - Append a review entry in `docs/CI_MANUAL_REVIEW_LOG.md`.
 - Update roadmap progress with decision outcome.
 
-Status: `Planned` (2026-02-15)
+Status: `In Progress` (2026-02-15)
 
 ## 3. Execution Loop Rules
 
@@ -80,3 +79,5 @@ For each phase:
 - 2026-02-15: Created ROADMAP_V8 from issue #178 after V7 dependency/CI follow-up phases merged.
 - 2026-02-15: Carried forward blocker issue #150 with current peer dependency evidence.
 - 2026-02-15: Added issue #179 for the weekly manual-only CI operations review cycle.
+- 2026-02-15: Merged issue #178 via PR #180 and finalized V7 closeout + V8 bootstrap docs on master.
+- 2026-02-15: Started issue #179 on branch `docs/179-manual-ci-review` and executed manual-only CI review checklist with no unexpected automatic runs observed.
