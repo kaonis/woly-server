@@ -6,8 +6,8 @@ Scope: Continue autonomous delivery on `kaonis/woly-server` after V1 completion.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `woly-server` synced with `origin/master` at merge commit `a172968` (PR #119).
-- Active execution branch for next phase: `feat/46-host-data-quality-backpressure`.
+- `woly-server` synced with `origin/master` at merge commit `336f309` (PR #120).
+- Active execution branch for next phase: `feat/63-node-agent-lint-type-hygiene`.
 
 ### GitHub issues snapshot (`kaonis/woly-server`)
 - Open issues reviewed on 2026-02-15.
@@ -21,9 +21,8 @@ Scope: Continue autonomous delivery on `kaonis/woly-server` after V1 completion.
   - #51 `[C&C] Phase 6: Observability and operations`
 
 ### CI snapshot
-- V1 completion PRs merged on 2026-02-15: #118 and #119.
-- Post-merge checks for PR #118 are green (CI + CodeQL).
-- Post-merge checks for PR #119 are currently in progress on `master` as of this audit timestamp.
+- Recent merged PRs on 2026-02-15: #118, #119, #120.
+- Post-merge checks on `master` for #120 are green (CI + CodeQL).
 
 ### Local gate health (`woly-server`)
 - `npm run typecheck`: pass.
@@ -45,7 +44,7 @@ Acceptance criteria:
 - Add stale-host data detection.
 - Add/adjust tests with passing local gates.
 
-Status: `In Review` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #120)
 
 ### Phase 2: Node-agent lint/type debt cleanup
 Issue: #63  
@@ -56,7 +55,7 @@ Acceptance criteria:
 - Replace `any` at command boundaries with typed payload handling or narrowed `unknown`.
 - Keep lint noise near zero with documented exceptions only if necessary.
 
-Status: `Planned`
+Status: `In Progress` (2026-02-15)
 
 ### Phase 3: C&C WebSocket abuse controls
 Issues:
@@ -113,4 +112,6 @@ For each issue phase:
 - 2026-02-15: Created ROADMAP_V2 after V1 phase set reached completion via PR #119.
 - 2026-02-15: Started Phase 1 implementation branch for issue #46 (`feat/46-host-data-quality-backpressure`).
 - 2026-02-15: Completed #46 implementation with local gate green (`npx tsc --noEmit`, `npx jest --ci --coverage --passWithNoTests` in `apps/node-agent`).
-- Next: Open PR for #46, merge after CI, then start #63.
+- 2026-02-15: Merged #46 via PR #120; verified post-merge `master` checks green.
+- 2026-02-15: Started Phase 2 branch for #63 (`feat/63-node-agent-lint-type-hygiene`) and added zero-warning lint gate enforcement in `apps/node-agent`.
+- Next: Open PR for #63, merge after CI, then start #55/#56.
