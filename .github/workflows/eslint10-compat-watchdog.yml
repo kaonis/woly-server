@@ -1,9 +1,8 @@
 name: ESLint 10 Compatibility Watchdog
 
 on:
+  # Temporary budget-control mode: run only when manually triggered.
   workflow_dispatch:
-  schedule:
-    - cron: '0 9 * * 1'
 
 jobs:
   eslint10-watchdog:
