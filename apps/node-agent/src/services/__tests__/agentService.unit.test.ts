@@ -570,6 +570,7 @@ describe('AgentService command handlers', () => {
     service.setHostDatabase((dbEmitter as unknown) as any);
     dbEmitter.emit('host-discovered', sampleHost);
     dbEmitter.emit('host-updated', sampleHost);
+    dbEmitter.emit('host-removed', sampleHost.name);
     dbEmitter.emit('scan-complete', 9);
 
     expect(mockCncClient.send).toHaveBeenCalledWith(
@@ -577,6 +578,12 @@ describe('AgentService command handlers', () => {
     );
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'host-updated' })
+    );
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'host-removed',
+        data: expect.objectContaining({ name: sampleHost.name }),
+      })
     );
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({

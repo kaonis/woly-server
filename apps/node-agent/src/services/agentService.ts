@@ -50,6 +50,10 @@ export class AgentService extends EventEmitter {
       this.sendHostUpdated(host);
     });
 
+    this.hostDb.on('host-removed', (hostName: string) => {
+      this.sendHostRemoved(hostName);
+    });
+
     this.hostDb.on('scan-complete', (hostCount: number) => {
       this.sendScanComplete(hostCount);
     });
