@@ -28,7 +28,7 @@ const cncCapabilities: CncCapabilitiesResponse = {
       supported: true,
       routes: ['/api/hosts/:fqn/schedules', '/api/hosts/schedules/:id'],
       persistence: 'backend',
-      note: 'Host wake schedules are persisted in CNC backend.',
+      note: 'Host wake schedules are persisted and executed in CNC backend.',
     },
     commandStatusStreaming: {
       supported: false,

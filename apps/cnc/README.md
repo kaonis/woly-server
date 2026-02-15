@@ -236,6 +236,13 @@ Environment variables (`.env`):
 | `WS_ALLOW_QUERY_TOKEN_AUTH` | Allow legacy query token auth (`?token=`) | `false` in production, else `true` |
 | `NODE_HEARTBEAT_INTERVAL` | Expected heartbeat interval (ms) | `30000` |
 | `NODE_TIMEOUT` | Node offline threshold (ms) | `90000` |
+| `COMMAND_TIMEOUT` | Command acknowledgement timeout (ms) | `30000` |
+| `COMMAND_RETENTION_DAYS` | Retention window for historical command rows | `30` |
+| `COMMAND_MAX_RETRIES` | Maximum command retries before terminal failure | `3` |
+| `COMMAND_RETRY_BASE_DELAY_MS` | Base delay for retry backoff (ms) | `1000` |
+| `SCHEDULE_WORKER_ENABLED` | Enable backend wake schedule execution worker | `true` |
+| `SCHEDULE_POLL_INTERVAL_MS` | Wake schedule polling interval (ms) | `60000` |
+| `SCHEDULE_BATCH_SIZE` | Max due schedules processed per worker tick | `25` |
 | `LOG_LEVEL` | Logging level | `info` |
 
 ## WebSocket Protocol

@@ -132,5 +132,8 @@ export interface ServerConfig {
   commandRetentionDays: number;
   commandMaxRetries: number;
   commandRetryBaseDelayMs: number;
+  scheduleWorkerEnabled: boolean;
+  schedulePollIntervalMs: number;
+  scheduleBatchSize: number;
   logLevel: string;
 }

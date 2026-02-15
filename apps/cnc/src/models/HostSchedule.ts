@@ -118,6 +118,7 @@ function computeNextTrigger(
   scheduledTimeIso: string,
   frequency: ScheduleFrequency,
   enabled: boolean,
+  referenceNow: Date = new Date(),
 ): string | null {
   if (!enabled) return null;
 
@@ -126,7 +127,7 @@ function computeNextTrigger(
     return null;
   }
 
-  const now = new Date();
+  const now = referenceNow;
 
   if (frequency === 'once') {
     return scheduledTime > now ? scheduledTime.toISOString() : null;
@@ -214,6 +215,23 @@ export class HostScheduleModel {
        WHERE host_fqn = $1
        ORDER BY created_at DESC`,
       [hostFqn],
+    );
+
+    return result.rows.map(mapRow);
+  }
+
+  static async listDue(limit = 25, nowIso = new Date().toISOString()): Promise<HostWakeSchedule[]> {
+    await this.ensureTable();
+    const enabledPredicate = isSqlite ? 'enabled = 1' : 'enabled = true';
+    const result = await db.query<HostScheduleRow>(
+      `SELECT *
+       FROM host_wake_schedules
+       WHERE ${enabledPredicate}
+         AND next_trigger IS NOT NULL
+         AND next_trigger <= $1
+       ORDER BY next_trigger ASC
+       LIMIT $2`,
+      [nowIso, limit],
     );
 
     return result.rows.map(mapRow);
@@ -359,6 +377,63 @@ export class HostScheduleModel {
     await this.ensureTable();
     const result = await db.query('DELETE FROM host_wake_schedules WHERE id = $1', [id]);
     return result.rowCount > 0;
+  }
+
+  static async recordExecutionAttempt(
+    id: string,
+    executedAtIso = new Date().toISOString(),
+  ): Promise<HostWakeSchedule | null> {
+    await this.ensureTable();
+
+    const existing = await this.findById(id);
+    if (!existing) {
+      return null;
+    }
+
+    const shouldRemainEnabled = existing.enabled && existing.frequency !== 'once';
+    const referenceNow = new Date(executedAtIso);
+    const nextTrigger = shouldRemainEnabled
+      ? computeNextTrigger(
+        existing.scheduledTime,
+        existing.frequency,
+        true,
+        Number.isNaN(referenceNow.getTime()) ? new Date() : referenceNow,
+      )
+      : null;
+
+    if (isSqlite) {
+      await db.query(
+        `UPDATE host_wake_schedules
+         SET enabled = $2,
+             last_triggered = $3,
+             next_trigger = $4,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [
+          id,
+          shouldRemainEnabled ? 1 : 0,
+          executedAtIso,
+          nextTrigger,
+        ],
+      );
+    } else {
+      await db.query(
+        `UPDATE host_wake_schedules
+         SET enabled = $2,
+             last_triggered = $3,
+             next_trigger = $4,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [
+          id,
+          shouldRemainEnabled,
+          executedAtIso,
+          nextTrigger,
+        ],
+      );
+    }
+
+    return this.findById(id);
   }
 }
 

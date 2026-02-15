@@ -288,6 +288,22 @@ describe('SqliteDatabase', () => {
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0].id).toBe('node-1');
     });
+
+    it('should honor placeholder indexes when order is not sequential', async () => {
+      await db.query(
+        'INSERT INTO test_nodes (id, name, status) VALUES ($1, $2, $3)',
+        ['node-out-of-order', 'Original', 'offline'],
+      );
+
+      const result = await db.query(
+        'UPDATE test_nodes SET name = $2, status = $3 WHERE id = $1 RETURNING *',
+        ['node-out-of-order', 'Updated', 'online'],
+      );
+
+      expect(result.rows).toHaveLength(1);
+      expect((result.rows[0] as { name: string }).name).toBe('Updated');
+      expect((result.rows[0] as { status: string }).status).toBe('online');
+    });
   });
 
   describe('SELECT queries', () => {
