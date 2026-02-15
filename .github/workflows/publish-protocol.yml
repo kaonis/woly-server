@@ -1,12 +1,7 @@
 name: Publish @kaonis/woly-protocol
 
 on:
-  # Trigger on version tags like protocol-v1.1.0
-  push:
-    tags:
-      - 'protocol-v*'
-
-  # Manual trigger from GitHub Actions UI
+  # Temporary budget-control mode: run only when manually triggered.
   workflow_dispatch:
     inputs:
       dry-run:

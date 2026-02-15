@@ -6,15 +6,16 @@ Scope: New autonomous cycle after V5 completion.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `7d811dc` (PR #160).
+- `master` synced at merge commit `3bff69a` (PR #161).
 - Active execution branch: `master`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
+- #162 `[CI] Temporarily switch all workflows to manual-only dispatch`
 
 ### CI snapshot
-- Post-merge checks for `7d811dc` are green (CI + CodeQL).
+- Post-merge checks for `3bff69a` are green (CI + CodeQL).
 - Dependency triage workflow and audit/security gates are documented and active.
 
 ## 2. Iterative Phases
@@ -107,6 +108,17 @@ Acceptance criteria:
 
 Status: `Completed` (2026-02-15, PR #160)
 
+### Phase 9: Manual-only GitHub workflow policy (temporary)
+Issue: #162  
+Labels: `priority:medium`, `developer-experience`, `technical-debt`
+
+Acceptance criteria:
+- Disable automatic workflow triggers (`push`, `pull_request`, `schedule`, tag push) across repo workflows.
+- Keep workflows runnable via `workflow_dispatch`.
+- Continue enforcing quality via local gates before merge.
+
+Status: `In Progress` (2026-02-15)
+
 ## 3. Execution Loop Rules
 
 For each phase:
@@ -162,3 +174,5 @@ For each phase:
 - 2026-02-15: Ran local gates for #159 (`npm run lint`, `npm run typecheck`, `npm run test:ci`, `npm run build`) successfully.
 - 2026-02-15: Merged #159 via PR #160 and verified post-merge `master` checks green (CI + CodeQL, commit `7d811dc`).
 - 2026-02-15: Manually dispatched `ESLint 10 Compatibility Watchdog` workflow run `22036729002`; it completed successfully and updated sticky comment `#issuecomment-3904488716` on issue #150.
+- 2026-02-15: Added follow-up issue #162 and started Phase 9 on branch `chore/162-manual-only-workflows`.
+- 2026-02-15: Updated workflow triggers to manual-only dispatch in `ci.yml`, `eslint10-compat-watchdog.yml`, and `publish-protocol.yml` to temporarily reduce Actions spend.
