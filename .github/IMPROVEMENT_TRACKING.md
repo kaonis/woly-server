@@ -15,12 +15,12 @@ This document tracks the current implementation status of items in [IMPROVEMENTS
 | Security | 7 | 6 | 1 | 0 |
 | Code TODOs | 2 | 2 | 0 | 0 |
 | Features | 7 | 0 | 0 | 7 |
-| Operations | 4 | 0 | 2 | 2 |
+| Operations | 4 | 0 | 3 | 1 |
 | Developer Experience | 4 | 0 | 1 | 3 |
 | Architecture | 3 | 0 | 0 | 3 |
 | Documentation | 3 | 0 | 1 | 2 |
 | Mobile Integration | 2 | 0 | 0 | 2 |
-| **TOTAL** | **32** | **8** | **5** | **19** |
+| **TOTAL** | **32** | **8** | **6** | **18** |
 
 ## Completed Security / TODO Items
 
@@ -32,16 +32,15 @@ This document tracks the current implementation status of items in [IMPROVEMENTS
 6. `Security §1.6` Production CORS tightening — [#57](https://github.com/kaonis/woly-server/issues/57)
 7. `Code TODO §2.1` Node-agent version from package metadata — [#88](https://github.com/kaonis/woly-server/issues/88)
 8. `Code TODO §2.2` Subnet/gateway metadata resolution — [#88](https://github.com/kaonis/woly-server/issues/88)
+9. `Operations §4.2` Prometheus export baseline (C&C endpoints + runtime gauges) — [#215](https://github.com/kaonis/woly-server/issues/215) (partial)
 
 ## Active Priority Queue
 
-1. `A2` Reconcile backlog docs and tracking consistency — [#214](https://github.com/kaonis/woly-server/issues/214)
-2. `B1` Prometheus metrics endpoint and baseline metric export — [#215](https://github.com/kaonis/woly-server/issues/215)
-3. `C1` Host notes/tags metadata support — [#216](https://github.com/kaonis/woly-server/issues/216)
-4. `C2` Wake verification workflow — [#217](https://github.com/kaonis/woly-server/issues/217)
-5. `D1` Cross-service E2E smoke tests — [#218](https://github.com/kaonis/woly-server/issues/218)
-6. `D2` Production deployment guide — [#219](https://github.com/kaonis/woly-server/issues/219)
-7. Dependency follow-up: ESLint 10 revisit — [#150](https://github.com/kaonis/woly-server/issues/150)
+1. `C1` Host notes/tags metadata support — [#216](https://github.com/kaonis/woly-server/issues/216)
+2. `C2` Wake verification workflow — [#217](https://github.com/kaonis/woly-server/issues/217)
+3. `D1` Cross-service E2E smoke tests — [#218](https://github.com/kaonis/woly-server/issues/218)
+4. `D2` Production deployment guide — [#219](https://github.com/kaonis/woly-server/issues/219)
+5. Dependency follow-up: ESLint 10 revisit — [#150](https://github.com/kaonis/woly-server/issues/150)
 
 ## Label Reference
 
