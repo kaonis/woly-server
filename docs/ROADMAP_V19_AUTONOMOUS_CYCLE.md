@@ -53,3 +53,11 @@ For each issue:
 ## 6. Exit Criteria
 
 V19 is complete when all four issues (`#239`, `#238`, `#150`, `#4`) are resolved (merged or explicitly updated/closed with documented blocker state) and docs/checkpoints are updated.
+
+## 7. Progress Updates
+
+- 2026-02-15: Completed `#239` by adding `npm run deps:checkpoint:eslint10` and documenting usage in dependency triage workflow.
+- 2026-02-15: Completed scoped rolling policy audit for `#238`:
+  - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+- 2026-02-15: Added CI review log entry for this cycle and created follow-up review issue `#240`.
+- 2026-02-15: Dependency checkpoint status unchanged for `#150` (blocked pending upstream ESLint 10 peer support in `@typescript-eslint`).
