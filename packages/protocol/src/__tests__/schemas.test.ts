@@ -1,8 +1,8 @@
 import {
+  cncCapabilitiesResponseSchema,
+  cncCapabilityDescriptorSchema,
   hostSchema,
   hostStatusSchema,
-  cncCapabilitiesResponseSchema,
-  cncFeatureCapabilitiesSchema,
   hostPortSchema,
   hostPortScanResponseSchema,
   scheduleFrequencySchema,
@@ -136,62 +136,73 @@ describe('errorResponseSchema', () => {
 });
 
 // ---------------------------------------------------------------------------
-// cncCapabilitiesResponseSchema
+// cncCapabilityDescriptorSchema / cncCapabilitiesResponseSchema
 // ---------------------------------------------------------------------------
 
-describe('cncCapabilitiesResponseSchema', () => {
-  it('accepts valid capabilities response', () => {
-    const result = cncCapabilitiesResponseSchema.safeParse({
-      apiVersion: '1.0.0',
-      protocolVersion: PROTOCOL_VERSION,
-      supportedProtocolVersions: [PROTOCOL_VERSION],
-      capabilities: {
-        scan: true,
-        notesTagsPersistence: true,
-        schedulesApi: false,
-        commandStatusStreaming: false,
-      },
-    });
-    expect(result.success).toBe(true);
+describe('cncCapabilityDescriptorSchema', () => {
+  it('accepts minimal capability descriptor', () => {
+    expect(cncCapabilityDescriptorSchema.safeParse({ supported: true }).success).toBe(true);
   });
 
-  it('rejects response without required feature flags', () => {
-    const result = cncCapabilitiesResponseSchema.safeParse({
-      apiVersion: '1.0.0',
-      protocolVersion: PROTOCOL_VERSION,
-      supportedProtocolVersions: [PROTOCOL_VERSION],
-      capabilities: {
-        scan: true,
-      },
-    });
-    expect(result.success).toBe(false);
+  it('accepts descriptor with routes/persistence/transport/note', () => {
+    expect(
+      cncCapabilityDescriptorSchema.safeParse({
+        supported: true,
+        routes: ['/api/hosts/scan-ports/:fqn'],
+        persistence: 'backend',
+        transport: 'websocket',
+        note: 'Feature is available',
+      }).success
+    ).toBe(true);
   });
 
-  it('rejects empty supported protocol version list', () => {
-    const result = cncCapabilitiesResponseSchema.safeParse({
-      apiVersion: '1.0.0',
-      protocolVersion: PROTOCOL_VERSION,
-      supportedProtocolVersions: [],
-      capabilities: {
-        scan: true,
-        notesTagsPersistence: true,
-        schedulesApi: false,
-        commandStatusStreaming: false,
-      },
-    });
-    expect(result.success).toBe(false);
+  it('rejects unsupported persistence value', () => {
+    expect(
+      cncCapabilityDescriptorSchema.safeParse({
+        supported: true,
+        persistence: 'remote',
+      }).success
+    ).toBe(false);
   });
 });
 
-describe('cncFeatureCapabilitiesSchema', () => {
-  it('accepts explicit boolean values for all features', () => {
-    const result = cncFeatureCapabilitiesSchema.safeParse({
-      scan: false,
-      notesTagsPersistence: true,
-      schedulesApi: false,
-      commandStatusStreaming: true,
-    });
-    expect(result.success).toBe(true);
+describe('cncCapabilitiesResponseSchema', () => {
+  const capability = { supported: true };
+
+  it('accepts valid CNC capabilities payload', () => {
+    expect(
+      cncCapabilitiesResponseSchema.safeParse({
+        mode: 'cnc',
+        versions: {
+          cncApi: '1.0.0',
+          protocol: '1.0.0',
+        },
+        capabilities: {
+          scan: capability,
+          notesTags: capability,
+          schedules: { supported: false },
+          commandStatusStreaming: { supported: false, transport: null },
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects non-cnc mode', () => {
+    expect(
+      cncCapabilitiesResponseSchema.safeParse({
+        mode: 'standalone',
+        versions: {
+          cncApi: '1.0.0',
+          protocol: '1.0.0',
+        },
+        capabilities: {
+          scan: capability,
+          notesTags: capability,
+          schedules: capability,
+          commandStatusStreaming: capability,
+        },
+      }).success
+    ).toBe(false);
   });
 });
 
@@ -205,37 +216,47 @@ describe('hostPortSchema', () => {
   });
 });
 
-describe('hostPortScanResponseSchema', () => {
-  it('accepts valid host port scan payloads', () => {
-    const result = hostPortScanResponseSchema.safeParse({
-      target: 'office-pc@home-node',
-      scannedAt: '2026-02-16T08:00:00.000Z',
-      openPorts: [
-        { port: 22, protocol: 'tcp', service: 'SSH' },
-        { port: 443, protocol: 'tcp', service: 'HTTPS' },
-      ],
-      scan: {
-        commandId: 'cmd-1',
-        state: 'acknowledged',
-        nodeId: 'node-1',
-      },
-      correlationId: 'corr-1',
-    });
+// ---------------------------------------------------------------------------
+// hostPortScanResponseSchema
+// ---------------------------------------------------------------------------
 
-    expect(result.success).toBe(true);
+describe('hostPortScanResponseSchema', () => {
+  it('accepts valid host port scan response', () => {
+    expect(
+      hostPortScanResponseSchema.safeParse({
+        target: 'Office-Mac@Home',
+        scannedAt: '2026-02-15T00:00:00.000Z',
+        openPorts: [
+          { port: 22, protocol: 'tcp', service: 'SSH' },
+          { port: 443, protocol: 'tcp', service: 'HTTPS' },
+        ],
+        scan: {
+          commandId: 'cmd-1',
+          state: 'acknowledged',
+          nodeId: 'node-1',
+        },
+      }).success
+    ).toBe(true);
   });
 
-  it('rejects invalid scan state values', () => {
-    const result = hostPortScanResponseSchema.safeParse({
-      target: 'office-pc@home-node',
-      scannedAt: '2026-02-16T08:00:00.000Z',
-      openPorts: [],
-      scan: {
-        state: 'unknown',
-      },
-    });
+  it('accepts empty open ports array', () => {
+    expect(
+      hostPortScanResponseSchema.safeParse({
+        target: 'Office-Mac@Home',
+        scannedAt: '2026-02-15T00:00:00.000Z',
+        openPorts: [],
+      }).success
+    ).toBe(true);
+  });
 
-    expect(result.success).toBe(false);
+  it('rejects invalid port protocol', () => {
+    expect(
+      hostPortScanResponseSchema.safeParse({
+        target: 'Office-Mac@Home',
+        scannedAt: '2026-02-15T00:00:00.000Z',
+        openPorts: [{ port: 80, protocol: 'udp', service: 'HTTP' }],
+      }).success
+    ).toBe(false);
   });
 });
 
@@ -347,7 +368,6 @@ describe('updateWakeScheduleRequestSchema', () => {
     expect(updateWakeScheduleRequestSchema.safeParse({}).success).toBe(false);
   });
 });
-
 // ---------------------------------------------------------------------------
 // outboundNodeMessageSchema (node → C&C)
 // ---------------------------------------------------------------------------

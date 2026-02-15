@@ -59,20 +59,26 @@ export interface ErrorResponse {
   details?: unknown;
 }
 
-// --- CNC API capabilities ---
-
-export interface CncFeatureCapabilities {
-  scan: boolean;
-  notesTagsPersistence: boolean;
-  schedulesApi: boolean;
-  commandStatusStreaming: boolean;
+export interface CncCapabilityDescriptor {
+  supported: boolean;
+  routes?: string[];
+  persistence?: 'backend' | 'local' | 'none';
+  transport?: 'websocket' | 'sse' | null;
+  note?: string;
 }
 
 export interface CncCapabilitiesResponse {
-  apiVersion: string;
-  protocolVersion: string;
-  supportedProtocolVersions: string[];
-  capabilities: CncFeatureCapabilities;
+  mode: 'cnc';
+  versions: {
+    cncApi: string;
+    protocol: string;
+  };
+  capabilities: {
+    scan: CncCapabilityDescriptor;
+    notesTags: CncCapabilityDescriptor;
+    schedules: CncCapabilityDescriptor;
+    commandStatusStreaming: CncCapabilityDescriptor;
+  };
 }
 
 export interface HostPort {
@@ -130,7 +136,6 @@ export interface CreateWakeScheduleRequest {
 export type UpdateWakeScheduleRequest = Partial<CreateWakeScheduleRequest> & {
   lastTriggered?: string | null;
 };
-
 // --- WebSocket message types ---
 
 export type NodeMessage =
@@ -210,22 +215,30 @@ export const errorResponseSchema = z.object({
   details: z.unknown().optional(),
 });
 
-export const cncFeatureCapabilitiesSchema = z.object({
-  scan: z.boolean(),
-  notesTagsPersistence: z.boolean(),
-  schedulesApi: z.boolean(),
-  commandStatusStreaming: z.boolean(),
-});
-
-export const cncCapabilitiesResponseSchema = z.object({
-  apiVersion: z.string().min(1),
-  protocolVersion: z.string().min(1),
-  supportedProtocolVersions: z.array(z.string().min(1)).min(1),
-  capabilities: cncFeatureCapabilitiesSchema,
-});
-
 const isoTimestampSchema = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
   message: 'Expected ISO-8601 timestamp',
+});
+
+export const cncCapabilityDescriptorSchema: z.ZodType<CncCapabilityDescriptor> = z.object({
+  supported: z.boolean(),
+  routes: z.array(z.string().min(1)).optional(),
+  persistence: z.enum(['backend', 'local', 'none']).optional(),
+  transport: z.enum(['websocket', 'sse']).nullable().optional(),
+  note: z.string().min(1).optional(),
+});
+
+export const cncCapabilitiesResponseSchema: z.ZodType<CncCapabilitiesResponse> = z.object({
+  mode: z.literal('cnc'),
+  versions: z.object({
+    cncApi: z.string().min(1),
+    protocol: z.string().min(1),
+  }),
+  capabilities: z.object({
+    scan: cncCapabilityDescriptorSchema,
+    notesTags: cncCapabilityDescriptorSchema,
+    schedules: cncCapabilityDescriptorSchema,
+    commandStatusStreaming: cncCapabilityDescriptorSchema,
+  }),
 });
 
 export const hostPortSchema: z.ZodType<HostPort> = z.object({
@@ -311,7 +324,6 @@ export const updateWakeScheduleRequestSchema = z
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one field must be provided',
   });
-
 const nodeMetadataSchema = z.object({
   version: z.string().min(1),
   platform: z.string().min(1),
