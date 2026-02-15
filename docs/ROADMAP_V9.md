@@ -6,14 +6,14 @@ Scope: New autonomous cycle after V8 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `ebf5b5c` (PR #193).
-- Active execution branch: `feat/196-cnc-coverage-hardening`.
+- `master` synced at merge commit `22951e9` (PR #197).
+- Active execution branch: `docs/194-manual-review-cycle`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
 - #194 `[CI] Schedule next weekly manual-only operations review`
-- #196 `[Testing][CNC] Coverage hardening for service/controller edge paths`
+- #198 `[CI] Schedule weekly manual-only operations review (next cycle)`
 
 ### CI snapshot
 - Repository workflows are in temporary manual-only mode (`workflow_dispatch` only).
@@ -21,8 +21,9 @@ Scope: New autonomous cycle after V8 closeout.
 - Manual workflow jobs are capped to `timeout-minutes: 8`.
 - Local manual-only run audit command is available: `npm run ci:audit:manual`.
 - Local workflow policy guard command is available: `npm run ci:policy:check` (PR #193).
+- Latest manual CI run succeeded: `22039325902` (PR #197, 2026-02-15).
 - Latest manual ESLint10 watchdog run succeeded: `22037969724` (2026-02-15).
-- Latest manual-only audit passed: `npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --fail-on-unexpected` (2026-02-15).
+- Latest manual-only audit passed: `npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --fail-on-unexpected` (`2026-02-15T16:46:26Z`).
 - Latest ESLint10 compatibility checkpoint remains blocked (`npm run deps:check-eslint10`, 2026-02-15).
 
 ## 2. Iterative Phases
@@ -89,7 +90,7 @@ Acceptance criteria:
 - Create follow-up issue for next weekly manual-only review cycle.
 - Keep roadmap issue snapshot and phase plan aligned with queued review work.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, queued follow-up issue #198)
 
 ### Phase 7: CNC coverage hardening tranche
 Issue: #196
@@ -104,7 +105,7 @@ Acceptance criteria:
   - `npm run build`
 - Keep CNC statement coverage at/above target threshold (>= 80%) and document latest snapshot.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #197)
 
 ## 3. Execution Loop Rules
 
@@ -137,3 +138,6 @@ For each phase:
 - 2026-02-15: Created issue #196 and started branch `feat/196-cnc-coverage-hardening` for continued CNC coverage hardening.
 - 2026-02-15: Expanded CNC branch/error-path tests (notably `hostAggregator`) and re-validated local gates (`lint`, `typecheck`, `test:ci`, `build`) successfully.
 - 2026-02-15: Latest CNC coverage snapshot: `86.85%` statements (`apps/cnc`) with service coverage raised (`hostAggregator.ts` now `100%` lines).
+- 2026-02-15: Merged issue #196 via PR #197 after manual CI run `22039325902` passed.
+- 2026-02-15: Ran scoped manual-only workflow audit for issue #194: `npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --fail-on-unexpected` (PASS).
+- 2026-02-15: Created follow-up issue #198 to queue the next weekly manual-only review cycle.
