@@ -107,9 +107,35 @@ GET /health
   "timestamp": 1763544894939,
   "status": "ok",
   "environment": "development",
+  "build": {
+    "version": "0.0.1",
+    "protocolVersion": "1.0.0"
+  },
+  "agent": {
+    "mode": "agent",
+    "authMode": "session-token",
+    "connected": true
+  },
   "checks": {
     "database": "healthy",
     "networkScan": "idle"
+  },
+  "telemetry": {
+    "reconnect": {
+      "scheduled": 0,
+      "failed": 0
+    },
+    "auth": {
+      "expired": 0,
+      "revoked": 0,
+      "unavailable": 0
+    },
+    "protocol": {
+      "inboundValidationFailures": 0,
+      "outboundValidationFailures": 0,
+      "unsupported": 0,
+      "errors": 0
+    }
   }
 }
 ```
@@ -428,6 +454,9 @@ apps/node-agent/
 - [Implementation Checklist](IMPLEMENTATION_CHECKLIST.md) — Progress tracking
 - [Security](SECURITY.md) — Security considerations and practices
 - [Testing](TESTING.md) — Testing strategy and guidelines
+- [Runbook: Reconnect/Auth Loop](docs/runbooks/reconnect-auth-loop.md)
+- [Runbook: Protocol Validation Failures](docs/runbooks/protocol-validation-failures.md)
+- [Rollout Policy: Canary to Staged](docs/runbooks/rollout-canary-staged.md)
 
 ### Architecture Decision Records (ADRs)
 

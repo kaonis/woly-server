@@ -41,6 +41,21 @@ jest.mock('../../utils/logger', () => ({
   },
 }));
 
+const runtimeTelemetryMock = {
+  recordReconnectScheduled: jest.fn(),
+  recordReconnectFailed: jest.fn(),
+  recordAuthExpired: jest.fn(),
+  recordAuthRevoked: jest.fn(),
+  recordAuthUnavailable: jest.fn(),
+  recordProtocolValidationFailure: jest.fn(),
+  recordProtocolUnsupported: jest.fn(),
+  recordProtocolError: jest.fn(),
+};
+
+jest.mock('../runtimeTelemetry', () => ({
+  runtimeTelemetry: runtimeTelemetryMock,
+}));
+
 const mockSockets: MockWebSocket[] = [];
 
 class MockWebSocket extends EventEmitter {
@@ -177,6 +192,8 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     expect(mockAxiosPost).toHaveBeenCalledTimes(2);
     expect(mockSockets).toHaveLength(2);
     expect(mockSockets[1].options?.headers?.Authorization).toBe('Bearer session-2');
+    expect(runtimeTelemetryMock.recordAuthExpired).toHaveBeenCalledTimes(1);
+    expect(runtimeTelemetryMock.recordReconnectScheduled).toHaveBeenCalledTimes(1);
   });
 
   it('emits auth-revoked when session token minting is rejected', async () => {
@@ -191,6 +208,7 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     expect(onRevoked).toHaveBeenCalledTimes(1);
     expect(mockSockets).toHaveLength(0);
     expect(jest.getTimerCount()).toBeGreaterThan(0);
+    expect(runtimeTelemetryMock.recordAuthRevoked).toHaveBeenCalledTimes(1);
   });
 
   it('emits auth-unavailable when session token service is unreachable', async () => {
@@ -205,6 +223,26 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     expect(onUnavailable).toHaveBeenCalledTimes(1);
     expect(mockSockets).toHaveLength(0);
     expect(jest.getTimerCount()).toBeGreaterThan(0);
+    expect(runtimeTelemetryMock.recordAuthUnavailable).toHaveBeenCalledTimes(1);
+  });
+
+  it('records reconnect failure when max reconnect attempts are exhausted', async () => {
+    mockedAgentConfig.maxReconnectAttempts = 1;
+    await client.connect();
+
+    const onReconnectFailed = jest.fn();
+    client.on('reconnect-failed', onReconnectFailed);
+
+    mockSockets[0].emit('close', 1006, Buffer.from('network down'));
+    jest.advanceTimersByTime(mockedAgentConfig.reconnectInterval);
+    await flushPromises();
+    await flushPromises();
+
+    expect(mockSockets).toHaveLength(2);
+    mockSockets[1].emit('close', 1006, Buffer.from('network down'));
+
+    expect(onReconnectFailed).toHaveBeenCalledTimes(1);
+    expect(runtimeTelemetryMock.recordReconnectFailed).toHaveBeenCalledTimes(1);
   });
 
   it('rejects malformed inbound command payloads with structured validation logs', async () => {
@@ -227,6 +265,7 @@ describe('CncClient Phase 1 auth lifecycle', () => {
         messageType: 'wake',
       })
     );
+    expect(runtimeTelemetryMock.recordProtocolValidationFailure).toHaveBeenCalledWith('inbound');
   });
 
   it('rejects unknown inbound command types without crashing the dispatcher loop', async () => {
@@ -281,6 +320,7 @@ describe('CncClient Phase 1 auth lifecycle', () => {
         validationIssues: expect.any(Array),
       })
     );
+    expect(runtimeTelemetryMock.recordProtocolValidationFailure).toHaveBeenCalledWith('outbound');
   });
 
   it('allows outbound host payloads with pingResponsive set to null', async () => {
@@ -367,6 +407,7 @@ describe('CncClient Phase 1 auth lifecycle', () => {
       })
     );
     expect(client.isConnected()).toBe(false);
+    expect(runtimeTelemetryMock.recordProtocolUnsupported).toHaveBeenCalledTimes(1);
   });
 
   it('disables reconnection after protocol version mismatch to prevent infinite loop', async () => {
@@ -434,5 +475,6 @@ describe('CncClient Phase 1 auth lifecycle', () => {
         message: 'Invalid protocol payload',
       })
     );
+    expect(runtimeTelemetryMock.recordProtocolError).toHaveBeenCalledTimes(1);
   });
 });

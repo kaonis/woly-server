@@ -123,4 +123,5 @@ For each issue phase:
 - 2026-02-15: Started Phase 4 issue #57 on branch `feat/57-node-agent-cors-tightening`.
 - 2026-02-15: Merged #57 via PR #124; verified post-merge `master` checks green.
 - 2026-02-15: Started Phase 5 issue #47 on branch `feat/47-node-agent-observability-rollout`.
-- Next: Implement #47 and continue with #51.
+- 2026-02-15: Implemented #47 observability + rollout docs on `feat/47-node-agent-observability-rollout` with local gate green (`npx tsc --noEmit`, `npx jest --ci --coverage --passWithNoTests` in `apps/node-agent`).
+- Next: Open/merge #47 PR, verify post-merge CI, then continue with #51.

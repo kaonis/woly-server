@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 import { CncCommand, Host, NodeMessage } from '../types';
 import HostDatabase from './hostDatabase';
 import ScanOrchestrator from './scanOrchestrator';
+import { runtimeTelemetry } from './runtimeTelemetry';
 
 type WakeCommand = Extract<CncCommand, { type: 'wake' }>;
 type ScanCommand = Extract<CncCommand, { type: 'scan' }>;
@@ -414,9 +415,17 @@ export class AgentService extends EventEmitter {
   }
 
   private sendCommandResult(
+    commandType: CncCommand['type'],
     commandId: string,
-    payload: { success: boolean; message?: string; error?: string }
+    payload: { success: boolean; message?: string; error?: string },
+    startedAtMs?: number
   ): void {
+    runtimeTelemetry.recordCommandResult(
+      commandType,
+      payload.success,
+      startedAtMs !== undefined ? Date.now() - startedAtMs : 0
+    );
+
     cncClient.send({
       type: 'command-result',
       data: {
@@ -434,15 +443,16 @@ export class AgentService extends EventEmitter {
   private async handleWakeCommand(command: WakeCommand): Promise<void> {
     const { commandId, data } = command;
     const { hostName, mac } = data;
+    const startedAtMs = Date.now();
 
     logger.info('Received wake command from C&C', { commandId, hostName, mac });
 
     if (!this.hostDb) {
       logger.error('Host database not initialized');
-      this.sendCommandResult(commandId, {
+      this.sendCommandResult(command.type, commandId, {
         success: false,
         error: 'Host database not initialized',
-      });
+      }, startedAtMs);
       return;
     }
 
@@ -470,20 +480,20 @@ export class AgentService extends EventEmitter {
         });
       });
 
-      this.sendCommandResult(commandId, {
+      this.sendCommandResult(command.type, commandId, {
         success: true,
         message: `Wake-on-LAN packet sent to ${host?.name || hostName} (${targetMac})`,
-      });
+      }, startedAtMs);
 
       logger.info('Wake command completed', { commandId, hostName });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Wake command failed', { commandId, error: message });
 
-      this.sendCommandResult(commandId, {
+      this.sendCommandResult(command.type, commandId, {
         success: false,
         error: message,
-      });
+      }, startedAtMs);
     }
   }
 
@@ -493,23 +503,24 @@ export class AgentService extends EventEmitter {
   private async handleScanCommand(command: ScanCommand): Promise<void> {
     const { commandId, data } = command;
     const { immediate } = data;
+    const startedAtMs = Date.now();
 
     logger.info('Received scan command from C&C', { commandId, immediate });
 
     if (!this.hostDb) {
       logger.error('Host database not initialized');
-      this.sendCommandResult(commandId, {
+      this.sendCommandResult(command.type, commandId, {
         success: false,
         error: 'Host database not initialized',
-      });
+      }, startedAtMs);
       return;
     }
     if (!this.scanOrchestrator) {
       logger.error('Scan orchestrator not initialized');
-      this.sendCommandResult(commandId, {
+      this.sendCommandResult(command.type, commandId, {
         success: false,
         error: 'Scan orchestrator not initialized',
-      });
+      }, startedAtMs);
       return;
     }
 
@@ -518,10 +529,10 @@ export class AgentService extends EventEmitter {
         await this.scanOrchestrator.syncWithNetwork();
         const hosts = await this.hostDb.getAllHosts();
 
-        this.sendCommandResult(commandId, {
+        this.sendCommandResult(command.type, commandId, {
           success: true,
           message: `Scan completed, found ${hosts.length} hosts`,
-        });
+        }, startedAtMs);
 
         logger.info('Scan command completed', { commandId, hostCount: hosts.length });
       } else {
@@ -534,10 +545,10 @@ export class AgentService extends EventEmitter {
           });
         }, 0);
 
-        this.sendCommandResult(commandId, {
+        this.sendCommandResult(command.type, commandId, {
           success: true,
           message: 'Background scan scheduled',
-        });
+        }, startedAtMs);
 
         logger.info('Scan command scheduled in background', { commandId });
       }
@@ -545,10 +556,10 @@ export class AgentService extends EventEmitter {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Scan command failed', { commandId, error: message });
 
-      this.sendCommandResult(commandId, {
+      this.sendCommandResult(command.type, commandId, {
         success: false,
         error: message,
-      });
+      }, startedAtMs);
     }
   }
 
@@ -557,13 +568,14 @@ export class AgentService extends EventEmitter {
    */
   private async handleUpdateHostCommand(command: UpdateHostCommand): Promise<void> {
     const { commandId } = command;
+    const startedAtMs = Date.now();
 
     if (!this.hostDb) {
       logger.error('Host database not initialized');
-      this.sendCommandResult(commandId, {
+      this.sendCommandResult(command.type, commandId, {
         success: false,
         error: 'Host database not initialized',
-      });
+      }, startedAtMs);
       return;
     }
 
@@ -594,21 +606,21 @@ export class AgentService extends EventEmitter {
         this.sendHostUpdated(updated);
       }
 
-      this.sendCommandResult(commandId, {
+      this.sendCommandResult(command.type, commandId, {
         success: true,
         message:
           currentName === data.name
             ? `Host ${data.name} updated successfully`
             : `Host ${currentName} renamed to ${data.name} and updated successfully`,
-      });
+      }, startedAtMs);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Update-host command failed', { commandId, error: message });
 
-      this.sendCommandResult(commandId, {
+      this.sendCommandResult(command.type, commandId, {
         success: false,
         error: message,
-      });
+      }, startedAtMs);
     }
   }
 
@@ -618,15 +630,16 @@ export class AgentService extends EventEmitter {
   private async handleDeleteHostCommand(command: DeleteHostCommand): Promise<void> {
     const { commandId, data } = command;
     const { name } = data;
+    const startedAtMs = Date.now();
 
     logger.info('Received delete-host command from C&C', { commandId, name });
 
     if (!this.hostDb) {
       logger.error('Host database not initialized');
-      this.sendCommandResult(commandId, {
+      this.sendCommandResult(command.type, commandId, {
         success: false,
         error: 'Host database not initialized',
-      });
+      }, startedAtMs);
       return;
     }
 
@@ -634,18 +647,18 @@ export class AgentService extends EventEmitter {
       await this.hostDb.deleteHost(name);
       this.sendHostRemoved(name);
 
-      this.sendCommandResult(commandId, {
+      this.sendCommandResult(command.type, commandId, {
         success: true,
         message: `Host ${name} deleted successfully`,
-      });
+      }, startedAtMs);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Delete-host command failed', { commandId, error: message });
 
-      this.sendCommandResult(commandId, {
+      this.sendCommandResult(command.type, commandId, {
         success: false,
         error: message,
-      });
+      }, startedAtMs);
     }
   }
 

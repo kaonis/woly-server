@@ -1,8 +1,6 @@
 import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 import os from 'os';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
 import { ZodError } from 'zod';
@@ -20,30 +18,13 @@ import {
   SUPPORTED_PROTOCOL_VERSIONS,
 } from '@kaonis/woly-protocol';
 import { logger } from '../utils/logger';
+import { NODE_AGENT_VERSION } from '../utils/nodeAgentVersion';
+import { runtimeTelemetry } from './runtimeTelemetry';
 
 const FALLBACK_NETWORK_INFO = {
   subnet: '0.0.0.0/0',
   gateway: '0.0.0.0',
 };
-
-function getNodeAgentVersion(): string {
-  try {
-    const packageJsonPath = join(__dirname, '../../package.json');
-    const packageJsonRaw = readFileSync(packageJsonPath, 'utf-8');
-    const packageJson = JSON.parse(packageJsonRaw) as { version?: unknown };
-    if (typeof packageJson.version === 'string' && packageJson.version.trim().length > 0) {
-      return packageJson.version;
-    }
-  } catch (error) {
-    logger.warn('Failed to resolve node-agent version from package.json', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-
-  return '0.0.0';
-}
-
-const NODE_AGENT_VERSION = getNodeAgentVersion();
 
 /**
  * C&C Client Service
@@ -310,6 +291,7 @@ export class CncClient extends EventEmitter {
     }
 
     if (data.protocolVersion && !SUPPORTED_PROTOCOL_VERSIONS.includes(data.protocolVersion)) {
+      runtimeTelemetry.recordProtocolUnsupported();
       logger.error('Protocol version mismatch during registration', {
         receivedProtocolVersion: data.protocolVersion,
         supportedProtocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
@@ -344,6 +326,7 @@ export class CncClient extends EventEmitter {
   }
 
   private handleProtocolError(message: string): void {
+    runtimeTelemetry.recordProtocolError();
     logger.warn('Received protocol error from C&C', { message });
     this.emit('protocol-error', { message });
   }
@@ -389,10 +372,12 @@ export class CncClient extends EventEmitter {
     this.ws = null;
 
     if (this.isExpiredAuthFailure(code, reasonText)) {
+      runtimeTelemetry.recordAuthExpired();
       logger.warn('C&C rejected authentication: token expired');
       this.invalidateSessionToken();
       this.emit('auth-expired');
     } else if (this.isRevokedAuthFailure(code, reasonText)) {
+      runtimeTelemetry.recordAuthRevoked();
       logger.error('C&C rejected authentication: token revoked or invalid');
       this.invalidateSessionToken();
       this.emit('auth-revoked');
@@ -428,6 +413,7 @@ export class CncClient extends EventEmitter {
       agentConfig.maxReconnectAttempts > 0 &&
       this.reconnectAttempts >= agentConfig.maxReconnectAttempts
     ) {
+      runtimeTelemetry.recordReconnectFailed();
       logger.error('Max reconnection attempts reached, giving up');
       this.emit('reconnect-failed');
       return;
@@ -435,6 +421,7 @@ export class CncClient extends EventEmitter {
 
     this.reconnectAttempts++;
     const delay = agentConfig.reconnectInterval;
+    runtimeTelemetry.recordReconnectScheduled();
 
     logger.info('Scheduling reconnection', {
       attempt: this.reconnectAttempts,
@@ -534,6 +521,7 @@ export class CncClient extends EventEmitter {
     const status = this.extractHttpStatus(error);
 
     if (status === 401) {
+      runtimeTelemetry.recordAuthExpired();
       logger.warn('Session token request rejected: bootstrap token expired');
       this.invalidateSessionToken();
       this.emit('auth-expired');
@@ -541,12 +529,14 @@ export class CncClient extends EventEmitter {
     }
 
     if (status === 403) {
+      runtimeTelemetry.recordAuthRevoked();
       logger.error('Session token request rejected: bootstrap token revoked');
       this.invalidateSessionToken();
       this.emit('auth-revoked');
       return;
     }
 
+    runtimeTelemetry.recordAuthUnavailable();
     logger.warn('Session token service unavailable', { error });
     this.emit('auth-unavailable');
   }
@@ -614,6 +604,7 @@ export class CncClient extends EventEmitter {
     error: unknown;
   }): void {
     const { direction, correlationId, messageType, rawData, error } = params;
+    runtimeTelemetry.recordProtocolValidationFailure(direction);
     const validationIssues =
       error instanceof ZodError
         ? error.issues.map((issue) => ({

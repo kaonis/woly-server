@@ -151,6 +151,40 @@ const options: swaggerJsdoc.Options = {
               description: 'Current environment',
               example: 'development',
             },
+            build: {
+              type: 'object',
+              properties: {
+                version: {
+                  type: 'string',
+                  description: 'Node-agent build version',
+                  example: '0.0.1',
+                },
+                protocolVersion: {
+                  type: 'string',
+                  description: 'Active protocol version',
+                  example: '1.0.0',
+                },
+              },
+            },
+            agent: {
+              type: 'object',
+              properties: {
+                mode: {
+                  type: 'string',
+                  enum: ['standalone', 'agent'],
+                  example: 'agent',
+                },
+                authMode: {
+                  type: 'string',
+                  enum: ['standalone', 'static-token', 'session-token'],
+                  example: 'session-token',
+                },
+                connected: {
+                  type: 'boolean',
+                  example: true,
+                },
+              },
+            },
             checks: {
               type: 'object',
               properties: {
@@ -165,6 +199,11 @@ const options: swaggerJsdoc.Options = {
                   example: 'idle',
                 },
               },
+            },
+            telemetry: {
+              type: 'object',
+              description:
+                'Runtime counters for reconnect/auth/protocol validation and command latency',
             },
           },
         },

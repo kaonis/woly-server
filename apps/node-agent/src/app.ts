@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
+import { PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from '@kaonis/woly-protocol';
 import { config } from './config';
 import { agentConfig } from './config/agent';
 import { logger } from './utils/logger';
@@ -14,6 +15,8 @@ import hosts from './routes/hosts';
 import { agentService } from './services/agentService';
 import { evaluateCorsOrigin } from './utils/corsOrigin';
 import { healthLimiter } from './middleware/rateLimiter';
+import { NODE_AGENT_VERSION } from './utils/nodeAgentVersion';
+import { runtimeTelemetry } from './services/runtimeTelemetry';
 
 const app = express();
 
@@ -58,9 +61,36 @@ app.use(express.json({ limit: '100kb' }));
 const hostDb = new HostDatabase(config.database.path);
 const scanOrchestrator = new ScanOrchestrator(hostDb);
 
+function getAgentAuthMode(): 'standalone' | 'static-token' | 'session-token' {
+  if (agentConfig.mode !== 'agent') {
+    return 'standalone';
+  }
+
+  return agentConfig.sessionTokenUrl ? 'session-token' : 'static-token';
+}
+
+function logStartupDiagnostics(): void {
+  logger.info('Node agent startup diagnostics', {
+    buildVersion: NODE_AGENT_VERSION,
+    protocolVersion: PROTOCOL_VERSION,
+    supportedProtocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
+    mode: agentConfig.mode,
+    authMode: getAgentAuthMode(),
+    wsQueryTokenFallbackEnabled: agentConfig.wsAllowQueryTokenFallback,
+    nodeId: agentConfig.nodeId || undefined,
+    location: agentConfig.location || undefined,
+    environment: config.server.env,
+    nodeRuntime: process.version,
+    platform: process.platform,
+  });
+}
+
 // Initialize and start the server
 async function startServer() {
   try {
+    runtimeTelemetry.reset();
+    logStartupDiagnostics();
+
     // Initialize database (create tables, seed data)
     await hostDb.initialize();
 
@@ -135,10 +165,20 @@ async function startServer() {
         timestamp: Date.now(),
         status: 'ok',
         environment: config.server.env,
+        build: {
+          version: NODE_AGENT_VERSION,
+          protocolVersion: PROTOCOL_VERSION,
+        },
+        agent: {
+          mode: agentConfig.mode,
+          authMode: getAgentAuthMode(),
+          connected: agentConfig.mode === 'agent' ? agentService.isActive() : false,
+        },
         checks: {
           database: 'unknown',
           networkScan: 'unknown',
         },
+        telemetry: runtimeTelemetry.snapshot(),
       };
 
       try {
