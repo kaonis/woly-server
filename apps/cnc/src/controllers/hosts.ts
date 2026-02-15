@@ -21,6 +21,8 @@ const updateHostBodySchema = z.object({
   mac: z.string().regex(MAC_ADDRESS_PATTERN).optional(),
   ip: ipAddressSchema.optional(),
   status: hostStatusSchema.optional(),
+  notes: z.string().max(2_000).nullable().optional(),
+  tags: z.array(z.string().min(1).max(64)).max(32).optional(),
 }).strict();
 
 export class HostsController {
@@ -292,10 +294,27 @@ export class HostsController {
    *     requestBody:
    *       required: true
    *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             description: Host properties to update
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             description: Host properties to update
+ *             properties:
+ *               name:
+ *                 type: string
+ *               mac:
+ *                 type: string
+ *               ip:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *                 enum: [awake, asleep]
+ *               notes:
+ *                 type: string
+ *                 nullable: true
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
    *     responses:
    *       200:
    *         description: Host updated successfully

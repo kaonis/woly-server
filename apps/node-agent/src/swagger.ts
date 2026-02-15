@@ -109,6 +109,20 @@ const options: swaggerJsdoc.Options = {
               example: 1,
               nullable: true,
             },
+            notes: {
+              type: 'string',
+              description: 'Optional operator notes for this host',
+              example: 'Hypervisor host in rack 2',
+              nullable: true,
+            },
+            tags: {
+              type: 'array',
+              description: 'Optional tags for filtering/grouping hosts',
+              items: {
+                type: 'string',
+              },
+              example: ['infra', 'linux'],
+            },
           },
           required: ['name', 'mac', 'ip', 'status'],
         },

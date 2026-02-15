@@ -61,6 +61,26 @@ describe('hostSchema', () => {
     expect(hostSchema.safeParse(withoutPing).success).toBe(true);
   });
 
+  it('accepts host with notes and tags metadata', () => {
+    expect(
+      hostSchema.safeParse({
+        ...validHost,
+        notes: 'Preferred machine for deployments',
+        tags: ['prod', 'linux'],
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts host with null notes and empty tags', () => {
+    expect(
+      hostSchema.safeParse({
+        ...validHost,
+        notes: null,
+        tags: [],
+      }).success
+    ).toBe(true);
+  });
+
   it('rejects empty name', () => {
     expect(hostSchema.safeParse({ ...validHost, name: '' }).success).toBe(false);
   });
@@ -72,6 +92,10 @@ describe('hostSchema', () => {
 
   it('rejects non-integer discovered', () => {
     expect(hostSchema.safeParse({ ...validHost, discovered: 1.5 }).success).toBe(false);
+  });
+
+  it('rejects tag metadata with empty values', () => {
+    expect(hostSchema.safeParse({ ...validHost, tags: [''] }).success).toBe(false);
   });
 });
 
@@ -449,6 +473,8 @@ describe('inboundCncCommandSchema', () => {
           mac: 'AA:BB:CC:DD:EE:FF',
           ip: '192.168.1.50',
           status: 'awake' as const,
+          notes: 'Renamed workstation',
+          tags: ['desk', 'critical'],
         },
       };
       expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);

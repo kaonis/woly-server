@@ -572,6 +572,8 @@ describe('AgentService command handlers', () => {
       mac: undefined,
       ip: '192.168.1.101',
       status: undefined,
+      notes: undefined,
+      tags: undefined,
     });
     expect(hostDbMock.getHost).toHaveBeenNthCalledWith(2, 'RENAMED-HOST');
     expect(sendHostUpdatedSpy).toHaveBeenCalledWith(updatedHost);
@@ -605,6 +607,44 @@ describe('AgentService command handlers', () => {
           commandId: 'cmd-update-missing',
           success: false,
           error: 'Host MISSING-HOST not found',
+        }),
+      })
+    );
+  });
+
+  it('supports update-host metadata fields notes/tags', async () => {
+    hostDbMock.getHost.mockResolvedValueOnce(sampleHost).mockResolvedValueOnce({
+      ...sampleHost,
+      notes: 'Rack 9',
+      tags: ['lab', 'primary'],
+    } as Host);
+
+    await ((service as unknown) as {
+      handleUpdateHostCommand: (command: unknown) => Promise<void>;
+    }).handleUpdateHostCommand({
+      type: 'update-host',
+      commandId: 'cmd-update-metadata',
+      data: {
+        name: 'PHANTOM-MBP',
+        notes: 'Rack 9',
+        tags: ['lab', 'primary'],
+      },
+    });
+
+    expect(hostDbMock.updateHost).toHaveBeenCalledWith('PHANTOM-MBP', {
+      name: 'PHANTOM-MBP',
+      mac: undefined,
+      ip: undefined,
+      status: undefined,
+      notes: 'Rack 9',
+      tags: ['lab', 'primary'],
+    });
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-update-metadata',
+          success: true,
         }),
       })
     );
@@ -683,6 +723,32 @@ describe('AgentService command handlers', () => {
           commandId: 'cmd-update-invalid-mac',
           success: false,
           error: 'Invalid update-host payload: mac has invalid format',
+        }),
+      })
+    );
+  });
+
+  it('rejects update-host payload with invalid tags metadata', async () => {
+    await ((service as unknown) as {
+      handleUpdateHostCommand: (command: unknown) => Promise<void>;
+    }).handleUpdateHostCommand({
+      type: 'update-host',
+      commandId: 'cmd-update-invalid-tags',
+      data: {
+        name: 'PHANTOM-MBP',
+        tags: [''],
+      },
+    });
+
+    expect(hostDbMock.getHost).not.toHaveBeenCalled();
+    expect(hostDbMock.updateHost).not.toHaveBeenCalled();
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-update-invalid-tags',
+          success: false,
+          error: 'Invalid update-host payload: each tag must be between 1 and 64 characters',
         }),
       })
     );

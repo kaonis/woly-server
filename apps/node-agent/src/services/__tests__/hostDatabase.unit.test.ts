@@ -182,11 +182,32 @@ describe('HostDatabase', () => {
       expect(newHost.status).toBe('asleep');
       expect(newHost.discovered).toBe(0);
       expect(newHost.pingResponsive).toBe(null);
+      expect(newHost.notes).toBe(null);
+      expect(newHost.tags).toEqual([]);
 
       // Verify it's in the database
       const retrieved = await db.getHost('TestHost');
       expect(retrieved).toBeDefined();
       expect(retrieved?.name).toBe('TestHost');
+      expect(retrieved?.notes).toBe(null);
+      expect(retrieved?.tags).toEqual([]);
+    });
+
+    it('should persist notes/tags metadata on create and update', async () => {
+      await db.addHost('MetadataHost', 'AA:BB:CC:DD:EE:88', '192.168.1.188', {
+        notes: 'Rack 7 - top shelf',
+        tags: ['lab', 'linux'],
+      });
+
+      await db.updateHost('MetadataHost', {
+        notes: null,
+        tags: ['primary', 'ssh'],
+      });
+
+      const updated = await db.getHost('MetadataHost');
+      expect(updated).toBeDefined();
+      expect(updated?.notes).toBe(null);
+      expect(updated?.tags).toEqual(['primary', 'ssh']);
     });
 
     it('should normalize MAC addresses on insert so scan updates match', async () => {
