@@ -6,13 +6,12 @@ Scope: New autonomous cycle after V8 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `38daddf` (PR #186).
-- Active execution branch: `docs/187-roadmap-v9-bootstrap`.
+- `master` synced at merge commit `70ccae6` (PR #189).
+- Active execution branch: `docs/188-manual-ci-review-cycle`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #187 `[Roadmap] Close V8 and bootstrap ROADMAP_V9`
 - #188 `[CI] Run next weekly manual-only operations review log update`
 
 ### CI snapshot
@@ -21,6 +20,7 @@ Scope: New autonomous cycle after V8 closeout.
 - Manual workflow jobs are capped to `timeout-minutes: 8`.
 - Local manual-only run audit command is available: `npm run ci:audit:manual`.
 - Latest manual ESLint10 watchdog run succeeded: `22037969724` (2026-02-15).
+- Latest manual-only audit passed: `npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --fail-on-unexpected` (2026-02-15).
 
 ## 2. Iterative Phases
 
@@ -32,7 +32,7 @@ Acceptance criteria:
 - Finalize V8 status after #185 merge.
 - Publish `docs/ROADMAP_V9.md` with carry-forward phases and issue links.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #189)
 
 ### Phase 2: ESLint 10 compatibility unblock monitoring
 Issue: #150  
@@ -54,7 +54,7 @@ Acceptance criteria:
 - Append decision entry to `docs/CI_MANUAL_REVIEW_LOG.md`.
 - Update roadmap progress with decision outcome.
 
-Status: `Planned` (2026-02-15)
+Status: `In Progress` (2026-02-15)
 
 ### Phase 4: Dependency dashboard checkpoint cadence
 Issue: #4  
@@ -86,3 +86,5 @@ For each phase:
 - 2026-02-15: Bootstrapped ROADMAP_V9 from issue #187 after merging phase #185 (PR #186).
 - 2026-02-15: Carried forward blocker issue #150 pending ESLint 10 peer support in `@typescript-eslint/*`.
 - 2026-02-15: Added issue #188 for the next weekly manual-only CI review cycle.
+- 2026-02-15: Merged issue #187 via PR #189 and published ROADMAP_V9 on master.
+- 2026-02-15: Started issue #188 on branch `docs/188-manual-ci-review-cycle` and executed scoped `ci:audit:manual` check with no unexpected automatic runs.

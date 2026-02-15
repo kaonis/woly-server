@@ -35,3 +35,13 @@ Period reviewed: post-merge cycle (#172 to #178)
 - Budget and throughput assessment: No new automatic Actions consumption; manual watchdog dispatch and local-gate-first policy remain effective.
 - Decision: Continue manual-only
 - Follow-up actions: Keep weekly review cadence and reassess rollback criteria when budget posture changes.
+
+Date: 2026-02-15
+Reviewer: Codex autonomous loop
+Period reviewed: post-merge cycle (#179 to #187)
+
+- Unexpected automatic workflow runs observed: No
+- Local gate policy followed: Yes
+- Budget and throughput assessment: Scoped audit (`ci:audit:manual --since 2026-02-15T15:11:32Z`) confirmed only manual dispatch events; budget controls remain effective.
+- Decision: Continue manual-only
+- Follow-up actions: Continue weekly audits using `ci:audit:manual` and reassess rollback criteria when budget posture changes.
