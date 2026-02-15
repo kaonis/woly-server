@@ -41,12 +41,14 @@ describe('AgentService command handlers', () => {
   let service: AgentService;
   let mockCncClient: MockCncClient;
   let hostDbMock: {
-    syncWithNetwork: jest.Mock;
     getAllHosts: jest.Mock;
     getHost: jest.Mock;
     getHostByMAC: jest.Mock;
     updateHost: jest.Mock;
     deleteHost: jest.Mock;
+  };
+  let scanOrchestratorMock: {
+    syncWithNetwork: jest.Mock;
   };
 
   const sampleHost: Host = {
@@ -66,14 +68,17 @@ describe('AgentService command handlers', () => {
     mockCncClient.removeAllListeners();
     service = new AgentService();
     hostDbMock = {
-      syncWithNetwork: jest.fn().mockResolvedValue(undefined),
       getAllHosts: jest.fn().mockResolvedValue([sampleHost]),
       getHost: jest.fn(),
       getHostByMAC: jest.fn(),
       updateHost: jest.fn().mockResolvedValue(undefined),
       deleteHost: jest.fn().mockResolvedValue(undefined),
     };
+    scanOrchestratorMock = {
+      syncWithNetwork: jest.fn().mockResolvedValue(undefined),
+    };
     ((service as unknown) as { hostDb: unknown }).hostDb = hostDbMock;
+    ((service as unknown) as { scanOrchestrator: unknown }).scanOrchestrator = scanOrchestratorMock;
     ((wakeOnLan.wake as unknown) as jest.Mock).mockImplementation(
       (_mac: string, callback: (error: Error | null) => void) => callback(null)
     );
@@ -305,7 +310,7 @@ describe('AgentService command handlers', () => {
       data: { immediate: true },
     });
 
-    expect(hostDbMock.syncWithNetwork).toHaveBeenCalledTimes(1);
+    expect(scanOrchestratorMock.syncWithNetwork).toHaveBeenCalledTimes(1);
     expect(hostDbMock.getAllHosts).toHaveBeenCalledTimes(1);
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -330,7 +335,7 @@ describe('AgentService command handlers', () => {
       data: { immediate: false },
     });
 
-    expect(hostDbMock.syncWithNetwork).not.toHaveBeenCalled();
+    expect(scanOrchestratorMock.syncWithNetwork).not.toHaveBeenCalled();
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'command-result',
@@ -344,11 +349,11 @@ describe('AgentService command handlers', () => {
 
     jest.runOnlyPendingTimers();
     await Promise.resolve();
-    expect(hostDbMock.syncWithNetwork).toHaveBeenCalledTimes(1);
+    expect(scanOrchestratorMock.syncWithNetwork).toHaveBeenCalledTimes(1);
   });
 
   it('sends scan failure when immediate scan throws', async () => {
-    hostDbMock.syncWithNetwork.mockRejectedValueOnce(new Error('scan failed'));
+    scanOrchestratorMock.syncWithNetwork.mockRejectedValueOnce(new Error('scan failed'));
 
     await ((service as unknown) as {
       handleScanCommand: (command: unknown) => Promise<void>;
@@ -365,6 +370,29 @@ describe('AgentService command handlers', () => {
           commandId: 'cmd-scan-fail',
           success: false,
           error: 'scan failed',
+        }),
+      })
+    );
+  });
+
+  it('returns scan-orchestrator error when scan dependencies are incomplete', async () => {
+    ((service as unknown) as { scanOrchestrator: unknown }).scanOrchestrator = null;
+
+    await ((service as unknown) as {
+      handleScanCommand: (command: unknown) => Promise<void>;
+    }).handleScanCommand({
+      type: 'scan',
+      commandId: 'cmd-scan-no-orchestrator',
+      data: { immediate: true },
+    });
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-scan-no-orchestrator',
+          success: false,
+          error: 'Scan orchestrator not initialized',
         }),
       })
     );

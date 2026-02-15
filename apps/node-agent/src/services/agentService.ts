@@ -5,6 +5,7 @@ import { agentConfig, validateAgentConfig } from '../config/agent';
 import { logger } from '../utils/logger';
 import { CncCommand, Host } from '../types';
 import HostDatabase from './hostDatabase';
+import ScanOrchestrator from './scanOrchestrator';
 
 type WakeCommand = Extract<CncCommand, { type: 'wake' }>;
 type ScanCommand = Extract<CncCommand, { type: 'scan' }>;
@@ -29,6 +30,7 @@ export class AgentService extends EventEmitter {
   private isRunning = false;
   private hostCache: Map<string, Host> = new Map();
   private hostDb: HostDatabase | null = null;
+  private scanOrchestrator: ScanOrchestrator | null = null;
 
   constructor() {
     super();
@@ -57,6 +59,10 @@ export class AgentService extends EventEmitter {
     this.hostDb.on('scan-complete', (hostCount: number) => {
       this.sendScanComplete(hostCount);
     });
+  }
+
+  public setScanOrchestrator(orchestrator: ScanOrchestrator | null): void {
+    this.scanOrchestrator = orchestrator;
   }
 
   /**
@@ -358,10 +364,18 @@ export class AgentService extends EventEmitter {
       });
       return;
     }
+    if (!this.scanOrchestrator) {
+      logger.error('Scan orchestrator not initialized');
+      this.sendCommandResult(commandId, {
+        success: false,
+        error: 'Scan orchestrator not initialized',
+      });
+      return;
+    }
 
     try {
       if (immediate) {
-        await this.hostDb.syncWithNetwork();
+        await this.scanOrchestrator.syncWithNetwork();
         const hosts = await this.hostDb.getAllHosts();
 
         this.sendCommandResult(commandId, {
@@ -371,9 +385,9 @@ export class AgentService extends EventEmitter {
 
         logger.info('Scan command completed', { commandId, hostCount: hosts.length });
       } else {
-        const hostDb = this.hostDb;
+        const scanOrchestrator = this.scanOrchestrator;
         setTimeout(() => {
-          hostDb.syncWithNetwork().catch((backgroundError: unknown) => {
+          scanOrchestrator.syncWithNetwork().catch((backgroundError: unknown) => {
             const message =
               backgroundError instanceof Error ? backgroundError.message : 'Unknown error';
             logger.error('Background scan command failed', { commandId, error: message });

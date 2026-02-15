@@ -1,6 +1,7 @@
 import request from 'supertest';
 import express from 'express';
 import HostDatabase from '../services/hostDatabase';
+import ScanOrchestrator from '../services/scanOrchestrator';
 import hosts from '../routes/hosts';
 import * as hostsController from '../controllers/hosts';
 import * as networkDiscovery from '../services/networkDiscovery';
@@ -16,6 +17,7 @@ jest.mock('axios');
 describe('API Integration Tests', () => {
   let app: express.Application;
   let db: HostDatabase;
+  let scanOrchestrator: ScanOrchestrator;
 
   beforeAll(async () => {
     // Setup express app
@@ -25,9 +27,11 @@ describe('API Integration Tests', () => {
     // Setup in-memory database
     db = new HostDatabase(':memory:');
     await db.initialize();
+    scanOrchestrator = new ScanOrchestrator(db);
 
     // Inject database into controller
     hostsController.setHostDatabase(db);
+    hostsController.setScanOrchestrator(scanOrchestrator);
 
     // Setup routes
     app.use('/hosts', hosts);
@@ -43,6 +47,7 @@ describe('API Integration Tests', () => {
   });
 
   afterAll(async () => {
+    scanOrchestrator.stopPeriodicSync();
     await db.close();
   });
 

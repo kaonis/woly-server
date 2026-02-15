@@ -124,7 +124,7 @@ describe('App initialization and health endpoint', () => {
       const mockDb = new HostDatabase(':memory:');
       expect(mockDb).toBeDefined();
       expect(mockDb.initialize).toBeDefined();
-      expect(mockDb.startPeriodicSync).toBeDefined();
+      expect(mockDb.close).toBeDefined();
     });
   });
 

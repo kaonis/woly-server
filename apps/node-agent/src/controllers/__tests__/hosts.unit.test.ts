@@ -10,6 +10,11 @@ jest.mock('wake_on_lan');
 
 describe('hosts controller', () => {
   let mockDb: jest.Mocked<HostDatabase>;
+  let mockScanOrchestrator: {
+    syncWithNetwork: jest.Mock;
+    isScanInProgress: jest.Mock;
+    getLastScanTime: jest.Mock;
+  };
   let mockReq: Partial<Request>;
   let mockRes: Partial<Response>;
 
@@ -23,17 +28,18 @@ describe('hosts controller', () => {
       deleteHost: jest.fn(),
       updateHostStatus: jest.fn(),
       updateHostSeen: jest.fn(),
-      syncWithNetwork: jest.fn(),
       initialize: jest.fn(),
       close: jest.fn(),
       createTable: jest.fn(),
       seedInitialHosts: jest.fn(),
-      startPeriodicSync: jest.fn(),
-      stopPeriodicSync: jest.fn(),
-      isScanInProgress: jest.fn().mockReturnValue(false),
-      getLastScanTime: jest.fn().mockReturnValue(null),
       emit: jest.fn(),
     } as any;
+
+    mockScanOrchestrator = {
+      syncWithNetwork: jest.fn(),
+      isScanInProgress: jest.fn().mockReturnValue(false),
+      getLastScanTime: jest.fn().mockReturnValue(null),
+    };
 
     // Create mock request
     mockReq = {
@@ -52,6 +58,7 @@ describe('hosts controller', () => {
 
     // Set database for controller
     hostsController.setHostDatabase(mockDb);
+    hostsController.setScanOrchestrator(mockScanOrchestrator as any);
 
     // Clear all mocks
     jest.clearAllMocks();
@@ -248,12 +255,12 @@ describe('hosts controller', () => {
           discovered: 1,
         },
       ];
-      mockDb.syncWithNetwork.mockResolvedValue(undefined);
+      mockScanOrchestrator.syncWithNetwork.mockResolvedValue(undefined);
       mockDb.getAllHosts.mockResolvedValue(mockHosts as any);
 
       await hostsController.scanNetwork(mockReq as Request, mockRes as Response);
 
-      expect(mockDb.syncWithNetwork).toHaveBeenCalled();
+      expect(mockScanOrchestrator.syncWithNetwork).toHaveBeenCalled();
       expect(mockDb.getAllHosts).toHaveBeenCalled();
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -264,7 +271,7 @@ describe('hosts controller', () => {
     });
 
     it('should handle network scan errors', async () => {
-      mockDb.syncWithNetwork.mockRejectedValue(new Error('Network error'));
+      mockScanOrchestrator.syncWithNetwork.mockRejectedValue(new Error('Network error'));
 
       // Controller now throws errors for Express error handler to catch
       await expect(

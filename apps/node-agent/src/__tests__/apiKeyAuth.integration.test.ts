@@ -1,10 +1,14 @@
 import request from 'supertest';
 import express from 'express';
 import HostDatabase from '../services/hostDatabase';
+import ScanOrchestrator from '../services/scanOrchestrator';
+import * as networkDiscovery from '../services/networkDiscovery';
 import hosts from '../routes/hosts';
 import * as hostsController from '../controllers/hosts';
 import { errorHandler, notFoundHandler } from '../middleware/errorHandler';
 import { config } from '../config';
+
+jest.mock('../services/networkDiscovery');
 
 // Mock config module
 jest.mock('../config', () => ({
@@ -42,6 +46,7 @@ jest.mock('../config', () => ({
 describe('API Key Authentication Integration Tests', () => {
   let app: express.Application;
   let db: HostDatabase;
+  let scanOrchestrator: ScanOrchestrator;
   const validApiKey = 'test-api-key-12345';
 
   // Helper to recreate app with different config
@@ -53,7 +58,9 @@ describe('API Key Authentication Integration Tests', () => {
     if (!db) {
       db = new HostDatabase(':memory:');
       await db.initialize();
+      scanOrchestrator = new ScanOrchestrator(db);
       hostsController.setHostDatabase(db);
+      hostsController.setScanOrchestrator(scanOrchestrator);
     }
 
     // Setup routes
@@ -75,7 +82,18 @@ describe('API Key Authentication Integration Tests', () => {
     app = await createApp();
   });
 
+  beforeEach(() => {
+    (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue([]);
+    (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(true);
+    (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
+      mac.toUpperCase().replace(/-/g, ':')
+    );
+  });
+
   afterAll(async () => {
+    if (scanOrchestrator) {
+      scanOrchestrator.stopPeriodicSync();
+    }
     if (db) {
       await db.close();
     }

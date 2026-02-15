@@ -5,10 +5,12 @@ import { LRUCache } from 'lru-cache';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import HostDatabase from '../services/hostDatabase';
+import ScanOrchestrator from '../services/scanOrchestrator';
 import { Host, MacVendorCacheEntry } from '../types';
 
 // Database service will be set by app.js
 let hostDb: HostDatabase | null = null;
+let scanOrchestrator: ScanOrchestrator | null = null;
 
 // MAC vendor cache with automatic TTL and size limit
 const macVendorCache = new LRUCache<string, MacVendorCacheEntry>({
@@ -17,8 +19,12 @@ const macVendorCache = new LRUCache<string, MacVendorCacheEntry>({
 });
 let lastMacVendorRequest = 0;
 
-function setHostDatabase(db: HostDatabase): void {
+function setHostDatabase(db: HostDatabase | null): void {
   hostDb = db;
+}
+
+function setScanOrchestrator(orchestrator: ScanOrchestrator | null): void {
+  scanOrchestrator = orchestrator;
 }
 
 /**
@@ -66,8 +72,8 @@ const getAllHosts = async (_req: Request, res: Response): Promise<void> => {
     return;
   }
   const hosts = await hostDb.getAllHosts();
-  const scanInProgress = hostDb.isScanInProgress();
-  const lastScanTime = hostDb.getLastScanTime();
+  const scanInProgress = scanOrchestrator?.isScanInProgress() ?? false;
+  const lastScanTime = scanOrchestrator?.getLastScanTime() ?? null;
 
   res.status(200).json({
     hosts,
@@ -284,8 +290,12 @@ const scanNetwork = async (_req: Request, res: Response): Promise<void> => {
     res.status(500).json({ error: 'Database not initialized' });
     return;
   }
+  if (!scanOrchestrator) {
+    res.status(500).json({ error: 'Scan orchestrator not initialized' });
+    return;
+  }
   logger.info('Manual network scan requested');
-  await hostDb.syncWithNetwork();
+  await scanOrchestrator.syncWithNetwork();
 
   const hosts = await hostDb.getAllHosts();
   res.status(200).json({
@@ -649,6 +659,7 @@ const getMacVendor = async (req: Request, res: Response): Promise<void> => {
 
 export {
   setHostDatabase,
+  setScanOrchestrator,
   getAllHosts,
   getHost,
   wakeUpHost,

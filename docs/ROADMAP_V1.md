@@ -12,6 +12,8 @@ Scope: `kaonis/woly-server` primary delivery, with regular compatibility checks 
 ### GitHub issues snapshot (`kaonis/woly-server`)
 - Open issues reviewed on 2026-02-15.
 - Existing relevant issues:
+  - #85 `[Node Agent] Extract scan orchestration from HostDatabase (SRP)`
+  - #88 `[Code Review] Misc code quality: async NBT lookup, SQL dedup, isSqlite, cncClient TODOs`
   - #86 `[Monorepo] Remove unused dependencies`
   - #93 `[Testing] Protocol coverage, CORS tests, raise thresholds, fix preflight version check`
   - #83 `[Node Agent] Restrict default CORS and rate-limit health endpoint`
@@ -83,7 +85,31 @@ Acceptance criteria:
 - Restrictive default CORS in production and health endpoint rate limiting (#83).
 - Standalone REST `PUT /hosts/:name` and `DELETE /hosts/:name` with tests/docs (#89).
 
-Status: `In Progress` (starting with #83)
+Status: `Completed` (2026-02-15 via PR #116 and PR #117)
+
+### Phase 5: Node-agent scan orchestration refactor
+Issue: #85  
+Labels: `priority:medium`, `architecture`, `node-agent`
+
+Acceptance criteria:
+- `HostDatabase` only owns CRUD + host event emission.
+- New `ScanOrchestrator` owns scan scheduling, sync orchestration, and concurrent-scan guardrails.
+- App wiring and agent/controller scan paths use `ScanOrchestrator` without behavior regressions.
+- Unit/integration coverage remains above threshold and green.
+
+Status: `In Progress` (2026-02-15)
+
+### Phase 6: Code review quality debt burn-down
+Issue: #88  
+Labels: `priority:medium`, `technical-debt`
+
+Acceptance criteria:
+- Replace blocking NetBIOS hostname lookup with async execution in node-agent discovery flow.
+- Deduplicate repeated host SELECT column mapping in C&C host aggregation service.
+- Introduce centralized `isSqlite` capability on the DB abstraction and use it in touched call sites.
+- Resolve node-agent `cncClient` registration TODO placeholders for version/subnet/gateway metadata.
+
+Status: `Planned`
 
 ## 3. Execution Loop Rules for V1
 
@@ -117,4 +143,7 @@ For each issue phase:
 - 2026-02-15: Merged PR #116 (`fix: restrict default CORS and rate-limit health endpoint (#83)`).
 - 2026-02-15: Verified post-merge `master` CI and CodeQL runs are green.
 - 2026-02-15: Started remaining Phase 4 implementation on issue #89 (`fix/89-node-agent-rest-update-delete`).
-- Next: Open and merge PR for #89.
+- 2026-02-15: Merged PR #117 (`fix: add standalone REST update/delete host endpoints (#89)`).
+- 2026-02-15: Verified post-merge `master` CI and CodeQL runs are green.
+- 2026-02-15: Started Phase 5 implementation on issue #85 (`feat/85-scan-orchestrator`).
+- Next: Open and merge PR for #85, then continue Phase 6 on #88.
