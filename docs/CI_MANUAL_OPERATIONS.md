@@ -61,6 +61,13 @@ npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --fail-on-unexpected
 npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --json
 ```
 
+Run policy guard to verify workflow files still enforce manual-only mode:
+
+```bash
+npm run ci:policy:check
+npm run ci:policy:check -- --json
+```
+
 ## Rollback Criteria (Re-enable Automatic Runs)
 
 Re-enable automatic CI only when all of the following are true:
@@ -82,6 +89,7 @@ Weekly checklist:
 2. Verify manual-only policy still matches budget and throughput needs:
    - count merges since last review
    - count manually dispatched runs since last review
+   - `npm run ci:policy:check`
 3. Confirm local validation gate remains standard before merge:
    - `npm run lint`
    - `npm run typecheck`
