@@ -60,3 +60,4 @@ V15 is complete when all four issues (`#210`, `#228`, `#229`, `#150`) are resolv
 - 2026-02-15: Completed scoped manual-only workflow audit for `#210`:
   - `npm run ci:audit:manual -- --since 2026-02-15T17:07:43Z --fail-on-unexpected` (PASS; 2 runs, all `workflow_dispatch`).
 - 2026-02-15: Added CI review log entry for this window and created next rolling review issue `#230`.
+- 2026-02-15: Re-checked ESLint 10 compatibility for `#150` via `npm run deps:check-eslint10` (`2026-02-15T21:35:59Z`); status remains blocked because latest `@typescript-eslint` peer range is `^8.57.0 || ^9.0.0`.
