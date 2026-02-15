@@ -34,9 +34,9 @@ Assessment:
 
 ## Phase A: Backlog Hygiene + Fast Technical Debt
 
-- [ ] **A1** Replace hardcoded C&C version values with runtime package version lookup.  
+- [x] **A1** Replace hardcoded C&C version values with runtime package version lookup.  
   Issue: `#213` https://github.com/kaonis/woly-server/issues/213
-- [ ] **A2** Refresh improvements tracking docs to reflect implemented work and active backlog only.  
+- [x] **A2** Refresh improvements tracking docs to reflect implemented work and active backlog only.  
   Issue: `#214` https://github.com/kaonis/woly-server/issues/214
 
 ## Phase B: Observability
@@ -71,3 +71,9 @@ For each roadmap item:
 ## 5. Exit Criteria for V11
 
 V11 is complete when all A/B/C/D items are merged and validated by green gates (`lint`, `typecheck`, `test:ci`, `build`).
+
+## 6. Execution Log
+
+- 2026-02-15: Created V11 roadmap and linked issues `#213` to `#219`.
+- 2026-02-15: Completed and merged **A1** (`#213`) after full gate pass (`lint`, `typecheck`, `test:ci`, `build`).
+- 2026-02-15: Completed **A2** (`#214`) by reconciling `IMPROVEMENTS.md` and `.github/IMPROVEMENT_TRACKING.md` with actual issue/code status.

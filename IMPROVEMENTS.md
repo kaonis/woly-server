@@ -2,7 +2,7 @@
 
 This document tracks improvement ideas and feature requests for the WoLy distributed Wake-on-LAN system. Each section groups related ideas by category and priority.
 
-> **Status:** 2026-02-09 — Initial compilation of improvement ideas. Create individual GitHub issues for implementation tracking.
+> **Status:** 2026-02-15 — Reconciled with repository state and GitHub issues. Completed items are marked explicitly; active backlog items include issue links where available.
 
 ---
 
@@ -14,7 +14,7 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 | Priority | HIGH |
 |----------|------|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#52`) |
 | **Severity** | High |
 
 **Problem:** The node-agent API (`/hosts/*`) has zero authentication. All endpoints are publicly accessible. Anyone with network access can wake computers, add/delete hosts, trigger scans.
@@ -29,6 +29,7 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 **References:**
 - SECURITY_AUDIT.md §11
+- https://github.com/kaonis/woly-server/issues/52
 
 ---
 
@@ -36,7 +37,7 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 | Priority | MEDIUM |
 |----------|--------|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#53`) |
 | **Severity** | Medium |
 
 **Problem:** `GET /api/nodes`, `GET /api/nodes/:id`, `GET /api/nodes/:id/health` require no JWT. Node metadata (IDs, locations, capabilities, last heartbeat) is exposed to anyone.
@@ -50,6 +51,7 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 **References:**
 - SECURITY_AUDIT.md §12
+- https://github.com/kaonis/woly-server/issues/53
 
 ---
 
@@ -57,7 +59,7 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 | Priority | MEDIUM |
 |----------|--------|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#54`) |
 | **Severity** | Medium |
 
 **Problem:** `POST /api/auth/token` can be brute-forced with no throttling. No rate limiting exists on C&C endpoints.
@@ -72,6 +74,7 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 **References:**
 - SECURITY_AUDIT.md §13
+- https://github.com/kaonis/woly-server/issues/54
 
 ---
 
@@ -79,7 +82,7 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 | Priority | LOW |
 |----------|-----|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#55`) |
 | **Severity** | Low |
 
 **Problem:** A connected node could flood the server with messages.
@@ -94,6 +97,7 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 **References:**
 - SECURITY_AUDIT.md §14
+- https://github.com/kaonis/woly-server/issues/55
 
 ---
 
@@ -101,7 +105,7 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 | Priority | LOW |
 |----------|-----|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#56`) |
 | **Severity** | Low |
 
 **Problem:** An attacker could open many WebSocket connections from the same IP.
@@ -116,6 +120,7 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 **References:**
 - SECURITY_AUDIT.md §15
+- https://github.com/kaonis/woly-server/issues/56
 
 ---
 
@@ -123,7 +128,7 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 | Priority | LOW |
 |----------|-----|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#57`) |
 | **Severity** | Low |
 
 **Problem:** Node-agent CORS allows ANY `*.ngrok-free.app` and `*.netlify.app` subdomain. This is fine for development but too broad for production.
@@ -138,6 +143,7 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 **References:**
 - SECURITY_AUDIT.md §16
+- https://github.com/kaonis/woly-server/issues/57
 
 ---
 
@@ -145,7 +151,7 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 | Priority | LOW |
 |----------|-----|
-| **Status** | Not Implemented |
+| **Status** | Partial (`#58`) |
 | **Severity** | Low |
 
 **Problem:** `WS_SESSION_TOKEN_SECRETS` defaults to `JWT_SECRET`. If JWT secret is compromised, WebSocket session tokens are also compromised.
@@ -159,6 +165,10 @@ Based on the [SECURITY_AUDIT.md](SECURITY_AUDIT.md) known risks section.
 
 **References:**
 - SECURITY_AUDIT.md §17
+- https://github.com/kaonis/woly-server/issues/58
+
+**Notes:**
+- Dedicated `WS_SESSION_TOKEN_SECRETS` support exists, but fallback to `JWT_SECRET` still remains for compatibility.
 
 ---
 
@@ -170,7 +180,7 @@ Issues identified in code comments.
 
 | Priority | LOW |
 |----------|-----|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#88`) |
 
 **Problem:** `apps/node-agent/src/services/cncClient.ts:159` has hardcoded version `'1.0.0'`.
 
@@ -191,6 +201,7 @@ version: packageJson.version,
 
 **References:**
 - `apps/node-agent/src/services/cncClient.ts:159`
+- https://github.com/kaonis/woly-server/issues/88
 
 ---
 
@@ -198,7 +209,7 @@ version: packageJson.version,
 
 | Priority | MEDIUM |
 |----------|--------|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#88`) |
 
 **Problem:** `apps/node-agent/src/services/cncClient.ts:163-164` uses placeholder network info:
 ```typescript
@@ -222,6 +233,10 @@ networkInfo: {
 
 **References:**
 - `apps/node-agent/src/services/cncClient.ts:163-164`
+- https://github.com/kaonis/woly-server/issues/88
+
+**Notes:**
+- Current implementation derives subnet from interface CIDR and infers gateway from interface address; platform-specific route-table probing is not yet used.
 
 ---
 
@@ -249,6 +264,9 @@ New features to improve functionality.
 - Better host organization
 - Easier identification in multi-device environments
 
+**Tracking Issue:**
+- https://github.com/kaonis/woly-server/issues/216
+
 ---
 
 ### 3.2 Host Grouping/Tagging
@@ -270,6 +288,9 @@ New features to improve functionality.
 **Benefits:**
 - Bulk operations on host groups
 - Better organization for large networks
+
+**Tracking Issue:**
+- https://github.com/kaonis/woly-server/issues/216
 
 ---
 
@@ -314,6 +335,9 @@ New features to improve functionality.
 **Benefits:**
 - Immediate feedback to user
 - Detect WoL configuration issues
+
+**Tracking Issue:**
+- https://github.com/kaonis/woly-server/issues/217
 
 ---
 
@@ -391,7 +415,7 @@ New features to improve functionality.
 
 | Priority | MEDIUM |
 |----------|--------|
-| **Status** | Not Implemented |
+| **Status** | Partial |
 
 **Problem:** Health checks are basic, no detailed diagnostics.
 
@@ -408,6 +432,9 @@ New features to improve functionality.
 **Benefits:**
 - Better monitoring integration (Prometheus, Datadog)
 - Faster troubleshooting
+
+**Notes:**
+- Node-agent now exposes enhanced health diagnostics (`database`, `networkScan`, `agent`, telemetry), but C&C health diagnostics are still basic.
 
 ---
 
@@ -437,13 +464,16 @@ New features to improve functionality.
 - Performance insights
 - Alerting capabilities
 
+**Tracking Issue:**
+- https://github.com/kaonis/woly-server/issues/215
+
 ---
 
 ### 4.3 Structured Logging Improvements
 
 | Priority | LOW |
 |----------|-----|
-| **Status** | Not Implemented |
+| **Status** | Partial |
 
 **Problem:** Logs are good but could be better structured for log aggregation systems.
 
@@ -460,6 +490,9 @@ New features to improve functionality.
 - Better log aggregation
 - Easier troubleshooting
 - Compliance requirements
+
+**Notes:**
+- Correlation IDs are implemented on C&C API routes; broader structured logging standardization remains open.
 
 ---
 
@@ -511,6 +544,9 @@ New features to improve functionality.
 - Catch integration bugs
 - Document expected behavior
 - Confidence in releases
+
+**Tracking Issue:**
+- https://github.com/kaonis/woly-server/issues/218
 
 ---
 
@@ -707,15 +743,18 @@ New features to improve functionality.
 - Easier production deployment
 - Reduced support questions
 
+**Tracking Issue:**
+- https://github.com/kaonis/woly-server/issues/219
+
 ---
 
 ### 7.3 Architecture Decision Records (ADRs)
 
 | Priority | LOW |
 |----------|-----|
-| **Status** | Partial (CnC only) |
+| **Status** | Partial (app-level ADRs exist; root consolidation pending) |
 
-**Problem:** Some architectural decisions documented only in CnC app.
+**Problem:** ADRs exist in app-specific folders but are not consolidated in a single root-level ADR index.
 
 **Solution:** Consolidate ADRs in root docs/ directory.
 
@@ -783,11 +822,11 @@ New features to improve functionality.
 
 ## Implementation Priority Summary
 
-| Priority | Count | Focus |
-|----------|-------|-------|
-| **HIGH** | 1 | Security (Node-agent auth) |
-| **MEDIUM** | 10 | Security, Features, Ops, Docs |
-| **LOW** | 18 | Nice-to-have improvements |
+| Priority | Total Ideas | Current State |
+|----------|-------------|---------------|
+| **HIGH** | 1 | Completed (`#52`) |
+| **MEDIUM** | 11 | Mixed: planned + partial + active roadmap issues |
+| **LOW** | 20 | Mixed: planned + partial |
 
 ---
 
@@ -805,12 +844,12 @@ See individual GitHub issues for implementation tracking. Each improvement shoul
 
 ## Next Steps
 
-1. **Review and prioritize** — Maintainers review this list and adjust priorities
-2. **Create GitHub issues** — One issue per improvement idea
-3. **Label appropriately** — `enhancement`, `security`, `documentation`, etc.
+1. **Execute active roadmap issues first** — Start with `#214`, `#215`, `#216`, `#217`, `#218`, `#219`
+2. **Re-evaluate priority after each merge** — Keep this file aligned with real repo status
+3. **Create new issues only for net-new backlog gaps** — Avoid duplicates against closed work
 4. **Assign to milestones** — Group related improvements
 5. **Accept contributions** — Community PRs welcome!
 
 ---
 
-*Last updated: 2026-02-09*
+*Last updated: 2026-02-15*
