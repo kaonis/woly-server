@@ -61,7 +61,7 @@ Acceptance criteria:
 - Coverage threshold raised to 60% in node-agent.
 - Preflight scripts aligned with Node 24+ requirement.
 
-Status: `In Progress`
+Status: `Completed` (2026-02-15 via PR #114)
 
 ### Phase 3: Cross-repo compatibility guardrails
 Issue: #112  
@@ -72,7 +72,7 @@ Acceptance criteria:
 - Validate auth and error envelope compatibility with `kaonis/woly` service layer expectations.
 - Ensure CI fails on breaking API drift.
 
-Status: `Planned`
+Status: `In Progress`
 
 ### Phase 4: Node-agent security and API parity
 Issues:
@@ -108,4 +108,7 @@ For each issue phase:
 - 2026-02-15: Merged PR #113 (`fix: remove unused monorepo dependencies (#86)`).
 - 2026-02-15: Verified post-merge `master` CI and CodeQL runs are green.
 - 2026-02-15: Started Phase 2 implementation on issue #93 (`fix/93-testing-hardening`).
-- Next: Open and merge PR for #93, then continue to #112.
+- 2026-02-15: Merged PR #114 (`test: harden protocol/CORS coverage checks (#93)`).
+- 2026-02-15: Verified post-merge `master` CI and CodeQL runs are green.
+- 2026-02-15: Started Phase 3 implementation on issue #112 (`test/112-mobile-compat-smoke`).
+- Next: Open and merge PR for #112, then continue to Phase 4.

@@ -229,6 +229,20 @@ export const SUPPORTED_PROTOCOL_VERSIONS = ['2.0.0'];
 3. Update app code to use new protocol API
 4. If breaking change is intentional, follow breaking change workflow
 
+### Cross-repo mobile API compatibility check
+
+When changing C&C auth or response payloads used by `kaonis/woly`, run the dedicated smoke suite:
+
+```bash
+npm run test -w apps/cnc -- mobileCompatibility.smoke
+```
+
+This verifies:
+- `POST /api/auth/token` response shape used by `cnc-auth-service`
+- `GET /api/hosts` response shape used by `woly-service`
+- `GET /api/nodes` response shape used by `woly-service`
+- auth failure envelopes expected by the mobile client
+
 ### Runtime: "Unsupported protocol version"
 
 **Cause**: Node agent protocol version not in C&C's `SUPPORTED_PROTOCOL_VERSIONS`
