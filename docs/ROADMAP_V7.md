@@ -1,0 +1,81 @@
+# Woly-Server Roadmap V7
+
+Date: 2026-02-15
+Scope: New autonomous cycle after V6 closeout.
+
+## 1. Status Audit
+
+### Repository and branch status
+- `master` synced at merge commit `69adf2e` (PR #165).
+- Active execution branch: `docs/166-roadmap-v7-bootstrap`.
+
+### Open issue snapshot (`kaonis/woly-server`)
+- #4 `Dependency Dashboard`
+- #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
+- #166 `[Roadmap] Close V6 and bootstrap ROADMAP_V7`
+- #167 `[CI] Define review cadence and exit criteria for manual-only mode`
+
+### CI snapshot
+- Repository workflows are in temporary manual-only mode (`workflow_dispatch` only).
+- GitHub CodeQL default setup is disabled (`state: not-configured`) to prevent automatic dynamic runs.
+- Latest local validation gate passed on 2026-02-15:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test:ci`
+  - `npm run build`
+
+## 2. Iterative Phases
+
+### Phase 1: V6 closeout and V7 bootstrap
+Issue: #166  
+Labels: `priority:low`, `documentation`, `developer-experience`
+
+Acceptance criteria:
+- Mark V6 Phase 10 as completed with merged PR reference.
+- Add V6 post-merge log entries for #164 / PR #165.
+- Publish `docs/ROADMAP_V7.md` with current status audit and phased plan.
+
+Status: `In Progress` (2026-02-15)
+
+### Phase 2: ESLint 10 compatibility unblock monitoring
+Issue: #150  
+Labels: `priority:low`, `technical-debt`, `testing`
+
+Acceptance criteria:
+- Re-check latest `@typescript-eslint/*` peer compatibility for ESLint 10.
+- If unblocked, execute upgrade and validate full local gates.
+- If still blocked, record evidence and keep issue in blocked state.
+
+Status: `Blocked` (2026-02-15; latest `@typescript-eslint/*@8.55.0` peers `eslint ^8.57 || ^9`)
+
+### Phase 3: Manual-only CI review cadence and exit policy
+Issue: #167  
+Labels: `priority:low`, `developer-experience`, `technical-debt`
+
+Acceptance criteria:
+- Document weekly review checklist for manual-only CI operations.
+- Define objective exit criteria for re-enabling automatic workflows.
+- Document decision ownership and recording process.
+
+Status: `Planned` (2026-02-15)
+
+## 3. Execution Loop Rules
+
+For each phase:
+1. Create branch `feat/<issue>-<slug>` or `fix/<issue>-<slug>` (or `docs/<issue>-<slug>` for docs-only work).
+2. Implement smallest complete change meeting acceptance criteria.
+3. Add/update tests when code behavior changes.
+4. Run local gate:
+   - `npm run lint`
+   - `npm run typecheck`
+   - `npm run test:ci`
+   - `npm run build`
+5. Open PR (`Closes #<issue>`) and merge after local validation.
+6. Verify post-merge state and confirm no unexpected auto workflow runs in manual-only mode.
+7. Update roadmap progress and continue.
+
+## 4. Progress Log
+
+- 2026-02-15: Created ROADMAP_V7 from issue #166 after V6 manual-only CI transition merged.
+- 2026-02-15: Re-checked ESLint 10 blocker for #150: `eslint@10.0.0` exists, but latest `@typescript-eslint/*@8.55.0` still peers `eslint ^8.57.0 || ^9.0.0`.
+- 2026-02-15: Added follow-up issue #167 to formalize manual-only CI review cadence and re-enable criteria.

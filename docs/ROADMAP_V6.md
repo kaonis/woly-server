@@ -12,10 +12,11 @@ Scope: New autonomous cycle after V5 completion.
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #164 `[CI] Document manual-only operations and rollback criteria`
+- #166 `[Roadmap] Close V6 and bootstrap ROADMAP_V7`
+- #167 `[CI] Define review cadence and exit criteria for manual-only mode`
 
 ### CI snapshot
-- Post-merge checks for `0763bf7` did not auto-run by design (manual-only mode enabled).
+- Post-merge checks for `69adf2e` did not auto-run by design (manual-only mode enabled).
 - Dependency triage workflow and audit/security gates are documented and active.
 
 ## 2. Iterative Phases
@@ -128,7 +129,7 @@ Acceptance criteria:
 - Define explicit rollback criteria and steps to re-enable automatic workflows.
 - Update README/roadmap references to reflect the temporary manual-only CI mode.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #165)
 
 ## 3. Execution Loop Rules
 
@@ -190,3 +191,6 @@ For each phase:
 - 2026-02-15: Merged #162 via PR #163 and confirmed no automatic workflow runs were triggered on `master` merge commit `0763bf7`.
 - 2026-02-15: Disabled GitHub CodeQL default setup (`state: not-configured`) to stop automatic `dynamic` CodeQL workflow runs.
 - 2026-02-15: Added follow-up issue #164, started Phase 10 on branch `docs/164-manual-ci-ops`, and drafted manual CI operations documentation.
+- 2026-02-15: Merged #164 via PR #165, adding `docs/CI_MANUAL_OPERATIONS.md` and updating README CI guidance for manual-only mode.
+- 2026-02-15: Updated dependency dashboard issue #4 with manual-only CI policy and local gate expectations.
+- 2026-02-15: Added follow-up roadmap issue #166 and CI policy review issue #167 to continue post-V6 execution.
