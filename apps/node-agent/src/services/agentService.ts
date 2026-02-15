@@ -3,7 +3,7 @@ import { isIP } from 'node:net';
 import { cncClient } from './cncClient';
 import { agentConfig, validateAgentConfig } from '../config/agent';
 import { logger } from '../utils/logger';
-import { CncCommand, Host } from '../types';
+import { CncCommand, Host, NodeMessage } from '../types';
 import HostDatabase from './hostDatabase';
 import ScanOrchestrator from './scanOrchestrator';
 
@@ -11,6 +11,10 @@ type WakeCommand = Extract<CncCommand, { type: 'wake' }>;
 type ScanCommand = Extract<CncCommand, { type: 'scan' }>;
 type UpdateHostCommand = Extract<CncCommand, { type: 'update-host' }>;
 type DeleteHostCommand = Extract<CncCommand, { type: 'delete-host' }>;
+type HostEventMessage = Extract<
+  NodeMessage,
+  { type: 'host-discovered' | 'host-updated' | 'host-removed' | 'scan-complete' }
+>;
 
 type ValidatedUpdateHostData = {
   currentName?: string;
@@ -31,6 +35,15 @@ export class AgentService extends EventEmitter {
   private hostCache: Map<string, Host> = new Map();
   private hostDb: HostDatabase | null = null;
   private scanOrchestrator: ScanOrchestrator | null = null;
+  private readonly maxBufferedHostEvents = Math.max(agentConfig.maxBufferedHostEvents, 1);
+  private readonly hostEventFlushBatchSize = Math.max(agentConfig.hostEventFlushBatchSize, 1);
+  private readonly hostUpdateDebounceMs = Math.max(agentConfig.hostUpdateDebounceMs, 0);
+  private readonly initialSyncChunkSize = Math.max(agentConfig.initialSyncChunkSize, 1);
+  private readonly hostStaleAfterMs = Math.max(agentConfig.hostStaleAfterMs, 0);
+  private readonly bufferedHostEvents: HostEventMessage[] = [];
+  private readonly pendingHostUpdates: Map<string, Host> = new Map();
+  private hostUpdateDebounceTimer: NodeJS.Timeout | null = null;
+  private hostEventFlushTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     super();
@@ -105,6 +118,7 @@ export class AgentService extends EventEmitter {
     }
 
     logger.info('Stopping agent service');
+    this.clearHostEventTimers();
     cncClient.disconnect();
     this.isRunning = false;
 
@@ -125,11 +139,12 @@ export class AgentService extends EventEmitter {
     // C&C connection events
     cncClient.on('connected', () => {
       logger.info('Agent connected to C&C backend');
-      this.onConnected();
+      void this.onConnected();
     });
 
     cncClient.on('disconnected', () => {
       logger.warn('Agent disconnected from C&C backend');
+      this.flushPendingHostUpdates();
     });
 
     cncClient.on('error', (error: Error) => {
@@ -180,14 +195,15 @@ export class AgentService extends EventEmitter {
       return;
     }
 
+    this.flushPendingHostUpdates();
+    this.flushBufferedHostEvents();
+
     // Send current host list to C&C
     try {
       const hosts = await this.hostDb.getAllHosts();
       logger.info(`Sending ${hosts.length} hosts to C&C backend`);
-
-      for (const host of hosts) {
-        this.sendHostDiscovered(host);
-      }
+      await this.sendHostsInChunks(hosts);
+      this.flushBufferedHostEvents();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Failed to send initial host list to C&C', { error: message });
@@ -198,51 +214,36 @@ export class AgentService extends EventEmitter {
    * Send host-discovered event to C&C
    */
   public sendHostDiscovered(host: Host): void {
-    if (!this.isActive()) {
-      return;
-    }
-
-    cncClient.send({
+    const normalizedHost = this.normalizeHostForReporting(host);
+    const message: HostEventMessage = {
       type: 'host-discovered',
       data: {
         nodeId: agentConfig.nodeId,
-        ...host,
+        ...normalizedHost,
       },
-    });
+    };
+    this.dispatchHostEvent(message);
 
     // Update cache
-    this.hostCache.set(host.name, host);
+    this.hostCache.set(normalizedHost.name, normalizedHost);
   }
 
   /**
    * Send host-updated event to C&C
    */
   public sendHostUpdated(host: Host): void {
-    if (!this.isActive()) {
-      return;
-    }
-
-    cncClient.send({
-      type: 'host-updated',
-      data: {
-        nodeId: agentConfig.nodeId,
-        ...host,
-      },
-    });
-
-    // Update cache
-    this.hostCache.set(host.name, host);
+    const normalizedHost = this.normalizeHostForReporting(host);
+    this.hostCache.set(normalizedHost.name, normalizedHost);
+    this.pendingHostUpdates.set(normalizedHost.name, normalizedHost);
+    this.scheduleHostUpdateFlush();
   }
 
   /**
    * Send host-removed event to C&C
    */
   public sendHostRemoved(hostName: string): void {
-    if (!this.isActive()) {
-      return;
-    }
-
-    cncClient.send({
+    this.pendingHostUpdates.delete(hostName);
+    this.dispatchHostEvent({
       type: 'host-removed',
       data: {
         nodeId: agentConfig.nodeId,
@@ -258,11 +259,7 @@ export class AgentService extends EventEmitter {
    * Send scan-complete event to C&C
    */
   public sendScanComplete(hostCount: number): void {
-    if (!this.isActive()) {
-      return;
-    }
-
-    cncClient.send({
+    this.dispatchHostEvent({
       type: 'scan-complete',
       data: {
         nodeId: agentConfig.nodeId,
@@ -271,6 +268,149 @@ export class AgentService extends EventEmitter {
     });
 
     logger.info('Sent scan complete to C&C', { hostCount });
+  }
+
+  private dispatchHostEvent(message: HostEventMessage): void {
+    if (!this.isRunning) {
+      return;
+    }
+
+    if (this.isActive()) {
+      cncClient.send(message);
+      return;
+    }
+
+    this.enqueueBufferedHostEvent(message);
+  }
+
+  private enqueueBufferedHostEvent(message: HostEventMessage): void {
+    if (this.bufferedHostEvents.length >= this.maxBufferedHostEvents) {
+      this.bufferedHostEvents.shift();
+      logger.warn('Host event buffer reached capacity; dropping oldest event', {
+        maxBufferedHostEvents: this.maxBufferedHostEvents,
+      });
+    }
+
+    this.bufferedHostEvents.push(message);
+  }
+
+  private flushBufferedHostEvents(): void {
+    if (!this.isActive() || this.bufferedHostEvents.length === 0 || this.hostEventFlushTimer) {
+      return;
+    }
+
+    const flushBatch = () => {
+      this.hostEventFlushTimer = null;
+
+      if (!this.isActive() || this.bufferedHostEvents.length === 0) {
+        return;
+      }
+
+      const batch = this.bufferedHostEvents.splice(0, this.hostEventFlushBatchSize);
+      for (const bufferedMessage of batch) {
+        cncClient.send(bufferedMessage);
+      }
+
+      if (this.bufferedHostEvents.length > 0) {
+        this.hostEventFlushTimer = setTimeout(flushBatch, 0);
+      }
+    };
+
+    flushBatch();
+  }
+
+  private scheduleHostUpdateFlush(): void {
+    if (this.hostUpdateDebounceTimer) {
+      return;
+    }
+
+    this.hostUpdateDebounceTimer = setTimeout(() => {
+      this.hostUpdateDebounceTimer = null;
+      this.flushPendingHostUpdates();
+      this.flushBufferedHostEvents();
+    }, this.hostUpdateDebounceMs);
+  }
+
+  private flushPendingHostUpdates(): void {
+    if (this.pendingHostUpdates.size === 0) {
+      return;
+    }
+
+    for (const host of this.pendingHostUpdates.values()) {
+      this.dispatchHostEvent({
+        type: 'host-updated',
+        data: {
+          nodeId: agentConfig.nodeId,
+          ...host,
+        },
+      });
+    }
+
+    this.pendingHostUpdates.clear();
+  }
+
+  private async sendHostsInChunks(hosts: Host[]): Promise<void> {
+    for (let index = 0; index < hosts.length; index += this.initialSyncChunkSize) {
+      const chunk = hosts.slice(index, index + this.initialSyncChunkSize);
+      for (const host of chunk) {
+        this.sendHostDiscovered(host);
+      }
+
+      if (index + this.initialSyncChunkSize < hosts.length) {
+        await this.yieldToEventLoop();
+      }
+    }
+  }
+
+  private normalizeHostForReporting(host: Host): Host {
+    if (!this.isStaleHost(host)) {
+      return host;
+    }
+
+    if (host.status === 'asleep' && host.pingResponsive === 0) {
+      return host;
+    }
+
+    logger.debug('Flagging stale host as asleep for outbound reporting', {
+      name: host.name,
+      lastSeen: host.lastSeen,
+      staleAfterMs: this.hostStaleAfterMs,
+    });
+
+    return {
+      ...host,
+      status: 'asleep',
+      pingResponsive: 0,
+    };
+  }
+
+  private isStaleHost(host: Host): boolean {
+    if (!host.lastSeen) {
+      return true;
+    }
+
+    const lastSeenMs = new Date(host.lastSeen).getTime();
+    if (Number.isNaN(lastSeenMs)) {
+      return true;
+    }
+
+    return Date.now() - lastSeenMs > this.hostStaleAfterMs;
+  }
+
+  private async yieldToEventLoop(): Promise<void> {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  }
+
+  private clearHostEventTimers(): void {
+    if (this.hostUpdateDebounceTimer) {
+      clearTimeout(this.hostUpdateDebounceTimer);
+      this.hostUpdateDebounceTimer = null;
+    }
+
+    if (this.hostEventFlushTimer) {
+      clearTimeout(this.hostEventFlushTimer);
+      this.hostEventFlushTimer = null;
+    }
   }
 
   private sendCommandResult(
