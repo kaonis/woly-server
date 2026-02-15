@@ -242,7 +242,7 @@ describe('Cross-service E2E smoke', () => {
     }
   });
 
-  it('registers node, propagates host inventory, and routes wake command', async () => {
+  it('registers node, propagates host inventory, validates manual CRUD propagation, and routes wake command', async () => {
     try {
       const cncPort = await getFreePort();
       const nodeAgentPort = await getFreePort();
@@ -294,6 +294,19 @@ describe('Cross-service E2E smoke', () => {
       const cncAuthHeaders = {
         Authorization: `Bearer ${operatorJwt}`,
       };
+      const nodeAgentBaseUrl = `http://${LOCALHOST}:${nodeAgentPort}`;
+      const cncBaseUrl = `http://${LOCALHOST}:${cncPort}`;
+
+      const fetchCncHosts = async (): Promise<Array<Record<string, unknown>>> => {
+        const response = await fetchJson(`${cncBaseUrl}/api/hosts`, {
+          headers: cncAuthHeaders,
+        });
+        if (response.status !== 200 || !isRecord(response.body) || !Array.isArray(response.body.hosts)) {
+          throw new Error(`Unexpected /api/hosts response: status=${response.status} body=${response.rawBody}`);
+        }
+
+        return response.body.hosts.filter(isRecord);
+      };
 
       const nodeAgentService = startService({
         name: 'node-agent',
@@ -320,7 +333,7 @@ describe('Cross-service E2E smoke', () => {
         description: 'node-agent /health agent.connected',
         timeoutMs: 30_000,
         check: async () => {
-          const response = await fetchJson(`http://${LOCALHOST}:${nodeAgentPort}/health`);
+          const response = await fetchJson(`${nodeAgentBaseUrl}/health`);
           if (response.status !== 200 || !isRecord(response.body)) {
             return false;
           }
@@ -338,7 +351,7 @@ describe('Cross-service E2E smoke', () => {
         description: 'C&C node registration',
         timeoutMs: 30_000,
         check: async () => {
-          const response = await fetchJson(`http://${LOCALHOST}:${cncPort}/api/nodes`, {
+          const response = await fetchJson(`${cncBaseUrl}/api/nodes`, {
             headers: cncAuthHeaders,
           });
 
@@ -361,30 +374,95 @@ describe('Cross-service E2E smoke', () => {
         description: 'C&C host propagation',
         timeoutMs: 30_000,
         check: async () => {
-          const response = await fetchJson(`http://${LOCALHOST}:${cncPort}/api/hosts`, {
-            headers: cncAuthHeaders,
-          });
-
-          if (response.status !== 200 || !isRecord(response.body)) {
-            return false;
-          }
-
-          const { hosts } = response.body;
-          if (!Array.isArray(hosts)) {
-            return false;
-          }
-
+          const hosts = await fetchCncHosts();
           return hosts.some(
             (host) =>
-              isRecord(host) &&
               host.fullyQualifiedName === SMOKE_HOST_FQN &&
               host.nodeId === SMOKE_NODE_ID
           );
         },
       });
 
+      const manualHostName = 'MANUAL-CRUD-SMOKE';
+      const manualHostFqn = `${manualHostName}@${encodeURIComponent(SMOKE_LOCATION)}-${SMOKE_NODE_ID}`;
+
+      const createResponse = await fetchJson(`${nodeAgentBaseUrl}/hosts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: manualHostName,
+          mac: 'AA:BB:CC:DD:EE:55',
+          ip: '192.168.10.55',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+
+      await waitForCondition({
+        description: 'manual host create propagation to C&C',
+        timeoutMs: 20_000,
+        check: async () => {
+          const hosts = await fetchCncHosts();
+          return hosts.some(
+            (host) =>
+              host.fullyQualifiedName === manualHostFqn &&
+              host.name === manualHostName &&
+              host.nodeId === SMOKE_NODE_ID
+          );
+        },
+      });
+
+      const updateResponse = await fetchJson(`${nodeAgentBaseUrl}/hosts/${encodeURIComponent(manualHostName)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          notes: 'manual propagation note',
+          tags: ['smoke', 'manual'],
+        }),
+      });
+      expect(updateResponse.status).toBe(200);
+
+      await waitForCondition({
+        description: 'manual host update propagation to C&C',
+        timeoutMs: 20_000,
+        check: async () => {
+          const hosts = await fetchCncHosts();
+          const updated = hosts.find((host) => host.fullyQualifiedName === manualHostFqn);
+          if (!updated) {
+            return false;
+          }
+
+          const tags = Array.isArray(updated.tags)
+            ? updated.tags.filter((tag): tag is string => typeof tag === 'string')
+            : [];
+
+          return (
+            updated.notes === 'manual propagation note' &&
+            tags.includes('smoke') &&
+            tags.includes('manual')
+          );
+        },
+      });
+
+      const deleteResponse = await fetchJson(`${nodeAgentBaseUrl}/hosts/${encodeURIComponent(manualHostName)}`, {
+        method: 'DELETE',
+      });
+      expect(deleteResponse.status).toBe(200);
+
+      await waitForCondition({
+        description: 'manual host delete propagation to C&C',
+        timeoutMs: 20_000,
+        check: async () => {
+          const hosts = await fetchCncHosts();
+          return !hosts.some((host) => host.fullyQualifiedName === manualHostFqn);
+        },
+      });
+
       const wakeupResponse = await fetchJson(
-        `http://${LOCALHOST}:${cncPort}/api/hosts/wakeup/${encodeURIComponent(SMOKE_HOST_FQN)}`,
+        `${cncBaseUrl}/api/hosts/wakeup/${encodeURIComponent(SMOKE_HOST_FQN)}`,
         {
           method: 'POST',
           headers: {
