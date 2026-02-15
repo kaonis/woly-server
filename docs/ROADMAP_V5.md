@@ -41,7 +41,7 @@ Acceptance criteria:
 - Configure tests/CI to fail when coverage regresses below baseline.
 - Publish phased plan for threshold increases.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #143)
 
 ### Phase 3: Dependency dashboard triage workflow
 Issue: #141  
@@ -52,7 +52,7 @@ Acceptance criteria:
 - Document decision categories and defer/acceptance policy.
 - Link triage process from roadmap/checklist docs.
 
-Status: `Pending`
+Status: `In Progress` (2026-02-15)
 
 ## 3. Execution Loop Rules
 
@@ -77,3 +77,9 @@ For each phase:
 - 2026-02-15: Started Phase 2 issue #140 on branch `feat/140-cnc-coverage-ratchet-policy`.
 - 2026-02-15: Added C&C coverage-ratchet policy doc and raised Jest global coverage thresholds to a non-regression baseline gate.
 - 2026-02-15: Ran local C&C gates for #140 (`npm run typecheck -w apps/cnc`, `npm run test:ci -w apps/cnc`) successfully.
+- 2026-02-15: Merged #140 via PR #143 and verified post-merge `master` checks green (CI + CodeQL).
+- 2026-02-15: Started Phase 3 issue #141 on branch `feat/141-dependency-dashboard-triage-workflow`.
+- 2026-02-15: Added dependency dashboard triage workflow with ownership, cadence, decision categories, and defer/follow-up policy.
+- 2026-02-15: Linked dependency triage workflow from README and node-agent checklist.
+- 2026-02-15: Ran local node-agent gates for #141 (`npm run typecheck -w apps/node-agent`, `npm run test:ci -w apps/node-agent`) successfully.
+- 2026-02-15: Added triage output comment on issue #4 and created follow-up issue #144 for deferred major dependency upgrades.

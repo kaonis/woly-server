@@ -188,6 +188,9 @@ All checks must pass for a PR to be merged. The workflow runs:
 
 See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
+Dependency update review cadence and decision rules are documented in:
+- [docs/DEPENDENCY_TRIAGE_WORKFLOW.md](docs/DEPENDENCY_TRIAGE_WORKFLOW.md)
+
 **Note:** To enforce PR blocking, configure branch protection rules in GitHub repository settings to require the `validate` status check to pass before merging.
 
 ## Tech Stack

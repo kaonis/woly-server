@@ -17,6 +17,7 @@ Owner: Platform Team
 - [x] Confirm current audit state has no high/critical findings.
 - [x] Document remediation strategy, ownership, and exception process in `docs/security/dependency-remediation-plan.md`.
 - [x] Add CI security gate (`npm run security:audit`) to fail on high/critical vulnerabilities.
+- [x] Link dependency triage ownership/cadence policy in `docs/DEPENDENCY_TRIAGE_WORKFLOW.md`.
 
 ## Phase 0 - Baseline and Safety Rails
 
