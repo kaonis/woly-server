@@ -234,6 +234,129 @@ describe('AgentService command handlers', () => {
     );
   });
 
+  it('guards duplicate command delivery and replays cached result without re-executing', async () => {
+    hostDbMock.getHost.mockResolvedValue(sampleHost);
+
+    const handleWake = ((service as unknown) as {
+      handleWakeCommand: (command: unknown) => Promise<void>;
+    }).handleWakeCommand.bind(service);
+
+    await handleWake({
+      type: 'wake',
+      commandId: 'cmd-wake-duplicate',
+      data: { hostName: sampleHost.name, mac: sampleHost.mac },
+    });
+
+    await handleWake({
+      type: 'wake',
+      commandId: 'cmd-wake-duplicate',
+      data: { hostName: sampleHost.name, mac: sampleHost.mac },
+    });
+
+    expect(wakeOnLan.wake).toHaveBeenCalledTimes(1);
+    expect(mockCncClient.send).toHaveBeenCalledTimes(2);
+    const snapshot = runtimeTelemetry.snapshot();
+    expect(snapshot.commands.byType.wake.total).toBe(1);
+    expect(snapshot.commands.byType.wake.success).toBe(1);
+  });
+
+  it('applies bounded wake retries and fails deterministically after max attempts', async () => {
+    jest.useFakeTimers();
+    hostDbMock.getHost.mockResolvedValue(sampleHost);
+    ((wakeOnLan.wake as unknown) as jest.Mock).mockImplementation(
+      (_mac: string, callback: (error: Error | null) => void) => callback(new Error('wol transient'))
+    );
+
+    const handleWakePromise = ((service as unknown) as {
+      handleWakeCommand: (command: unknown) => Promise<void>;
+    }).handleWakeCommand({
+      type: 'wake',
+      commandId: 'cmd-wake-retry-fail',
+      data: { hostName: sampleHost.name, mac: sampleHost.mac },
+    });
+
+    await jest.runAllTimersAsync();
+    await handleWakePromise;
+
+    expect(wakeOnLan.wake).toHaveBeenCalledTimes(2);
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-wake-retry-fail',
+          success: false,
+          error: 'wol transient',
+        }),
+      })
+    );
+  });
+
+  it('marks wake command as timed out after bounded timeout retries', async () => {
+    jest.useFakeTimers();
+    hostDbMock.getHost.mockResolvedValue(sampleHost);
+    ((wakeOnLan.wake as unknown) as jest.Mock).mockImplementation(() => undefined);
+
+    const handleWakePromise = ((service as unknown) as {
+      handleWakeCommand: (command: unknown) => Promise<void>;
+    }).handleWakeCommand({
+      type: 'wake',
+      commandId: 'cmd-wake-timeout',
+      data: { hostName: sampleHost.name, mac: sampleHost.mac },
+    });
+
+    await jest.advanceTimersByTimeAsync(16_000);
+    await handleWakePromise;
+
+    expect(wakeOnLan.wake).toHaveBeenCalledTimes(2);
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-wake-timeout',
+          success: false,
+          error: expect.stringContaining('timed out'),
+        }),
+      })
+    );
+  });
+
+  it('buffers command results while disconnected and flushes them on reconnect', async () => {
+    await service.start();
+    hostDbMock.getAllHosts.mockResolvedValue([]);
+    hostDbMock.getHost.mockResolvedValue(sampleHost);
+    mockCncClient.isConnected.mockReturnValue(false);
+
+    await ((service as unknown) as {
+      handleWakeCommand: (command: unknown) => Promise<void>;
+    }).handleWakeCommand({
+      type: 'wake',
+      commandId: 'cmd-wake-buffered',
+      data: { hostName: sampleHost.name, mac: sampleHost.mac },
+    });
+
+    expect(mockCncClient.send).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({ commandId: 'cmd-wake-buffered' }),
+      })
+    );
+
+    mockCncClient.send.mockClear();
+    mockCncClient.isConnected.mockReturnValue(true);
+    mockCncClient.emit('connected');
+    await Promise.resolve();
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-wake-buffered',
+          success: true,
+        }),
+      })
+    );
+  });
+
   it('returns missing-db error for commands that require host database', async () => {
     ((service as unknown) as { hostDb: unknown }).hostDb = null;
 
@@ -583,7 +706,7 @@ describe('AgentService command handlers', () => {
   });
 
   it('returns delete failure when deletion throws', async () => {
-    hostDbMock.deleteHost.mockRejectedValueOnce(new Error('delete failed'));
+    hostDbMock.deleteHost.mockRejectedValue(new Error('delete failed'));
 
     await ((service as unknown) as {
       handleDeleteHostCommand: (command: unknown) => Promise<void>;
