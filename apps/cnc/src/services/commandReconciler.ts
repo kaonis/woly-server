@@ -31,6 +31,11 @@ export async function pruneOldCommands(retentionDays: number): Promise<number> {
 let pruningInterval: NodeJS.Timeout | null = null;
 
 export function startCommandPruning(retentionDays: number): void {
+  if (pruningInterval) {
+    clearInterval(pruningInterval);
+    pruningInterval = null;
+  }
+
   if (retentionDays <= 0) {
     logger.info('Command pruning disabled (COMMAND_RETENTION_DAYS <= 0)');
     return;

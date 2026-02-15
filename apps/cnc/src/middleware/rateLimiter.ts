@@ -4,7 +4,14 @@ import { logger } from '../utils/logger';
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
 // Configurable auth rate limit parameters with validation
-const parsePositiveInt = (value: string, defaultValue: number): number => {
+const parsePositiveInt = (
+  value: string | undefined,
+  defaultValue: number,
+): number => {
+  if (!value || value.trim() === '') {
+    return defaultValue;
+  }
+
   const parsed = parseInt(value, 10);
   if (isNaN(parsed) || parsed <= 0) {
     logger.warn(
@@ -16,11 +23,11 @@ const parsePositiveInt = (value: string, defaultValue: number): number => {
 };
 
 const AUTH_RATE_LIMIT_WINDOW_MS = parsePositiveInt(
-  process.env.AUTH_RATE_LIMIT_WINDOW_MS || '',
+  process.env.AUTH_RATE_LIMIT_WINDOW_MS,
   900000,
 ); // 15 minutes default
 const AUTH_RATE_LIMIT_MAX = parsePositiveInt(
-  process.env.AUTH_RATE_LIMIT_MAX || '',
+  process.env.AUTH_RATE_LIMIT_MAX,
   5,
 ); // 5 attempts default
 

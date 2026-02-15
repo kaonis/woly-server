@@ -7,12 +7,13 @@ Scope: New autonomous cycle after V8 closeout.
 
 ### Repository and branch status
 - `master` synced at merge commit `ebf5b5c` (PR #193).
-- Active execution branch: `docs/194-v9-followup-queue`.
+- Active execution branch: `feat/196-cnc-coverage-hardening`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
 - #194 `[CI] Schedule next weekly manual-only operations review`
+- #196 `[Testing][CNC] Coverage hardening for service/controller edge paths`
 
 ### CI snapshot
 - Repository workflows are in temporary manual-only mode (`workflow_dispatch` only).
@@ -90,6 +91,21 @@ Acceptance criteria:
 
 Status: `In Progress` (2026-02-15)
 
+### Phase 7: CNC coverage hardening tranche
+Issue: #196
+Labels: `priority:medium`, `testing`, `cnc`
+
+Acceptance criteria:
+- Expand CNC controller/service edge-path test coverage without unintended behavior changes.
+- Keep local monorepo quality gates green:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test:ci`
+  - `npm run build`
+- Keep CNC statement coverage at/above target threshold (>= 80%) and document latest snapshot.
+
+Status: `In Progress` (2026-02-15)
+
 ## 3. Execution Loop Rules
 
 For each phase:
@@ -118,3 +134,6 @@ For each phase:
 - 2026-02-15: Created issue #192 and started branch `feat/192-workflow-policy-guard` for local workflow policy validation.
 - 2026-02-15: Merged issue #192 via PR #193 and published local workflow policy guardrails.
 - 2026-02-15: Created issue #194 and started branch `docs/194-v9-followup-queue` to queue next weekly manual-only review cycle.
+- 2026-02-15: Created issue #196 and started branch `feat/196-cnc-coverage-hardening` for continued CNC coverage hardening.
+- 2026-02-15: Expanded CNC branch/error-path tests (notably `hostAggregator`) and re-validated local gates (`lint`, `typecheck`, `test:ci`, `build`) successfully.
+- 2026-02-15: Latest CNC coverage snapshot: `86.85%` statements (`apps/cnc`) with service coverage raised (`hostAggregator.ts` now `100%` lines).

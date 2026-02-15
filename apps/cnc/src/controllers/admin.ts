@@ -180,7 +180,10 @@ export class AdminController {
     try {
       const limitRaw = req.query.limit;
       const nodeIdRaw = req.query.nodeId;
-      const limit = typeof limitRaw === 'string' ? Math.min(Math.max(parseInt(limitRaw, 10) || 50, 1), 200) : 50;
+      const parsedLimit = typeof limitRaw === 'string' ? Number.parseInt(limitRaw, 10) : NaN;
+      const limit = Number.isFinite(parsedLimit)
+        ? Math.min(Math.max(parsedLimit, 1), 200)
+        : 50;
       const nodeId = typeof nodeIdRaw === 'string' && nodeIdRaw.trim().length > 0 ? nodeIdRaw.trim() : null;
 
       const commands = await CommandModel.listRecent({ limit, nodeId });
