@@ -6,17 +6,18 @@ Scope: New autonomous cycle after V6 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `91f3624` (PR #171).
-- Active execution branch: `feat/172-eslint10-watchdog-script`.
+- `master` synced at merge commit `037a24c` (PR #173).
+- Active execution branch: `feat/174-watchdog-validation`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #172 `[Dependencies] Extract ESLint 10 watchdog check into reusable repo script`
+- #174 `[Dependencies] Validate ESLint10 watchdog workflow after script extraction`
 
 ### CI snapshot
 - Repository workflows are in temporary manual-only mode (`workflow_dispatch` only).
 - GitHub CodeQL default setup is disabled (`state: not-configured`) to prevent automatic dynamic runs.
+- Latest manual watchdog validation run succeeded: `22037969724` (2026-02-15).
 - Latest local validation gate passed on 2026-02-15:
   - `npm run lint`
   - `npm run typecheck`
@@ -67,6 +68,17 @@ Acceptance criteria:
 - Add local command for manual compatibility checks.
 - Update watchdog workflow to use the reusable script while keeping sticky comment behavior.
 
+Status: `Completed` (2026-02-15, PR #173)
+
+### Phase 5: Post-extraction watchdog validation on master
+Issue: #174  
+Labels: `priority:low`, `technical-debt`, `testing`
+
+Acceptance criteria:
+- Manually dispatch ESLint 10 watchdog workflow on `master`.
+- Confirm workflow success and sticky comment update on issue #150.
+- Record validation evidence in roadmap/dependency tracking.
+
 Status: `In Progress` (2026-02-15)
 
 ## 3. Execution Loop Rules
@@ -95,3 +107,5 @@ For each phase:
 - 2026-02-15: Started issue #170 to sync ROADMAP_V7 after #167 merge and refresh open-issue snapshot.
 - 2026-02-15: Merged issue #170 via PR #171, syncing ROADMAP_V7 to completed Phase 3 state and current open issue set.
 - 2026-02-15: Added issue #172 and started Phase 4 on branch `feat/172-eslint10-watchdog-script`.
+- 2026-02-15: Merged issue #172 via PR #173, extracting watchdog logic into `scripts/eslint10-compat-watchdog.cjs`, adding `npm run deps:check-eslint10`, and wiring workflow reuse.
+- 2026-02-15: Added issue #174, manually dispatched watchdog workflow run `22037969724`, and validated success with sticky issue #150 comment refresh at `2026-02-15T15:11:45Z`.
