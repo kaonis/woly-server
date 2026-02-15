@@ -84,7 +84,7 @@ Acceptance criteria:
 - Add startup diagnostics and incident runbook scaffolding.
 - Define staged rollout/canary and rollback procedure.
 
-Status: `In Progress` (2026-02-15, #47 complete via PR #125; #51 in active implementation)
+Status: `Completed` (2026-02-15, PRs #125 and #126)
 
 ## 3. Execution Loop Rules for V2
 
@@ -121,4 +121,5 @@ For each issue phase:
 - 2026-02-15: Merged #47 via PR #125; verified post-merge `master` checks green.
 - 2026-02-15: Started #51 implementation branch `feat/51-cnc-observability-rollout`.
 - 2026-02-15: Implemented #51 observability/correlation/runbooks changes with local gate green (`npx tsc --noEmit`, `npx jest --ci --coverage --passWithNoTests`, `npm run lint` in `apps/cnc`).
-- Next: Open/merge #51 PR, verify post-merge CI, then continue roadmap cycle.
+- 2026-02-15: Merged #51 via PR #126; verified post-merge `master` checks green.
+- 2026-02-15: Rolled forward to ROADMAP_V3 and started #129.
