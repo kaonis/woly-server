@@ -430,12 +430,18 @@ export class CommandRouter extends EventEmitter {
    * @param result Command result
    */
   private handleCommandResult(result: CommandResult): void {
+    void this.applyCommandResult(result);
+  }
+
+  private async applyCommandResult(result: CommandResult): Promise<void> {
     const pending = this.pendingCommands.get(result.commandId);
+    const metricCommandType =
+      pending?.commandType ?? (await this.resolvePersistedCommandType(result.commandId));
     runtimeMetrics.recordCommandResult(
       result.commandId,
       result.success,
       Date.now(),
-      pending?.commandType ?? null
+      metricCommandType
     );
     logger.debug('Received command result', {
       commandId: result.commandId,
@@ -493,6 +499,19 @@ export class CommandRouter extends EventEmitter {
 
     for (const resolver of pending.resolvers) {
       resolver.reject(new Error(result.error || 'Command failed'));
+    }
+  }
+
+  private async resolvePersistedCommandType(commandId: string): Promise<string | null> {
+    try {
+      const record = await CommandModel.findById(commandId);
+      return record?.type ?? null;
+    } catch (error) {
+      logger.warn('Failed to resolve persisted command type for result attribution', {
+        commandId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
     }
   }
 
