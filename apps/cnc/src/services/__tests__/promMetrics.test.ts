@@ -31,6 +31,13 @@ describe('promMetrics', () => {
         timeoutRate: 0.0909,
         avgLatencyMs: 123,
         lastLatencyMs: 200,
+        outcomesByType: {
+          wake: {
+            acknowledged: 4,
+            failed: 1,
+            timedOut: 0,
+          },
+        },
         byType: {
           wake: {
             dispatched: 5,
@@ -55,10 +62,14 @@ describe('promMetrics', () => {
     expect(metrics).toContain('woly_cnc_protocol_invalid_payload_total');
     expect(metrics).toContain('woly_cnc_commands_dispatched_total');
     expect(metrics).toContain('woly_cnc_command_avg_latency_ms');
+    expect(metrics).toContain('woly_cnc_command_outcomes_total');
     expect(metrics).toMatch(/woly_cnc_nodes_connected\{[^}]*app=\"woly-cnc\"[^}]*\} 3/);
     expect(metrics).toMatch(/woly_cnc_command_timeout_rate\{[^}]*app=\"woly-cnc\"[^}]*\} 0.0909/);
     expect(metrics).toMatch(
       /woly_cnc_commands_by_type\{(?=[^}]*state=\"acknowledged\")(?=[^}]*type=\"wake\")[^}]*\} 4/
+    );
+    expect(metrics).toMatch(
+      /woly_cnc_command_outcomes_total\{(?=[^}]*state=\"failed\")(?=[^}]*type=\"wake\")[^}]*\} 1/
     );
   });
 });
