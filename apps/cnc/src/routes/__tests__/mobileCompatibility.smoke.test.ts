@@ -1,5 +1,6 @@
 import express, { Express } from 'express';
 import request from 'supertest';
+import { cncCapabilitiesResponseSchema } from '@kaonis/woly-protocol';
 import { createRoutes } from '../index';
 import { NodeManager } from '../../services/nodeManager';
 import { HostAggregator } from '../../services/hostAggregator';
@@ -192,6 +193,44 @@ describe('Mobile API compatibility smoke checks', () => {
       const response = await request(app)
         .get('/api/nodes')
         .set('Authorization', 'InvalidHeader');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+  });
+
+  describe('GET /api/capabilities', () => {
+    const operatorJwt = createToken({
+      sub: 'mobile-client',
+      role: 'operator',
+      iss: 'test-issuer',
+      aud: 'test-audience',
+      exp: now + 3600,
+      nbf: now - 10,
+    });
+
+    it('returns capability payload compatible with mobile feature negotiation', async () => {
+      const response = await request(app)
+        .get('/api/capabilities')
+        .set('Authorization', `Bearer ${operatorJwt}`);
+
+      expect(response.status).toBe(200);
+      expect(cncCapabilitiesResponseSchema.safeParse(response.body).success).toBe(true);
+      expect(response.body).toMatchObject({
+        capabilities: {
+          scan: expect.any(Boolean),
+          notesTagsPersistence: expect.any(Boolean),
+          schedulesApi: expect.any(Boolean),
+          commandStatusStreaming: expect.any(Boolean),
+        },
+      });
+    });
+
+    it('returns auth error envelope when JWT is missing', async () => {
+      const response = await request(app).get('/api/capabilities');
 
       expect(response.status).toBe(401);
       expect(response.body).toMatchObject({

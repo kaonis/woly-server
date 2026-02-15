@@ -59,6 +59,22 @@ export interface ErrorResponse {
   details?: unknown;
 }
 
+// --- CNC API capabilities ---
+
+export interface CncFeatureCapabilities {
+  scan: boolean;
+  notesTagsPersistence: boolean;
+  schedulesApi: boolean;
+  commandStatusStreaming: boolean;
+}
+
+export interface CncCapabilitiesResponse {
+  apiVersion: string;
+  protocolVersion: string;
+  supportedProtocolVersions: string[];
+  capabilities: CncFeatureCapabilities;
+}
+
 // --- WebSocket message types ---
 
 export type NodeMessage =
@@ -134,6 +150,20 @@ export const errorResponseSchema = z.object({
   message: z.string().min(1),
   code: z.string().optional(),
   details: z.unknown().optional(),
+});
+
+export const cncFeatureCapabilitiesSchema = z.object({
+  scan: z.boolean(),
+  notesTagsPersistence: z.boolean(),
+  schedulesApi: z.boolean(),
+  commandStatusStreaming: z.boolean(),
+});
+
+export const cncCapabilitiesResponseSchema = z.object({
+  apiVersion: z.string().min(1),
+  protocolVersion: z.string().min(1),
+  supportedProtocolVersions: z.array(z.string().min(1)).min(1),
+  capabilities: cncFeatureCapabilitiesSchema,
 });
 
 const nodeMetadataSchema = z.object({

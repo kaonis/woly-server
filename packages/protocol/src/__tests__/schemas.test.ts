@@ -1,6 +1,8 @@
 import {
   hostSchema,
   hostStatusSchema,
+  cncCapabilitiesResponseSchema,
+  cncFeatureCapabilitiesSchema,
   commandStateSchema,
   errorResponseSchema,
   outboundNodeMessageSchema,
@@ -123,6 +125,66 @@ describe('errorResponseSchema', () => {
 
   it('rejects missing message', () => {
     expect(errorResponseSchema.safeParse({ error: 'ERR' }).success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cncCapabilitiesResponseSchema
+// ---------------------------------------------------------------------------
+
+describe('cncCapabilitiesResponseSchema', () => {
+  it('accepts valid capabilities response', () => {
+    const result = cncCapabilitiesResponseSchema.safeParse({
+      apiVersion: '1.0.0',
+      protocolVersion: PROTOCOL_VERSION,
+      supportedProtocolVersions: [PROTOCOL_VERSION],
+      capabilities: {
+        scan: true,
+        notesTagsPersistence: true,
+        schedulesApi: false,
+        commandStatusStreaming: false,
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects response without required feature flags', () => {
+    const result = cncCapabilitiesResponseSchema.safeParse({
+      apiVersion: '1.0.0',
+      protocolVersion: PROTOCOL_VERSION,
+      supportedProtocolVersions: [PROTOCOL_VERSION],
+      capabilities: {
+        scan: true,
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty supported protocol version list', () => {
+    const result = cncCapabilitiesResponseSchema.safeParse({
+      apiVersion: '1.0.0',
+      protocolVersion: PROTOCOL_VERSION,
+      supportedProtocolVersions: [],
+      capabilities: {
+        scan: true,
+        notesTagsPersistence: true,
+        schedulesApi: false,
+        commandStatusStreaming: false,
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('cncFeatureCapabilitiesSchema', () => {
+  it('accepts explicit boolean values for all features', () => {
+    const result = cncFeatureCapabilitiesSchema.safeParse({
+      scan: false,
+      notesTagsPersistence: true,
+      schedulesApi: false,
+      commandStatusStreaming: true,
+    });
+    expect(result.success).toBe(true);
   });
 });
 
