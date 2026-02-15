@@ -64,6 +64,11 @@ For each triage pass, post a short issue `#4` comment containing:
 3. Updates requiring manual validation.
 4. Deferred updates with rationale and follow-up links.
 
+Helper command for ESLint10 checkpoint comments:
+
+- `npm run deps:checkpoint:eslint10`
+- Paste output directly into issue `#4` and optionally issue `#150`.
+
 ## 6. Operational Rules
 
 1. Do not defer without rationale.

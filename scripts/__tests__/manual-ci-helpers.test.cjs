@@ -12,6 +12,10 @@ const {
   parseArgs,
   resolveSinceCheckpoint,
 } = require('../manual-ci-review-template.cjs');
+const {
+  buildDashboardCheckpoint,
+  parseArgs: parseDashboardArgs,
+} = require('../eslint10-dashboard-checkpoint.cjs');
 
 test('findLatestSinceCheckpoint returns the latest valid checkpoint', () => {
   const markdown = [
@@ -68,4 +72,32 @@ test('buildTemplate includes mandatory review fields', () => {
   assert.match(template, /Unexpected automatic workflow runs observed/);
   assert.match(template, /Decision: <Continue manual-only \/ Start rollback>/);
   assert.match(template, /2026-02-15T21:31:02Z/);
+});
+
+test('parseDashboardArgs supports --json and --help flags', () => {
+  assert.deepEqual(parseDashboardArgs(['--json']), {
+    json: true,
+    help: false,
+  });
+  assert.deepEqual(parseDashboardArgs(['--help']), {
+    json: false,
+    help: true,
+  });
+});
+
+test('buildDashboardCheckpoint includes expected dependency fields', () => {
+  const markdown = buildDashboardCheckpoint({
+    checkedAt: '2026-02-15T21:52:27Z',
+    eslintVersion: '10.0.0',
+    pluginVersion: '8.55.0',
+    parserVersion: '8.55.0',
+    peerRange: '^8.57.0 || ^9.0.0',
+    supportsEslint10: false,
+  });
+
+  assert.match(markdown, /Dependency Dashboard ESLint10 Checkpoint/);
+  assert.match(markdown, /Latest `eslint`: `10.0.0`/);
+  assert.match(markdown, /peer range: `\^8.57.0 \|\| \^9.0.0`/);
+  assert.match(markdown, /Status: \*\*BLOCKED/);
+  assert.match(markdown, /Dependency dashboard: #4/);
 });
