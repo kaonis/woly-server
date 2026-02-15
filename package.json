@@ -24,6 +24,7 @@
     "format": "prettier --write .",
     "deps:check-eslint10": "node scripts/eslint10-compat-watchdog.cjs",
     "ci:audit:manual": "node scripts/manual-ci-run-audit.cjs",
+    "ci:policy:check": "node scripts/manual-ci-workflow-policy-check.cjs",
     "protocol:build": "npm run build --workspace=@kaonis/woly-protocol",
     "protocol:publish": "npm run protocol:build && npm publish --workspace=@kaonis/woly-protocol",
     "protocol:publish:next": "npm run protocol:build && npm publish --workspace=@kaonis/woly-protocol --tag next",
