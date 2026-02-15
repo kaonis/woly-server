@@ -85,6 +85,16 @@ npm run ci:followup:create -- --after <current-review-issue-number> --dry-run
 npm run ci:followup:create -- --after <current-review-issue-number>
 ```
 
+Generate or post a standardized closeout comment for the current review issue:
+
+```bash
+# Preview closeout comment body
+npm run ci:closeout:comment -- --issue <current-review-issue-number> --followup <next-review-issue-number> --cycle "post-merge cycle (#x to #y)" --roadmap docs/ROADMAP_VXX_AUTONOMOUS_CYCLE.md --deps-payload <checkpoint-iso>
+
+# Post comment directly to the issue
+npm run ci:closeout:comment -- --issue <current-review-issue-number> --followup <next-review-issue-number> --cycle "post-merge cycle (#x to #y)" --roadmap docs/ROADMAP_VXX_AUTONOMOUS_CYCLE.md --deps-payload <checkpoint-iso> --post
+```
+
 ## Rollback Criteria (Re-enable Automatic Runs)
 
 Re-enable automatic CI only when all of the following are true:
@@ -115,6 +125,8 @@ Weekly checklist:
    - `Continue manual-only` or `Start rollback`
 5. Queue next rolling review issue:
    - `npm run ci:followup:create -- --after <current-review-issue-number>`
+6. Post standardized closeout issue comment:
+   - `npm run ci:closeout:comment -- --issue <current-review-issue-number> --followup <next-review-issue-number> --cycle "<review-cycle>" --roadmap <roadmap-path> --deps-payload <checkpoint-iso> --post`
 
 ## Objective Exit Criteria
 

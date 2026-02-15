@@ -28,6 +28,11 @@ const {
   parseArgs: parseFollowupIssueArgs,
   resolveLabels: resolveFollowupLabels,
 } = require('../manual-ci-followup-issue.cjs');
+const {
+  buildCloseoutComment,
+  parseArgs: parseCloseoutArgs,
+  postCloseoutComment,
+} = require('../manual-ci-closeout-comment.cjs');
 
 test('findLatestSinceCheckpoint returns the latest valid checkpoint', () => {
   const markdown = [
@@ -234,4 +239,74 @@ test('createFollowupIssue delegates to provided issue creator', () => {
       labels: ['l1', 'l2'],
     },
   ]);
+});
+
+test('parseCloseoutArgs parses required flags and post mode', () => {
+  const parsed = parseCloseoutArgs([
+    '--issue',
+    '243',
+    '--followup',
+    '245',
+    '--post',
+  ]);
+
+  assert.deepEqual(parsed, {
+    issue: 243,
+    followup: 245,
+    merge: '<merge-commit-sha>',
+    cycle: '<post-merge-cycle>',
+    roadmap: '<roadmap-file>',
+    since: null,
+    depsPayload: null,
+    post: true,
+    help: false,
+  });
+});
+
+test('parseCloseoutArgs validates required issue arguments', () => {
+  assert.throws(
+    () => parseCloseoutArgs(['--followup', '245']),
+    /Missing required --issue/
+  );
+  assert.throws(
+    () => parseCloseoutArgs(['--issue', '243']),
+    /Missing required --followup/
+  );
+  assert.throws(
+    () => parseCloseoutArgs(['--issue', 'abc', '--followup', '245']),
+    /Missing or invalid value for --issue/
+  );
+});
+
+test('buildCloseoutComment includes core closeout sections', () => {
+  const markdown = buildCloseoutComment({
+    issue: 243,
+    followup: 245,
+    merge: 'abc1234',
+    cycle: 'post-merge cycle (#242 to #244)',
+    roadmap: 'docs/ROADMAP_V21_AUTONOMOUS_CYCLE.md',
+    since: '2026-02-15T21:31:02Z',
+    depsPayload: '2026-02-15T22:11:32Z',
+  });
+
+  assert.match(markdown, /Completed in merge commit abc1234/);
+  assert.match(markdown, /checkpoint `2026-02-15T21:31:02Z`/);
+  assert.match(markdown, /docs\/CI_MANUAL_REVIEW_LOG.md/);
+  assert.match(markdown, /issue #245/);
+  assert.match(markdown, /payload `2026-02-15T22:11:32Z`/);
+});
+
+test('postCloseoutComment delegates to provided comment poster', () => {
+  const calls = [];
+  const output = postCloseoutComment(
+    243,
+    'closeout-body',
+    (issueNumber, body) => {
+      calls.push([issueNumber, body]);
+      return 'https://example.invalid/issue/243#comment';
+    }
+  );
+
+  assert.equal(output, 'https://example.invalid/issue/243#comment');
+  assert.deepEqual(calls, [[243, 'closeout-body']]);
 });
