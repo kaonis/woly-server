@@ -176,6 +176,9 @@ docker run -d --net host \
   woly-node-agent
 ```
 
+For full production rollout guidance (topology, secrets, TLS, backup/restore, and rollback):
+- [docs/PRODUCTION_DEPLOYMENT_GUIDE.md](docs/PRODUCTION_DEPLOYMENT_GUIDE.md)
+
 ## CI
 
 GitHub Actions is currently in a temporary manual-only mode to control Actions spend.
