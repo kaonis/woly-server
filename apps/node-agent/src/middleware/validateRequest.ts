@@ -14,7 +14,7 @@ export type ValidationTarget = 'body' | 'params' | 'query';
  * @param target - Which part of the request to validate (body, params, or query)
  * @returns Express middleware function
  */
-export const validateRequest = (schema: z.ZodObject<z.ZodRawShape>, target: ValidationTarget = 'body') => {
+export const validateRequest = (schema: z.ZodTypeAny, target: ValidationTarget = 'body') => {
   return (req: Request, _res: Response, next: NextFunction) => {
     const dataToValidate = req[target];
 

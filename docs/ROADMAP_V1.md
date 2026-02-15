@@ -114,4 +114,7 @@ For each issue phase:
 - 2026-02-15: Merged PR #115 (`test: add mobile API compatibility smoke suite (#112)`).
 - 2026-02-15: Verified post-merge `master` CI and CodeQL runs are green.
 - 2026-02-15: Started Phase 4 implementation on issue #83 (`fix/83-node-agent-cors-health-hardening`).
-- Next: Open and merge PR for #83, then continue to #89.
+- 2026-02-15: Merged PR #116 (`fix: restrict default CORS and rate-limit health endpoint (#83)`).
+- 2026-02-15: Verified post-merge `master` CI and CodeQL runs are green.
+- 2026-02-15: Started remaining Phase 4 implementation on issue #89 (`fix/89-node-agent-rest-update-delete`).
+- Next: Open and merge PR for #89.

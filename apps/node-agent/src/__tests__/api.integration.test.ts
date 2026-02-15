@@ -166,6 +166,61 @@ describe('API Integration Tests', () => {
     });
   });
 
+  describe('PUT /hosts/:name', () => {
+    beforeAll(async () => {
+      await db.addHost('TEST-UPDATE-HOST', 'AA:BB:CC:44:44:44', '192.168.1.104');
+    });
+
+    it('should update host fields', async () => {
+      const response = await request(app)
+        .put('/hosts/TEST-UPDATE-HOST')
+        .send({
+          name: 'TEST-UPDATE-HOST-RENAMED',
+          ip: '192.168.1.105',
+        })
+        .expect(200);
+
+      expect(response.body.name).toBe('TEST-UPDATE-HOST-RENAMED');
+      expect(response.body.ip).toBe('192.168.1.105');
+
+      await request(app).get('/hosts/TEST-UPDATE-HOST-RENAMED').expect(200);
+    });
+
+    it('should return 404 for unknown host', async () => {
+      const response = await request(app)
+        .put('/hosts/DOES-NOT-EXIST')
+        .send({ ip: '192.168.1.200' })
+        .expect(404);
+
+      expect(response.body).toHaveProperty('error', 'Not Found');
+    });
+  });
+
+  describe('DELETE /hosts/:name', () => {
+    beforeEach(async () => {
+      try {
+        await db.addHost('TEST-DELETE-HOST', 'AA:BB:CC:55:55:55', '192.168.1.106');
+      } catch {
+        // host may already exist from previous test iteration
+      }
+    });
+
+    it('should delete existing host', async () => {
+      const response = await request(app).delete('/hosts/TEST-DELETE-HOST').expect(200);
+      expect(response.body).toEqual({
+        message: 'Host deleted',
+        name: 'TEST-DELETE-HOST',
+      });
+
+      await request(app).get('/hosts/TEST-DELETE-HOST').expect(404);
+    });
+
+    it('should return 404 for unknown host', async () => {
+      const response = await request(app).delete('/hosts/NO-SUCH-HOST').expect(404);
+      expect(response.body).toHaveProperty('error', 'Not Found');
+    });
+  });
+
   describe('POST /hosts/wakeup/:name', () => {
     beforeAll(async () => {
       // Add test host for WoL tests since seed data was removed

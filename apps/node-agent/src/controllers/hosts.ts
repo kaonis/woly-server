@@ -5,7 +5,7 @@ import { LRUCache } from 'lru-cache';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import HostDatabase from '../services/hostDatabase';
-import { MacVendorCacheEntry } from '../types';
+import { Host, MacVendorCacheEntry } from '../types';
 
 // Database service will be set by app.js
 let hostDb: HostDatabase | null = null;
@@ -368,6 +368,137 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
 
 /**
  * @swagger
+ * /hosts/{name}:
+ *   put:
+ *     summary: Update host properties
+ *     description: Update host name, MAC address, or IP address
+ *     tags: [Hosts]
+ *     security:
+ *       - BearerAuth: []
+ *       - {}
+ *     parameters:
+ *       - in: path
+ *         name: name
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Existing host name
+ *         example: OLD-HOSTNAME
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: NEW-HOSTNAME
+ *               mac:
+ *                 type: string
+ *                 example: 'AA:BB:CC:DD:EE:FF'
+ *               ip:
+ *                 type: string
+ *                 example: 192.168.1.200
+ *     responses:
+ *       200:
+ *         description: Host updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Host'
+ *       404:
+ *         description: Host not found
+ *       409:
+ *         description: Conflict (duplicate name/mac/ip)
+ */
+const updateHost = async (req: Request, res: Response): Promise<void> => {
+  const currentName = req.params.name as string;
+  const updates = req.body as Partial<Pick<Host, 'name' | 'mac' | 'ip'>>;
+
+  if (!hostDb) {
+    res.status(500).json({ error: 'Database not initialized' });
+    return;
+  }
+
+  const existing = await hostDb.getHost(currentName);
+  if (!existing) {
+    res.status(404).json({ error: 'Not Found', message: `Host '${currentName}' not found` });
+    return;
+  }
+
+  try {
+    await hostDb.updateHost(currentName, updates);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    if (message.includes('UNIQUE constraint failed')) {
+      res.status(409).json({
+        error: 'Conflict',
+        message: 'Host update conflicts with an existing host record',
+      });
+      return;
+    }
+    throw error;
+  }
+
+  const lookupName = updates.name ?? currentName;
+  const updatedHost = await hostDb.getHost(lookupName);
+  if (!updatedHost) {
+    res.status(500).json({ error: 'Failed to load updated host' });
+    return;
+  }
+
+  // Forward to C&C in agent mode (if listeners are registered).
+  hostDb.emit('host-updated', updatedHost);
+  res.status(200).json(updatedHost);
+};
+
+/**
+ * @swagger
+ * /hosts/{name}:
+ *   delete:
+ *     summary: Delete a host
+ *     description: Remove host from local database
+ *     tags: [Hosts]
+ *     security:
+ *       - BearerAuth: []
+ *       - {}
+ *     parameters:
+ *       - in: path
+ *         name: name
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Host name to delete
+ *         example: OLD-HOSTNAME
+ *     responses:
+ *       200:
+ *         description: Host deleted successfully
+ *       404:
+ *         description: Host not found
+ */
+const deleteHost = async (req: Request, res: Response): Promise<void> => {
+  const name = req.params.name as string;
+
+  if (!hostDb) {
+    res.status(500).json({ error: 'Database not initialized' });
+    return;
+  }
+
+  const existing = await hostDb.getHost(name);
+  if (!existing) {
+    res.status(404).json({ error: 'Not Found', message: `Host '${name}' not found` });
+    return;
+  }
+
+  await hostDb.deleteHost(name);
+  // Forward to C&C in agent mode (if listeners are registered).
+  hostDb.emit('host-removed', name);
+  res.status(200).json({ message: 'Host deleted', name });
+};
+
+/**
+ * @swagger
  * /hosts/mac-vendor/{mac}:
  *   get:
  *     summary: Get MAC address vendor information
@@ -516,4 +647,14 @@ const getMacVendor = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-export { setHostDatabase, getAllHosts, getHost, wakeUpHost, scanNetwork, addHost, getMacVendor };
+export {
+  setHostDatabase,
+  getAllHosts,
+  getHost,
+  wakeUpHost,
+  scanNetwork,
+  addHost,
+  updateHost,
+  deleteHost,
+  getMacVendor,
+};

@@ -4,6 +4,8 @@ import { apiLimiter, scanLimiter, wakeLimiter } from '../middleware/rateLimiter'
 import { validateRequest } from '../middleware/validateRequest';
 import { apiKeyAuth } from '../middleware/apiKeyAuth';
 import {
+  addHostSchema,
+  deleteHostSchema,
   hostNameParamSchema,
   macAddressSchema,
   updateHostSchema,
@@ -24,7 +26,7 @@ router.get('/', hostsController.getAllHosts);
 router.post('/scan', scanLimiter, hostsController.scanNetwork);
 
 // Add a new host manually (with validation)
-router.post('/', validateRequest(updateHostSchema, 'body'), hostsController.addHost);
+router.post('/', validateRequest(addHostSchema, 'body'), hostsController.addHost);
 
 // Get MAC address vendor information (with validation)
 router.get(
@@ -42,6 +44,21 @@ router.post(
   wakeLimiter,
   validateRequest(hostNameParamSchema, 'params'),
   hostsController.wakeUpHost
+);
+
+// Update a specific host
+router.put(
+  '/:name',
+  validateRequest(hostNameParamSchema, 'params'),
+  validateRequest(updateHostSchema, 'body'),
+  hostsController.updateHost
+);
+
+// Delete a specific host
+router.delete(
+  '/:name',
+  validateRequest(deleteHostSchema, 'params'),
+  hostsController.deleteHost
 );
 
 export default router;

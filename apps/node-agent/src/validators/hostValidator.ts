@@ -14,13 +14,37 @@ export const macAddressSchema = z.object({
 });
 
 /**
- * Schema for validating host creation/update data
+ * Schema for validating host creation data
  */
-export const updateHostSchema = z.object({
+export const addHostSchema = z.object({
   name: z.string().min(1, 'Hostname must be at least 1 character').max(255, 'Hostname must not exceed 255 characters').trim(),
   ip: z.string().ip('IP address must be a valid IPv4 or IPv6 address'),
   mac: z.string().regex(macAddressPattern, 'MAC address must be in format XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX'),
 });
+
+/**
+ * Schema for validating partial host update data
+ */
+export const updateHostSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1, 'Hostname must be at least 1 character')
+      .max(255, 'Hostname must not exceed 255 characters')
+      .trim()
+      .optional(),
+    ip: z.string().ip('IP address must be a valid IPv4 or IPv6 address').optional(),
+    mac: z
+      .string()
+      .regex(
+        macAddressPattern,
+        'MAC address must be in format XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX'
+      )
+      .optional(),
+  })
+  .refine((value) => value.name !== undefined || value.ip !== undefined || value.mac !== undefined, {
+    message: 'At least one field is required: name, ip, or mac',
+  });
 
 /**
  * Schema for validating host name path parameter
@@ -33,5 +57,9 @@ export const hostNameParamSchema = z.object({
  * Schema for validating delete host request
  */
 export const deleteHostSchema = z.object({
-  macAddress: z.string().regex(macAddressPattern, 'MAC address must be in format XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX'),
+  name: z
+    .string()
+    .min(1, 'Hostname must be at least 1 character')
+    .max(255, 'Hostname must not exceed 255 characters')
+    .trim(),
 });

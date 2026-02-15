@@ -19,6 +19,8 @@ describe('hosts controller', () => {
       getAllHosts: jest.fn(),
       getHost: jest.fn(),
       addHost: jest.fn(),
+      updateHost: jest.fn(),
+      deleteHost: jest.fn(),
       updateHostStatus: jest.fn(),
       updateHostSeen: jest.fn(),
       syncWithNetwork: jest.fn(),
@@ -30,6 +32,7 @@ describe('hosts controller', () => {
       stopPeriodicSync: jest.fn(),
       isScanInProgress: jest.fn().mockReturnValue(false),
       getLastScanTime: jest.fn().mockReturnValue(null),
+      emit: jest.fn(),
     } as any;
 
     // Create mock request
@@ -304,6 +307,108 @@ describe('hosts controller', () => {
       await expect(
         hostsController.addHost(mockReq as Request, mockRes as Response)
       ).rejects.toThrow('UNIQUE constraint failed');
+    });
+  });
+
+  describe('updateHost', () => {
+    it('should update a host and return updated payload', async () => {
+      const existingHost = {
+        name: 'OLD-HOST',
+        mac: 'AA:BB:CC:DD:EE:01',
+        ip: '192.168.1.50',
+        status: 'awake',
+      };
+      const updatedHost = {
+        name: 'NEW-HOST',
+        mac: 'AA:BB:CC:DD:EE:01',
+        ip: '192.168.1.60',
+        status: 'awake',
+      };
+
+      mockReq.params = { name: 'OLD-HOST' };
+      mockReq.body = { name: 'NEW-HOST', ip: '192.168.1.60' };
+      mockDb.getHost
+        .mockResolvedValueOnce(existingHost as any)
+        .mockResolvedValueOnce(updatedHost as any);
+
+      await hostsController.updateHost(mockReq as Request, mockRes as Response);
+
+      expect(mockDb.updateHost).toHaveBeenCalledWith('OLD-HOST', {
+        name: 'NEW-HOST',
+        ip: '192.168.1.60',
+      });
+      expect(mockDb.emit).toHaveBeenCalledWith('host-updated', updatedHost);
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(updatedHost);
+    });
+
+    it('should return 404 when host does not exist', async () => {
+      mockReq.params = { name: 'MISSING' };
+      mockReq.body = { ip: '192.168.1.99' };
+      mockDb.getHost.mockResolvedValue(undefined);
+
+      await hostsController.updateHost(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Not Found',
+        message: "Host 'MISSING' not found",
+      });
+    });
+
+    it('should return 409 on uniqueness conflicts', async () => {
+      mockReq.params = { name: 'HOST-A' };
+      mockReq.body = { name: 'HOST-B' };
+      mockDb.getHost.mockResolvedValueOnce({
+        name: 'HOST-A',
+        mac: 'AA:BB:CC:DD:EE:10',
+        ip: '192.168.1.10',
+        status: 'awake',
+      } as any);
+      mockDb.updateHost.mockRejectedValue(new Error('UNIQUE constraint failed'));
+
+      await hostsController.updateHost(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(409);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Conflict',
+        message: 'Host update conflicts with an existing host record',
+      });
+    });
+  });
+
+  describe('deleteHost', () => {
+    it('should delete host and return success payload', async () => {
+      mockReq.params = { name: 'DELETE-ME' };
+      mockDb.getHost.mockResolvedValue({
+        name: 'DELETE-ME',
+        mac: 'AA:BB:CC:DD:EE:02',
+        ip: '192.168.1.70',
+        status: 'asleep',
+      } as any);
+
+      await hostsController.deleteHost(mockReq as Request, mockRes as Response);
+
+      expect(mockDb.deleteHost).toHaveBeenCalledWith('DELETE-ME');
+      expect(mockDb.emit).toHaveBeenCalledWith('host-removed', 'DELETE-ME');
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        message: 'Host deleted',
+        name: 'DELETE-ME',
+      });
+    });
+
+    it('should return 404 when deleting unknown host', async () => {
+      mockReq.params = { name: 'UNKNOWN' };
+      mockDb.getHost.mockResolvedValue(undefined);
+
+      await hostsController.deleteHost(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Not Found',
+        message: "Host 'UNKNOWN' not found",
+      });
     });
   });
 

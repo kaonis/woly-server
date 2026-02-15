@@ -183,6 +183,17 @@ describe('API Key Authentication Integration Tests', () => {
           .set('Authorization', 'Bearer wrong-key')
           .expect(401);
       });
+
+      it('should reject PUT /hosts/:name without Authorization header', async () => {
+        await request(app)
+          .put('/hosts/TEST-HOST-AUTH2')
+          .send({ ip: '192.168.1.222' })
+          .expect(401);
+      });
+
+      it('should reject DELETE /hosts/:name without Authorization header', async () => {
+        await request(app).delete('/hosts/TEST-HOST-AUTH2').expect(401);
+      });
     });
 
     describe('authorized requests', () => {
@@ -251,6 +262,25 @@ describe('API Key Authentication Integration Tests', () => {
           .expect((res) => {
             // Accept 200 (success), 204 (no content), 429 (rate limit), or 500 (vendor lookup error in test env)
             expect([200, 204, 429, 500]).toContain(res.status);
+          });
+      });
+
+      it('should allow PUT /hosts/:name with valid API key', async () => {
+        await request(app)
+          .put('/hosts/TEST-HOST-AUTH2')
+          .set('Authorization', `Bearer ${validApiKey}`)
+          .send({ ip: '192.168.1.202' })
+          .expect((res) => {
+            expect([200, 404, 409]).toContain(res.status);
+          });
+      });
+
+      it('should allow DELETE /hosts/:name with valid API key', async () => {
+        await request(app)
+          .delete('/hosts/TEST-HOST-AUTH2')
+          .set('Authorization', `Bearer ${validApiKey}`)
+          .expect((res) => {
+            expect([200, 404]).toContain(res.status);
           });
       });
     });
