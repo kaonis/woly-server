@@ -21,6 +21,8 @@ export interface Host {
   lastSeen: string | null;
   discovered: number;
   pingResponsive?: number | null;
+  notes?: string | null;
+  tags?: string[];
 }
 
 /** @deprecated Use `Host` instead. */
@@ -101,6 +103,8 @@ export type CncCommand =
         mac?: string;
         ip?: string;
         status?: HostStatus;
+        notes?: string | null;
+        tags?: string[];
       };
     }
   | { type: 'delete-host'; commandId: string; data: { name: string } }
@@ -110,6 +114,8 @@ export type CncCommand =
 // --- Zod schemas ---
 
 export const hostStatusSchema = z.enum(['awake', 'asleep']);
+export const hostNotesSchema = z.string().max(2_000).nullable();
+export const hostTagsSchema = z.array(z.string().min(1).max(64)).max(32);
 
 export const hostSchema = z.object({
   name: z.string().min(1),
@@ -119,6 +125,8 @@ export const hostSchema = z.object({
   lastSeen: z.string().nullable(),
   discovered: z.number().int(),
   pingResponsive: z.number().int().nullable().optional(),
+  notes: hostNotesSchema.optional(),
+  tags: hostTagsSchema.optional(),
 });
 
 export const commandStateSchema = z.enum([
@@ -243,6 +251,8 @@ export const inboundCncCommandSchema: z.ZodType<CncCommand> = z.discriminatedUni
       mac: z.string().min(1).optional(),
       ip: z.string().min(1).optional(),
       status: hostStatusSchema.optional(),
+      notes: hostNotesSchema.optional(),
+      tags: hostTagsSchema.optional(),
     }),
   }),
   z.object({

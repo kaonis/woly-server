@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS aggregated_hosts (
     fully_qualified_name VARCHAR(512) NOT NULL,
     discovered INTEGER NOT NULL DEFAULT 1,
     ping_responsive INTEGER,
+    notes TEXT,
+    tags TEXT NOT NULL DEFAULT '[]',
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE(node_id, name)

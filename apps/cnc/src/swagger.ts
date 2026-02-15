@@ -150,6 +150,20 @@ const options: swaggerJsdoc.Options = {
               example: 1,
               nullable: true,
             },
+            notes: {
+              type: 'string',
+              description: 'Optional operator notes for this host',
+              example: 'Patch window Sundays 03:00 UTC',
+              nullable: true,
+            },
+            tags: {
+              type: 'array',
+              description: 'Optional host tags for filtering/grouping',
+              items: {
+                type: 'string',
+              },
+              example: ['prod', 'database'],
+            },
             nodeId: {
               type: 'string',
               description: 'ID of the node managing this host',

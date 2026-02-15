@@ -11,6 +11,7 @@ The schema files in `src/database/` are used for **fresh installations only**. I
 | Version | File | Description | Date |
 |---------|------|-------------|------|
 | 001 | `001_add_commands_table.sql` (PostgreSQL)<br/>`001_add_commands_table.sqlite.sql` (SQLite) | Adds the `commands` table for Phase 4 (Durable Command Lifecycle) with lifecycle states and idempotency support | 2026-02-07 |
+| 002 | `002_add_host_metadata.sql` (PostgreSQL)<br/>`002_add_host_metadata.sqlite.sql` (SQLite) | Adds `notes` and `tags` host metadata columns to `aggregated_hosts` and backfills null tags | 2026-02-15 |
 
 ## How to Apply Migrations
 
@@ -21,10 +22,12 @@ For production PostgreSQL databases, run the migration script using `psql`:
 ```bash
 # Connect to your database and run the migration
 psql -U woly -d woly < migrations/001_add_commands_table.sql
+psql -U woly -d woly < migrations/002_add_host_metadata.sql
 
 # Or connect first, then run the migration
 psql -U woly -d woly
 \i migrations/001_add_commands_table.sql
+\i migrations/002_add_host_metadata.sql
 ```
 
 ### SQLite
@@ -34,10 +37,12 @@ For SQLite databases (development/tunnel environments), use the `sqlite3` comman
 ```bash
 # Run the migration
 sqlite3 db/woly-cnc.db < migrations/001_add_commands_table.sqlite.sql
+sqlite3 db/woly-cnc.db < migrations/002_add_host_metadata.sqlite.sql
 
 # Or interactively
 sqlite3 db/woly-cnc.db
 .read migrations/001_add_commands_table.sqlite.sql
+.read migrations/002_add_host_metadata.sqlite.sql
 ```
 
 ### Docker Environments
@@ -89,6 +94,7 @@ SELECT conname, contype FROM pg_constraint WHERE conrelid = 'commands'::regclass
 2. **Test in Staging**: Run migrations on a staging/test environment before production
 3. **Use Transactions**: Migrations use `IF NOT EXISTS` clauses to be idempotent
 4. **Track Versions**: Keep a record of which migrations have been applied
+5. **SQLite Note**: `002_add_host_metadata.sqlite.sql` is not re-runnable; skip it once applied
 
 ## Rollback
 

@@ -17,6 +17,8 @@ interface HostUpdateData {
   mac?: string;
   ip?: string;
   status?: HostStatus;
+  notes?: string | null;
+  tags?: string[];
 }
 
 /**
@@ -194,10 +196,12 @@ export class CommandRouter extends EventEmitter {
       commandId,
       data: {
         currentName: host.name,
-        name: hostData.name || host.name,
-        mac: hostData.mac || host.mac,
-        ip: hostData.ip || host.ip,
-        status: hostData.status || host.status,
+        name: hostData.name ?? host.name,
+        mac: hostData.mac ?? host.mac,
+        ip: hostData.ip ?? host.ip,
+        status: hostData.status ?? host.status,
+        notes: hostData.notes !== undefined ? hostData.notes : host.notes,
+        tags: hostData.tags !== undefined ? hostData.tags : host.tags,
       },
     };
 

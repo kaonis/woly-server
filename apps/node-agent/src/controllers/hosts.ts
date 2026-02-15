@@ -349,6 +349,17 @@ const scanNetwork = async (_req: Request, res: Response): Promise<void> => {
  *                 format: ipv4
  *                 description: IPv4 address
  *                 example: 192.168.1.100
+ *               notes:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Optional operator notes for the host
+ *                 example: Hypervisor host
+ *               tags:
+ *                 type: array
+ *                 description: Optional host tags
+ *                 items:
+ *                   type: string
+ *                 example: [infra, linux]
  *     responses:
  *       201:
  *         description: Host added successfully
@@ -370,7 +381,7 @@ const scanNetwork = async (_req: Request, res: Response): Promise<void> => {
  *         $ref: '#/components/responses/InternalError'
  */
 const addHost = async (req: Request, res: Response): Promise<void> => {
-  const { name, mac, ip } = req.body;
+  const { name, mac, ip, notes, tags } = req.body;
 
   if (!name || !mac || !ip) {
     res.status(400).json({ error: 'Missing required fields: name, mac, ip' });
@@ -381,7 +392,10 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ error: 'Database not initialized' });
     return;
   }
-  const host = await hostDb.addHost(name, mac, ip);
+  const host = await hostDb.addHost(name, mac, ip, {
+    notes,
+    tags,
+  });
   res.status(201).json(host);
 };
 
@@ -419,6 +433,15 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
  *               ip:
  *                 type: string
  *                 example: 192.168.1.200
+ *               notes:
+ *                 type: string
+ *                 nullable: true
+ *                 example: Reserved for backup tasks
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: [backup, low-priority]
  *     responses:
  *       200:
  *         description: Host updated successfully
@@ -433,7 +456,7 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
  */
 const updateHost = async (req: Request, res: Response): Promise<void> => {
   const currentName = req.params.name as string;
-  const updates = req.body as Partial<Pick<Host, 'name' | 'mac' | 'ip'>>;
+  const updates = req.body as Partial<Pick<Host, 'name' | 'mac' | 'ip' | 'notes' | 'tags'>>;
 
   if (!hostDb) {
     res.status(500).json({ error: 'Database not initialized' });

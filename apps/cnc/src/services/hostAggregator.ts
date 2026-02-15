@@ -37,6 +37,8 @@ const HOST_SELECT_COLUMNS = `
         ah.ip,
         ah.status,
         ah.last_seen as "lastSeen",
+        ah.notes,
+        ah.tags,
         ah.location,
         ah.fully_qualified_name as "fullyQualifiedName",
         ah.discovered,
@@ -51,9 +53,119 @@ const HOST_SELECT_COLUMNS_WITH_ID = `
 
 export class HostAggregator extends EventEmitter {
   private readonly isSqlite = db.isSqlite;
+  private metadataColumnsReady: Promise<void> | null = null;
 
   constructor() {
     super();
+  }
+
+  private parseTags(value: unknown, hostName: string): string[] {
+    if (Array.isArray(value)) {
+      return value.filter((tag): tag is string => typeof tag === 'string');
+    }
+
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((tag): tag is string => typeof tag === 'string');
+      }
+    } catch (error) {
+      logger.warn('Failed to parse aggregated host tags; defaulting to empty list', {
+        hostName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return [];
+  }
+
+  private serializeTags(tags: string[] | undefined): string {
+    if (!tags || tags.length === 0) {
+      return '[]';
+    }
+
+    return JSON.stringify(tags);
+  }
+
+  private normalizeHost(row: AggregatedHost & { tags?: unknown }): AggregatedHost {
+    return {
+      ...row,
+      notes: row.notes ?? null,
+      tags: this.parseTags(row.tags, row.name),
+    };
+  }
+
+  private isDuplicateColumnError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    const maybeCode = (error as { code?: unknown }).code;
+    if (maybeCode === '42701') {
+      return true;
+    }
+
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    return message.includes('duplicate column') || message.includes('already exists');
+  }
+
+  private async ensureHostMetadataColumns(): Promise<void> {
+    if (!this.metadataColumnsReady) {
+      this.metadataColumnsReady = this.applyHostMetadataMigrations().catch((error) => {
+        this.metadataColumnsReady = null;
+        throw error;
+      });
+    }
+
+    await this.metadataColumnsReady;
+  }
+
+  private async applyHostMetadataMigrations(): Promise<void> {
+    const existingColumns = await this.getExistingHostColumns();
+    const migrationStatements: Array<{ column: string; statement: string }> = [
+      { column: 'notes', statement: 'ALTER TABLE aggregated_hosts ADD COLUMN notes TEXT' },
+      { column: 'tags', statement: "ALTER TABLE aggregated_hosts ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'" },
+    ];
+
+    for (const migration of migrationStatements) {
+      if (existingColumns.has(migration.column)) {
+        continue;
+      }
+
+      try {
+        await db.query(migration.statement);
+      } catch (error) {
+        if (!this.isDuplicateColumnError(error)) {
+          logger.error('Failed to apply aggregated host metadata migration', {
+            statement: migration.statement,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          throw error;
+        }
+      }
+    }
+
+    await db.query("UPDATE aggregated_hosts SET tags = '[]' WHERE tags IS NULL");
+  }
+
+  private async getExistingHostColumns(): Promise<Set<string>> {
+    if (this.isSqlite) {
+      const result = await db.query<{ name: string }>(
+        "SELECT name FROM pragma_table_info('aggregated_hosts')"
+      );
+      return new Set(result.rows.map((row) => row.name));
+    }
+
+    const result = await db.query<{ column_name: string }>(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_name = 'aggregated_hosts' AND table_schema = 'public'`
+    );
+    return new Set(result.rows.map((row) => row.column_name));
   }
 
   // Internal row shape used for reconciliation/deduping. External API types do not expose `id`.
@@ -69,7 +181,8 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
       [nodeId, name]
     );
 
-    return result.rows[0] ?? null;
+    const row = result.rows[0];
+    return row ? (this.normalizeHost(row as AggregatedHost & { tags?: unknown }) as AggregatedHostRow) : null;
   }
 
   private async findHostRowByNodeAndMac(
@@ -86,7 +199,8 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
       [nodeId, mac]
     );
 
-    return result.rows[0] ?? null;
+    const row = result.rows[0];
+    return row ? (this.normalizeHost(row as AggregatedHost & { tags?: unknown }) as AggregatedHostRow) : null;
   }
 
   private async deleteOtherHostsByNodeAndMac(
@@ -113,6 +227,8 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
 
     const discovered = host.discovered ?? 1;
     const pingResponsive = host.pingResponsive ?? null;
+    const notes = host.notes ?? null;
+    const tags = this.serializeTags(host.tags);
 
     // Convert lastSeen to ISO string for SQLite compatibility
     const lastSeen = host.lastSeen
@@ -132,8 +248,10 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
             fully_qualified_name = $7,
             discovered = $8,
             ping_responsive = $9,
+            notes = $10,
+            tags = $11,
             updated_at = ${timestamp}
-        WHERE id = $10 AND node_id = $11`,
+        WHERE id = $12 AND node_id = $13`,
       [
         host.name,
         host.mac,
@@ -144,6 +262,8 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
         fullyQualifiedName,
         discovered,
         pingResponsive,
+        notes,
+        tags,
         id,
         nodeId,
       ]
@@ -199,6 +319,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
    * Process host-discovered event from a node
    */
   async onHostDiscovered(event: HostDiscoveredEvent): Promise<void> {
+    await this.ensureHostMetadataColumns();
     const { nodeId, host, location } = event;
     const fullyQualifiedName = this.buildFQN(host.name, location, nodeId);
 
@@ -245,6 +366,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
    * Process host-updated event from a node
    */
   async onHostUpdated(event: HostUpdatedEvent): Promise<void> {
+    await this.ensureHostMetadataColumns();
     const { nodeId, host, location } = event;
     const fullyQualifiedName = this.buildFQN(host.name, location, nodeId);
 
@@ -283,6 +405,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
    * Process host-removed event from a node
    */
   async onHostRemoved(event: HostRemovedEvent): Promise<void> {
+    await this.ensureHostMetadataColumns();
     const { nodeId, name } = event;
 
     try {
@@ -328,6 +451,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
    * Mark all hosts for a node as unreachable when node goes offline
    */
   async markNodeHostsUnreachable(nodeId: string): Promise<void> {
+    await this.ensureHostMetadataColumns();
     try {
       const timestamp = this.isSqlite ? 'CURRENT_TIMESTAMP' : 'NOW()';
       const query = this.isSqlite
@@ -363,6 +487,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
    * Remove all hosts for a node (when node is deregistered)
    */
   async removeNodeHosts(nodeId: string): Promise<void> {
+    await this.ensureHostMetadataColumns();
     try {
       const result = await db.query(
         'DELETE FROM aggregated_hosts WHERE node_id = $1 RETURNING name',
@@ -389,6 +514,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
    * Get all aggregated hosts
    */
   async getAllHosts(): Promise<AggregatedHost[]> {
+    await this.ensureHostMetadataColumns();
     try {
       const result = await db.query<AggregatedHost>(`
         SELECT
@@ -397,7 +523,7 @@ ${HOST_SELECT_COLUMNS}
         ORDER BY ah.fully_qualified_name
       `);
 
-      return result.rows;
+      return result.rows.map((row) => this.normalizeHost(row as AggregatedHost & { tags?: unknown }));
     } catch (error) {
       logger.error('Failed to get all hosts', {
         error: error instanceof Error ? error.message : String(error),
@@ -410,6 +536,7 @@ ${HOST_SELECT_COLUMNS}
    * Get hosts for a specific node
    */
   async getHostsByNode(nodeId: string): Promise<AggregatedHost[]> {
+    await this.ensureHostMetadataColumns();
     try {
       const result = await db.query<AggregatedHost>(
         `SELECT
@@ -420,7 +547,7 @@ ${HOST_SELECT_COLUMNS}
         [nodeId]
       );
 
-      return result.rows;
+      return result.rows.map((row) => this.normalizeHost(row as AggregatedHost & { tags?: unknown }));
     } catch (error) {
       logger.error('Failed to get hosts by node', {
         nodeId,
@@ -434,6 +561,7 @@ ${HOST_SELECT_COLUMNS}
    * Get a specific host by fully qualified name
    */
   async getHostByFQN(fullyQualifiedName: string): Promise<AggregatedHost | null> {
+    await this.ensureHostMetadataColumns();
     try {
       const result = await db.query<AggregatedHost>(
         `SELECT
@@ -443,7 +571,8 @@ ${HOST_SELECT_COLUMNS}
         [fullyQualifiedName]
       );
 
-      return result.rows[0] ?? null;
+      const row = result.rows[0];
+      return row ? this.normalizeHost(row as AggregatedHost & { tags?: unknown }) : null;
     } catch (error) {
       logger.error('Failed to get host by FQN', {
         fullyQualifiedName,
@@ -462,6 +591,7 @@ ${HOST_SELECT_COLUMNS}
     asleep: number;
     byLocation: Record<string, { total: number; awake: number }>;
   }> {
+    await this.ensureHostMetadataColumns();
     try {
       // Get overall stats (database-specific)
       const overallQuery = this.isSqlite ? `
@@ -515,11 +645,15 @@ ${HOST_SELECT_COLUMNS}
 
       const overall = overallResult.rows[0];
       const byLocation: Record<string, { total: number; awake: number }> = {};
+      const parseCount = (value: string | number | null | undefined): number => {
+        const parsed = Number.parseInt(String(value ?? '0'), 10);
+        return Number.isNaN(parsed) ? 0 : parsed;
+      };
 
       locationResult.rows.forEach((row) => {
         byLocation[row.location] = {
-          total: parseInt(String(row.total), 10),
-          awake: parseInt(String(row.awake || '0'), 10),
+          total: parseCount(row.total),
+          awake: parseCount(row.awake),
         };
       });
 
@@ -534,9 +668,9 @@ ${HOST_SELECT_COLUMNS}
       }
 
       return {
-        total: parseInt(String(overall.total), 10),
-        awake: parseInt(String(overall.awake), 10),
-        asleep: parseInt(String(overall.asleep), 10),
+        total: parseCount(overall.total),
+        awake: parseCount(overall.awake),
+        asleep: parseCount(overall.asleep),
         byLocation,
       };
     } catch (error) {
@@ -564,6 +698,8 @@ ${HOST_SELECT_COLUMNS}
   ): Promise<void> {
     const discovered = host.discovered ?? 1;
     const pingResponsive = host.pingResponsive ?? null;
+    const notes = host.notes ?? null;
+    const tags = this.serializeTags(host.tags);
 
     // Convert lastSeen to ISO string for SQLite compatibility
     const lastSeen = host.lastSeen 
@@ -572,8 +708,8 @@ ${HOST_SELECT_COLUMNS}
 
     await db.query(
       `INSERT INTO aggregated_hosts
-        (node_id, name, mac, ip, status, last_seen, location, fully_qualified_name, discovered, ping_responsive)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        (node_id, name, mac, ip, status, last_seen, location, fully_qualified_name, discovered, ping_responsive, notes, tags)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         nodeId,
         host.name,
@@ -585,6 +721,8 @@ ${HOST_SELECT_COLUMNS}
         fullyQualifiedName,
         discovered,
         pingResponsive,
+        notes,
+        tags,
       ]
     );
   }

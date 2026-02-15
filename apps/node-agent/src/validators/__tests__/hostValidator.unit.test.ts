@@ -24,6 +24,8 @@ describe('hostValidator schemas', () => {
         name: 'TestHost',
         ip: '192.168.1.100',
         mac: 'AA:BB:CC:DD:EE:FF',
+        notes: 'Primary workstation',
+        tags: ['office', 'critical'],
       });
       expect(result.success).toBe(true);
     });
@@ -40,6 +42,8 @@ describe('hostValidator schemas', () => {
       expect(updateHostSchema.safeParse({ name: 'Renamed' }).success).toBe(true);
       expect(updateHostSchema.safeParse({ ip: '192.168.1.222' }).success).toBe(true);
       expect(updateHostSchema.safeParse({ mac: 'AA:BB:CC:DD:EE:11' }).success).toBe(true);
+      expect(updateHostSchema.safeParse({ notes: null }).success).toBe(true);
+      expect(updateHostSchema.safeParse({ tags: ['tag-1'] }).success).toBe(true);
     });
 
     it('accepts combined updates', () => {
@@ -47,10 +51,13 @@ describe('hostValidator schemas', () => {
         name: 'Renamed',
         ip: '192.168.1.222',
         mac: 'AA:BB:CC:DD:EE:11',
+        notes: 'Renamed host note',
+        tags: ['desktop'],
       });
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.name).toBe('Renamed');
+        expect(result.data.notes).toBe('Renamed host note');
       }
     });
 
@@ -66,6 +73,8 @@ describe('hostValidator schemas', () => {
       expect(updateHostSchema.safeParse({ ip: '999.999.999.999' }).success).toBe(false);
       expect(updateHostSchema.safeParse({ mac: 'INVALID' }).success).toBe(false);
       expect(updateHostSchema.safeParse({ name: '' }).success).toBe(false);
+      expect(updateHostSchema.safeParse({ notes: 'x'.repeat(2001) }).success).toBe(false);
+      expect(updateHostSchema.safeParse({ tags: [''] }).success).toBe(false);
     });
   });
 

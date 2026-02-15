@@ -37,6 +37,8 @@ type HostRecord = {
   mac: string;
   ip: string;
   status: 'awake' | 'asleep';
+  notes?: string | null;
+  tags?: string[];
 };
 
 type HostAggregatorMock = {
@@ -198,7 +200,53 @@ describe('CommandRouter unit behavior', () => {
           mac: '00:11:22:33:44:55',
           ip: '10.0.0.10',
           status: 'asleep',
+          notes: undefined,
+          tags: undefined,
         },
+      }),
+      {
+        idempotencyKey: null,
+        correlationId: null,
+      }
+    );
+    router.cleanup();
+  });
+
+  it('builds update-host payload with metadata overrides', async () => {
+    const { router, hostAggregator, nodeManager } = createRouter();
+    hostAggregator.getHostByFQN.mockResolvedValue({
+      nodeId: 'node-2',
+      name: 'old-name',
+      mac: '00:11:22:33:44:55',
+      ip: '10.0.0.10',
+      status: 'asleep',
+      notes: 'legacy note',
+      tags: ['legacy'],
+    });
+    nodeManager.getNodeStatus.mockResolvedValue('online');
+
+    const executeSpy = jest.spyOn(
+      router as unknown as CommandRouterInternals,
+      'executeCommand'
+    ).mockResolvedValue({
+      commandId: 'cmd-update-2',
+      success: true,
+      timestamp: new Date(),
+    });
+
+    await router.routeUpdateHostCommand('old-name@SiteA', {
+      notes: null,
+      tags: ['prod', 'critical'],
+    });
+
+    expect(executeSpy).toHaveBeenCalledWith(
+      'node-2',
+      expect.objectContaining({
+        type: 'update-host',
+        data: expect.objectContaining({
+          notes: null,
+          tags: ['prod', 'critical'],
+        }),
       }),
       {
         idempotencyKey: null,

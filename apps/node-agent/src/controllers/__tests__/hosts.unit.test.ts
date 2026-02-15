@@ -319,9 +319,41 @@ describe('hosts controller', () => {
 
       await hostsController.addHost(mockReq as Request, mockRes as Response);
 
-      expect(mockDb.addHost).toHaveBeenCalledWith('TestHost', 'AA:BB:CC:DD:EE:FF', '192.168.1.200');
+      expect(mockDb.addHost).toHaveBeenCalledWith(
+        'TestHost',
+        'AA:BB:CC:DD:EE:FF',
+        '192.168.1.200',
+        { notes: undefined, tags: undefined }
+      );
       expect(mockRes.status).toHaveBeenCalledWith(201);
       expect(mockRes.json).toHaveBeenCalledWith(addedHost);
+    });
+
+    it('should pass notes/tags metadata when provided', async () => {
+      const newHost = {
+        name: 'TaggedHost',
+        mac: 'AA:BB:CC:DD:EE:AB',
+        ip: '192.168.1.201',
+        notes: 'Rack 4',
+        tags: ['lab'],
+      };
+      mockReq.body = newHost;
+      mockDb.addHost.mockResolvedValue({
+        ...newHost,
+        status: 'asleep',
+        discovered: 0,
+        pingResponsive: null,
+        lastSeen: null,
+      } as any);
+
+      await hostsController.addHost(mockReq as Request, mockRes as Response);
+
+      expect(mockDb.addHost).toHaveBeenCalledWith(
+        'TaggedHost',
+        'AA:BB:CC:DD:EE:AB',
+        '192.168.1.201',
+        { notes: 'Rack 4', tags: ['lab'] }
+      );
     });
 
     it('should reject request with missing fields', async () => {

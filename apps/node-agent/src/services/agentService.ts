@@ -27,6 +27,8 @@ type ValidatedUpdateHostData = {
   mac?: string;
   ip?: string;
   status?: Host['status'];
+  notes?: string | null;
+  tags?: string[];
 };
 
 const MAC_ADDRESS_REGEX = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^([0-9A-Fa-f]{12})$/;
@@ -939,6 +941,8 @@ export class AgentService extends EventEmitter {
         mac: data.mac,
         ip: data.ip,
         status: data.status,
+        notes: data.notes,
+        tags: data.tags,
       });
 
       const updated = await this.hostDb.getHost(data.name);
@@ -1037,12 +1041,48 @@ export class AgentService extends EventEmitter {
       status = payload.status;
     }
 
+    let notes: string | null | undefined;
+    if (payload.notes !== undefined) {
+      if (payload.notes !== null && typeof payload.notes !== 'string') {
+        throw new Error('Invalid update-host payload: notes must be a string or null');
+      }
+      const normalizedNotes = typeof payload.notes === 'string' ? payload.notes.trim() : null;
+      if (normalizedNotes && normalizedNotes.length > 2_000) {
+        throw new Error('Invalid update-host payload: notes must be at most 2000 characters');
+      }
+      notes = normalizedNotes;
+    }
+
+    let tags: string[] | undefined;
+    if (payload.tags !== undefined) {
+      if (!Array.isArray(payload.tags)) {
+        throw new Error('Invalid update-host payload: tags must be an array of strings');
+      }
+      if (payload.tags.length > 32) {
+        throw new Error('Invalid update-host payload: tags must contain at most 32 entries');
+      }
+      tags = payload.tags.map((tag) => {
+        if (typeof tag !== 'string') {
+          throw new Error('Invalid update-host payload: tags must be an array of strings');
+        }
+        const normalizedTag = tag.trim();
+        if (!normalizedTag || normalizedTag.length > 64) {
+          throw new Error(
+            'Invalid update-host payload: each tag must be between 1 and 64 characters'
+          );
+        }
+        return normalizedTag;
+      });
+    }
+
     return {
       currentName,
       name,
       mac,
       ip,
       status,
+      notes,
+      tags,
     };
   }
 }
