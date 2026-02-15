@@ -91,6 +91,7 @@ Apply these defaults before go-live:
    - Use centralized log collection.
    - Avoid logging secrets/tokens.
    - Monitor health and command timeout/error rates.
+   - Use `docs/COMMAND_OUTCOME_METRICS.md` for terminal-state triage workflow.
 6. Runtime hardening:
    - Run as non-root where possible.
    - Keep dependencies updated and pinned to reviewed versions.
@@ -137,7 +138,7 @@ Use this sequence for production deploys:
 
 1. Pre-deploy:
    - Confirm secrets are present and rotated as needed.
-   - Run local gate: `npx turbo run lint typecheck test:ci build`
+   - Run local gate: `npm run validate:standard`
    - Run smoke gate: `npm run test:e2e:smoke`
    - Confirm DB migration plan and backup created.
 2. Deploy C&C:
@@ -184,5 +185,8 @@ Run these checks after each production rollout:
    - Trigger controlled wake command to test host.
 5. Repo smoke suite:
    - `npm run test:e2e:smoke`
+6. Command outcome observability:
+   - `GET /api/metrics` includes `woly_cnc_command_outcomes_total`
+   - Review per-type terminal states using `docs/COMMAND_OUTCOME_METRICS.md`
 
 If any check fails, pause rollout and execute rollback checklist.

@@ -179,6 +179,7 @@ docker run -d --net host \
 
 For full production rollout guidance (topology, secrets, TLS, backup/restore, and rollback):
 - [docs/PRODUCTION_DEPLOYMENT_GUIDE.md](docs/PRODUCTION_DEPLOYMENT_GUIDE.md)
+- [docs/COMMAND_OUTCOME_METRICS.md](docs/COMMAND_OUTCOME_METRICS.md)
 
 ## CI
 
