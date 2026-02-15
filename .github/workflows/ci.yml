@@ -68,6 +68,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Node-agent dependency security gate
+        run: npm run security:audit -w apps/node-agent
+
       - name: Build, lint, typecheck, test
         run: npx turbo run lint typecheck test:ci build
 

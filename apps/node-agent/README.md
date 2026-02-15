@@ -453,6 +453,7 @@ apps/node-agent/
 - [Architecture Plan](ARCHITECTURE_PLAN.md) — Multi-phase evolution roadmap
 - [Implementation Checklist](IMPLEMENTATION_CHECKLIST.md) — Progress tracking
 - [Security](SECURITY.md) — Security considerations and practices
+- [Dependency Remediation Plan](docs/security/dependency-remediation-plan.md) — Dependency audit policy and exceptions
 - [Testing](TESTING.md) — Testing strategy and guidelines
 - [Runbook: Reconnect/Auth Loop](docs/runbooks/reconnect-auth-loop.md)
 - [Runbook: Protocol Validation Failures](docs/runbooks/protocol-validation-failures.md)
