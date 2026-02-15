@@ -75,6 +75,16 @@ npm run ci:policy:check
 npm run ci:policy:check -- --json
 ```
 
+Create the next rolling manual-review follow-up issue with the standard template:
+
+```bash
+# Preview title/body/labels without creating the issue
+npm run ci:followup:create -- --after <current-review-issue-number> --dry-run
+
+# Create the follow-up issue
+npm run ci:followup:create -- --after <current-review-issue-number>
+```
+
 ## Rollback Criteria (Re-enable Automatic Runs)
 
 Re-enable automatic CI only when all of the following are true:
@@ -103,6 +113,8 @@ Weekly checklist:
 4. Record decision in the review log:
    - template helper: `npm run ci:review:template`
    - `Continue manual-only` or `Start rollback`
+5. Queue next rolling review issue:
+   - `npm run ci:followup:create -- --after <current-review-issue-number>`
 
 ## Objective Exit Criteria
 

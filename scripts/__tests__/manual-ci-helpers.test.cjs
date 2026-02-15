@@ -21,6 +21,13 @@ const {
   postCheckpointToIssues,
   resolveIssues,
 } = require('../eslint10-dashboard-checkpoint-post.cjs');
+const {
+  buildBody: buildFollowupBody,
+  buildTitle: buildFollowupTitle,
+  createIssue: createFollowupIssue,
+  parseArgs: parseFollowupIssueArgs,
+  resolveLabels: resolveFollowupLabels,
+} = require('../manual-ci-followup-issue.cjs');
 
 test('findLatestSinceCheckpoint returns the latest valid checkpoint', () => {
   const markdown = [
@@ -157,5 +164,74 @@ test('postCheckpointToIssues calls commenter for each issue', () => {
   assert.deepEqual(results, [
     { issueNumber: 150, output: 'ok-150' },
     { issueNumber: 4, output: 'ok-4' },
+  ]);
+});
+
+test('parseFollowupIssueArgs parses required --after and dry-run', () => {
+  const parsed = parseFollowupIssueArgs(['--after', '243', '--dry-run']);
+  assert.deepEqual(parsed, {
+    afterIssue: 243,
+    dryRun: true,
+    labels: [],
+    help: false,
+  });
+});
+
+test('parseFollowupIssueArgs validates required and unknown args', () => {
+  assert.throws(
+    () => parseFollowupIssueArgs([]),
+    /Missing required --after/
+  );
+  assert.throws(
+    () => parseFollowupIssueArgs(['--after', 'abc']),
+    /Missing or invalid value for --after/
+  );
+  assert.throws(
+    () => parseFollowupIssueArgs(['--bogus']),
+    /Unknown argument/
+  );
+});
+
+test('resolveFollowupLabels defaults and deduplicates labels', () => {
+  assert.deepEqual(resolveFollowupLabels([]), [
+    'technical-debt',
+    'developer-experience',
+    'priority:low',
+  ]);
+  assert.deepEqual(resolveFollowupLabels(['a', 'b', 'a']), ['a', 'b']);
+});
+
+test('buildFollowupTitle and buildFollowupBody render standard template', () => {
+  const title = buildFollowupTitle(243);
+  const body = buildFollowupBody(243);
+
+  assert.equal(
+    title,
+    '[CI] Schedule weekly manual-only operations review (rolling follow-up after #243)'
+  );
+  assert.match(body, /after #243 closeout/);
+  assert.match(body, /npm run ci:audit:latest -- --fail-on-unexpected/);
+  assert.match(body, /docs\/CI_MANUAL_REVIEW_LOG.md/);
+});
+
+test('createFollowupIssue delegates to provided issue creator', () => {
+  const calls = [];
+  const result = createFollowupIssue(
+    'title',
+    'body',
+    ['l1', 'l2'],
+    (payload) => {
+      calls.push(payload);
+      return 'https://example.invalid/issue/999';
+    }
+  );
+
+  assert.equal(result, 'https://example.invalid/issue/999');
+  assert.deepEqual(calls, [
+    {
+      title: 'title',
+      body: 'body',
+      labels: ['l1', 'l2'],
+    },
   ]);
 });
