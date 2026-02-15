@@ -108,6 +108,11 @@ describe('Mobile API compatibility smoke checks', () => {
         success: true,
         timestamp: new Date('2026-02-15T00:00:00.000Z'),
       }),
+      routeUpdateHostCommand: jest.fn().mockResolvedValue({
+        commandId: 'update-command-1',
+        success: true,
+        timestamp: new Date('2026-02-15T00:00:00.000Z'),
+      }),
     } as unknown as CommandRouter;
 
     app = express();
@@ -274,6 +279,51 @@ describe('Mobile API compatibility smoke checks', () => {
 
     it('returns auth error envelope when JWT is missing', async () => {
       const response = await request(app).get('/api/hosts/scan-ports/Office-Mac%40Home');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+  });
+
+  describe('PUT /api/hosts/:fqn', () => {
+    const operatorJwt = createToken({
+      sub: 'mobile-client',
+      role: 'operator',
+      iss: 'test-issuer',
+      aud: 'test-audience',
+      exp: now + 3600,
+      nbf: now - 10,
+    });
+
+    it('accepts notes/tags payload compatible with CNC host metadata contract', async () => {
+      const response = await request(app)
+        .put('/api/hosts/Office-Mac%40Home')
+        .set('Authorization', `Bearer ${operatorJwt}`)
+        .send({
+          name: 'Office-Mac',
+          ip: '192.168.1.10',
+          mac: '00:11:22:33:44:55',
+          notes: 'Wake before backup window',
+          tags: ['infra', 'macos'],
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        success: true,
+        message: 'Host updated successfully',
+      });
+    });
+
+    it('returns auth error envelope when JWT is missing', async () => {
+      const response = await request(app)
+        .put('/api/hosts/Office-Mac%40Home')
+        .send({
+          notes: 'note',
+          tags: ['tag'],
+        });
 
       expect(response.status).toBe(401);
       expect(response.body).toMatchObject({
