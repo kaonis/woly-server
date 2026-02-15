@@ -90,3 +90,11 @@ Issue #144 is complete when:
     - version: `8.55.0`
     - peer `eslint`: `^8.57.0 || ^9.0.0`
   - Status for ESLint 10 adoption (`#150`): still blocked pending upstream peer compatibility.
+- 2026-02-15 (V15 / issue #150 checkpoint):
+  - Ran `npm run deps:check-eslint10` at `2026-02-15T21:35:59Z`.
+  - Watchdog status: blocked.
+  - Latest values:
+    - `eslint`: `10.0.0`
+    - `@typescript-eslint/eslint-plugin`: `8.55.0`
+    - `@typescript-eslint/parser`: `8.55.0`
+    - peer `eslint` range: `^8.57.0 || ^9.0.0`
