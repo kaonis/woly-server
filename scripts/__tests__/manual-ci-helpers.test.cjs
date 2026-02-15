@@ -33,6 +33,14 @@ const {
   parseArgs: parseCloseoutArgs,
   postCloseoutComment,
 } = require('../manual-ci-closeout-comment.cjs');
+const {
+  buildCycleSummary,
+  parseArgs: parseCycleArgs,
+  parseAuditOutput,
+  parseDepsCheckpointOutput,
+  parseFollowupOutput,
+  runCycle,
+} = require('../manual-ci-cycle-orchestrator.cjs');
 
 test('findLatestSinceCheckpoint returns the latest valid checkpoint', () => {
   const markdown = [
@@ -309,4 +317,83 @@ test('postCloseoutComment delegates to provided comment poster', () => {
 
   assert.equal(output, 'https://example.invalid/issue/243#comment');
   assert.deepEqual(calls, [[243, 'closeout-body']]);
+});
+
+test('parseCycleArgs validates required --after', () => {
+  assert.deepEqual(parseCycleArgs(['--after', '245']), {
+    afterIssue: 245,
+    dryRun: false,
+    help: false,
+  });
+  assert.throws(() => parseCycleArgs([]), /Missing required --after/);
+});
+
+test('parseAuditOutput extracts status, checkedAt and since', () => {
+  const parsed = parseAuditOutput([
+    '[ci:audit:latest] Using latest checkpoint --since 2026-02-15T21:31:02Z',
+    'Checked at: `2026-02-15T22:14:29Z`',
+    'Status: **PASS** (manual-only workflow policy observed in this scope)',
+  ].join('\n'));
+
+  assert.deepEqual(parsed, {
+    status: 'PASS',
+    checkedAt: '2026-02-15T22:14:29Z',
+    since: '2026-02-15T21:31:02Z',
+  });
+});
+
+test('parseFollowupOutput and parseDepsCheckpointOutput extract URLs', () => {
+  const followup = parseFollowupOutput(
+    'Created follow-up issue: https://github.com/kaonis/woly-server/issues/247'
+  );
+  const deps = parseDepsCheckpointOutput(
+    [
+      'Posted checkpoint to #150: https://github.com/kaonis/woly-server/issues/150#issuecomment-1',
+      'Posted checkpoint to #4: https://github.com/kaonis/woly-server/issues/4#issuecomment-2',
+    ].join('\n')
+  );
+
+  assert.deepEqual(followup, {
+    issueUrl: 'https://github.com/kaonis/woly-server/issues/247',
+    issueNumber: 247,
+  });
+  assert.deepEqual(deps, {
+    issue150Url: 'https://github.com/kaonis/woly-server/issues/150#issuecomment-1',
+    issue4Url: 'https://github.com/kaonis/woly-server/issues/4#issuecomment-2',
+  });
+});
+
+test('runCycle executes expected sequence and buildCycleSummary renders markdown', () => {
+  const calls = [];
+  const result = runCycle(245, (args) => {
+    calls.push(args);
+
+    if (args[0] === 'ci:audit:latest') {
+      return [
+        '[ci:audit:latest] Using latest checkpoint --since 2026-02-15T21:31:02Z',
+        'Checked at: `2026-02-15T22:14:29Z`',
+        'Status: **PASS** (manual-only workflow policy observed in this scope)',
+      ].join('\n');
+    }
+
+    if (args[0] === 'ci:followup:create') {
+      return 'Created follow-up issue: https://github.com/kaonis/woly-server/issues/247';
+    }
+
+    return [
+      'Posted checkpoint to #150: https://github.com/kaonis/woly-server/issues/150#issuecomment-1',
+      'Posted checkpoint to #4: https://github.com/kaonis/woly-server/issues/4#issuecomment-2',
+    ].join('\n');
+  });
+
+  assert.deepEqual(calls, [
+    ['ci:audit:latest', '--', '--fail-on-unexpected'],
+    ['ci:followup:create', '--', '--after', '245'],
+    ['deps:checkpoint:eslint10:post'],
+  ]);
+
+  const summary = buildCycleSummary(result);
+  assert.match(summary, /Source issue: #245/);
+  assert.match(summary, /Follow-up issue created: #247/);
+  assert.match(summary, /#150 checkpoint comment/);
 });
