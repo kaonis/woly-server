@@ -14,6 +14,7 @@ import { runtimeMetrics } from '../services/runtimeMetrics';
 import { authenticateJwt, authorizeRoles } from '../middleware/auth';
 import { apiLimiter, strictAuthLimiter } from '../middleware/rateLimiter';
 import { assignCorrelationId } from '../middleware/correlationId';
+import { CNC_VERSION } from '../utils/cncVersion';
 
 export function createRoutes(
   nodeManager: NodeManager,
@@ -63,7 +64,7 @@ export function createRoutes(
     res.json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      version: '1.0.0',
+      version: CNC_VERSION,
       metrics: runtimeMetrics.snapshot(),
     });
   });
