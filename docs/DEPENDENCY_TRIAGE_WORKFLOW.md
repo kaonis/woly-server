@@ -69,3 +69,8 @@ For each triage pass, post a short issue `#4` comment containing:
 1. Do not defer without rationale.
 2. Do not merge major dependency changes without explicit validation notes.
 3. Keep dependency triage outcomes reflected in the active roadmap phase when non-trivial work is required.
+
+## 7. Major Upgrade Planning Reference
+
+For active major dependency wave planning and current merge/defer decisions, see:
+- `docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md`
