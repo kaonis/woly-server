@@ -8,6 +8,14 @@ import { join } from 'path';
 import db from './database/connection';
 import logger from './utils/logger';
 
+function getTableName(row: unknown): string | null {
+  if (!row || typeof row !== 'object') {
+    return null;
+  }
+  const maybeName = (row as Record<string, unknown>).table_name;
+  return typeof maybeName === 'string' ? maybeName : null;
+}
+
 async function initDatabase(): Promise<void> {
   try {
     logger.info('Starting database initialization...');
@@ -36,8 +44,9 @@ async function initDatabase(): Promise<void> {
         WHERE type='table' AND name NOT LIKE 'sqlite_%'
         ORDER BY name
       `);
+      const tables = result.rows.map(getTableName).filter((tableName): tableName is string => Boolean(tableName));
       logger.info('Created tables:', {
-        tables: result.rows.map((r: any) => r.table_name)
+        tables
       });
     } else {
       const result = await db.query(`
@@ -46,8 +55,9 @@ async function initDatabase(): Promise<void> {
         WHERE table_schema = 'public'
         ORDER BY table_name
       `);
+      const tables = result.rows.map(getTableName).filter((tableName): tableName is string => Boolean(tableName));
       logger.info('Created tables:', {
-        tables: result.rows.map((r: any) => r.table_name)
+        tables
       });
     }
 

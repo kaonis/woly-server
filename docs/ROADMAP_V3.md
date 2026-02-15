@@ -6,15 +6,17 @@ Scope: Continue autonomous delivery after V2 Phase 5 completion (#47 + #51).
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `25ccf05` (PR #131).
-- Active execution branch: `feat/127-node-agent-security-remediation`.
+- `master` synced at merge commit `742a801` (PR #132).
+- Active execution branch: `feat/133-cnc-zero-warning-lint`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
-- #127 `[Security] Node-agent dependency vulnerability remediation plan`
 - #4 `Dependency Dashboard`
+- #133 `[C&C] Eliminate lint warnings and enforce zero-warning gate`
+- #134 `[C&C] Complete auth 401/403 integration coverage`
+- #135 `[Protocol] Define external publish readiness workflow`
 
 ### CI snapshot
-- Post-merge checks for `25ccf05` are green (CI + CodeQL).
+- Post-merge checks for `742a801` are green (CI + CodeQL).
 
 ## 2. Iterative Phases
 
@@ -50,7 +52,7 @@ Acceptance criteria:
 - Select and document remediation/acceptance strategy with owner and expiry.
 - Implement mitigation and CI policy updates.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #132)
 
 ## 3. Execution Loop Rules
 
@@ -75,3 +77,6 @@ For each phase:
 - 2026-02-15: Merged #128 via PR #131.
 - 2026-02-15: Verified post-merge `master` checks green for #131 (CI + CodeQL).
 - 2026-02-15: Started Phase 3 issue #127 on branch `feat/127-node-agent-security-remediation`.
+- 2026-02-15: Merged #127 via PR #132.
+- 2026-02-15: Verified post-merge `master` checks green for #132 (CI + CodeQL).
+- 2026-02-15: Closed lingering issue #129 manually after verifying PR #130 delivery.

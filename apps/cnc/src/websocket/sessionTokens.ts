@@ -45,6 +45,10 @@ function asNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
+}
+
 export function mintWsSessionToken(nodeId: string, config: WsSessionTokenConfig): WsMintedSessionToken {
   if (!nodeId || nodeId.trim().length === 0) {
     throw new Error('nodeId is required');
@@ -91,8 +95,10 @@ export function verifyWsSessionToken(token: string, config: WsSessionTokenConfig
 
   const header = decodeBase64UrlJson(encodedHeader);
   const payload = decodeBase64UrlJson(encodedPayload);
+  const headerRecord = asRecord(header);
+  const payloadRecord = asRecord(payload);
 
-  const alg = asString((header as any)?.alg);
+  const alg = asString(headerRecord?.alg);
   if (alg !== 'HS256') {
     throw new Error('Unsupported session token algorithm');
   }
@@ -102,12 +108,12 @@ export function verifyWsSessionToken(token: string, config: WsSessionTokenConfig
     throw new Error('Invalid session token signature');
   }
 
-  const issuer = asString((payload as any)?.iss);
-  const audience = asString((payload as any)?.aud);
-  const subject = asString((payload as any)?.sub);
-  const issuedAt = asNumber((payload as any)?.iat);
-  const expiresAt = asNumber((payload as any)?.exp);
-  const tokenType = asString((payload as any)?.typ);
+  const issuer = asString(payloadRecord?.iss);
+  const audience = asString(payloadRecord?.aud);
+  const subject = asString(payloadRecord?.sub);
+  const issuedAt = asNumber(payloadRecord?.iat);
+  const expiresAt = asNumber(payloadRecord?.exp);
+  const tokenType = asString(payloadRecord?.typ);
 
   if (!issuer || issuer !== config.issuer) {
     throw new Error('Invalid session token issuer');
