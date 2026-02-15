@@ -61,3 +61,6 @@ V19 is complete when all four issues (`#239`, `#238`, `#150`, `#4`) are resolved
   - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
 - 2026-02-15: Added CI review log entry for this cycle and created follow-up review issue `#240`.
 - 2026-02-15: Dependency checkpoint status unchanged for `#150` (blocked pending upstream ESLint 10 peer support in `@typescript-eslint`).
+- 2026-02-15: Completed scoped rolling policy audit for `#240`:
+  - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+- 2026-02-15: Added CI review log entry for this cycle and created follow-up review issue `#241`.
