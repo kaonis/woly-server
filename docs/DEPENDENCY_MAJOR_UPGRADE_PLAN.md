@@ -106,3 +106,7 @@ Issue #144 is complete when:
   - Ran rolling policy audit via helper:
     - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
   - ESLint 10 compatibility status unchanged (`#150` remains blocked; latest watchdog checkpoint `2026-02-15T21:35:59Z`).
+- 2026-02-15 (V18 / issue #236 checkpoint):
+  - Ran rolling policy audit via helper:
+    - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+  - ESLint 10 compatibility status unchanged (`#150` remains blocked; latest watchdog checkpoint `2026-02-15T21:35:59Z`).
