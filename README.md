@@ -177,22 +177,29 @@ docker run -d --net host \
 
 ## CI
 
-GitHub Actions runs on every push and PR to `master`:
+GitHub Actions is currently in a temporary manual-only mode to control Actions spend.
+Automatic runs on `push`/`pull_request` are disabled.
+
+Current validation flow:
 
 1. Protocol compatibility gate (schema tests, cross-repo contracts, app protocol contracts, C&C schema gate)
-2. Build, lint, typecheck, and test all workspaces via Turborepo
-3. Upload coverage reports as artifacts
+2. Build, lint, typecheck, and test all workspaces via Turborepo (via local gate and optional manual workflow dispatch)
+3. Upload coverage reports as artifacts when `ci.yml` is manually dispatched
 
-All checks must pass for a PR to be merged. The workflow runs:
+Required local gate before PR merge:
 - `npx turbo run lint typecheck test:ci build`
 
-See [.github/workflows/ci.yml](.github/workflows/ci.yml).
+Manual operations and rollback criteria are documented in:
+- [docs/CI_MANUAL_OPERATIONS.md](docs/CI_MANUAL_OPERATIONS.md)
+
+Main workflow definition:
+- [.github/workflows/ci.yml](.github/workflows/ci.yml)
 
 Dependency update review cadence and decision rules are documented in:
 - [docs/DEPENDENCY_TRIAGE_WORKFLOW.md](docs/DEPENDENCY_TRIAGE_WORKFLOW.md)
 - [docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md](docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md)
 
-**Note:** To enforce PR blocking, configure branch protection rules in GitHub repository settings to require the `validate` status check to pass before merging.
+**Note:** Branch protection requirements should match the current CI mode (manual-only vs automatic).
 
 ## Tech Stack
 
