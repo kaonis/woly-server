@@ -4,7 +4,8 @@ This smoke suite validates the core C&C <-> node-agent integration path in one r
 
 1. Node agent registers to C&C over WebSocket.
 2. Seeded node-agent host inventory propagates to C&C aggregated hosts.
-3. Wake command routing executes from C&C API to node agent and returns a terminal result.
+3. Manual node-agent host create, update, and delete operations propagate to C&C.
+4. Wake command routing executes from C&C API to node agent and returns a terminal result.
 
 ## Run Locally
 
