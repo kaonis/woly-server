@@ -13,6 +13,7 @@
     "test": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js",
     "test:watch": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --watch",
     "test:ci": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --ci --coverage --maxWorkers=2",
+    "test:e2e:smoke": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --runInBand src/services/__tests__/crossService.e2e.smoke.test.ts",
     "test:schema-gate": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --ci --runInBand src/services/__tests__/nodeManager.test.ts",
     "test:coverage": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --coverage",
     "lint": "eslint src --max-warnings=0",

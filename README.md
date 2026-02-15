@@ -88,6 +88,7 @@ npm run build -w packages/protocol
 | `npm run build` | Build all workspaces (protocol → apps) |
 | `npm run test` | Run all tests |
 | `npm run test:ci` | CI mode with coverage |
+| `npm run test:e2e:smoke` | Run cross-service C&C <-> node-agent E2E smoke suite |
 | `npm run typecheck` | Type-check all workspaces |
 | `npm run lint` | Lint all workspaces |
 | `npm run dev:node-agent` | Start node agent in dev mode |
@@ -192,6 +193,7 @@ Required local gate before PR merge:
 Manual operations and rollback criteria are documented in:
 - [docs/CI_MANUAL_OPERATIONS.md](docs/CI_MANUAL_OPERATIONS.md)
 - [docs/CI_MANUAL_REVIEW_LOG.md](docs/CI_MANUAL_REVIEW_LOG.md)
+- [docs/CROSS_SERVICE_E2E_SMOKE.md](docs/CROSS_SERVICE_E2E_SMOKE.md)
 
 Main workflow definition:
 - [.github/workflows/ci.yml](.github/workflows/ci.yml)
