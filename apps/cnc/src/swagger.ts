@@ -54,6 +54,10 @@ const options: swaggerJsdoc.Options = {
         description: 'Aggregated host management across nodes',
       },
       {
+        name: 'Capabilities',
+        description: 'Feature negotiation and version metadata',
+      },
+      {
         name: 'Admin',
         description: 'Administrative operations (requires admin role)',
       },
@@ -266,6 +270,61 @@ const options: swaggerJsdoc.Options = {
               type: 'string',
               description: 'Request correlation identifier for end-to-end tracing',
               example: 'corr_2a8f6842-6f8f-4e8f-b6dc-f7dbd9a18e68',
+            },
+          },
+        },
+        CapabilitiesResponse: {
+          type: 'object',
+          required: ['apiVersion', 'protocolVersion', 'supportedProtocolVersions', 'capabilities'],
+          properties: {
+            apiVersion: {
+              type: 'string',
+              description: 'CNC API version',
+              example: '1.0.0',
+            },
+            protocolVersion: {
+              type: 'string',
+              description: 'Current active protocol version used by C&C and nodes',
+              example: '1.0.0',
+            },
+            supportedProtocolVersions: {
+              type: 'array',
+              description: 'List of accepted protocol versions',
+              items: {
+                type: 'string',
+              },
+              example: ['1.0.0'],
+            },
+            capabilities: {
+              type: 'object',
+              required: [
+                'scan',
+                'notesTagsPersistence',
+                'schedulesApi',
+                'commandStatusStreaming',
+              ],
+              properties: {
+                scan: {
+                  type: 'boolean',
+                  description: 'Whether CNC scan command API is available for mobile clients',
+                  example: false,
+                },
+                notesTagsPersistence: {
+                  type: 'boolean',
+                  description: 'Whether host notes/tags persistence is supported server-side',
+                  example: true,
+                },
+                schedulesApi: {
+                  type: 'boolean',
+                  description: 'Whether server-managed wake schedule CRUD is available',
+                  example: false,
+                },
+                commandStatusStreaming: {
+                  type: 'boolean',
+                  description: 'Whether command lifecycle streaming is available to clients',
+                  example: false,
+                },
+              },
             },
           },
         },

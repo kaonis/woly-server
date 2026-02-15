@@ -7,6 +7,7 @@ import { NodesController } from '../controllers/nodes';
 import { AdminController } from '../controllers/admin';
 import { HostsController } from '../controllers/hosts';
 import { AuthController } from '../controllers/auth';
+import { CapabilitiesController } from '../controllers/capabilities';
 import { NodeManager } from '../services/nodeManager';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
@@ -28,6 +29,7 @@ export function createRoutes(
   const adminController = new AdminController(hostAggregator, nodeManager, commandRouter);
   const hostsController = new HostsController(hostAggregator, commandRouter);
   const authController = new AuthController();
+  const capabilitiesController = new CapabilitiesController();
 
   // Public API routes with rate limiting
   router.post('/auth/token', strictAuthLimiter, (req, res) => authController.issueToken(req, res));
@@ -35,6 +37,7 @@ export function createRoutes(
   // Route group protection
   router.use('/nodes', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/hosts', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
+  router.use('/capabilities', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/admin', apiLimiter, authenticateJwt, authorizeRoles('admin'));
 
   // Node API routes (protected)
@@ -52,6 +55,7 @@ export function createRoutes(
   router.post('/hosts/wakeup/:fqn', (req, res) => hostsController.wakeupHost(req, res));
   router.put('/hosts/:fqn', (req, res) => hostsController.updateHost(req, res));
   router.delete('/hosts/:fqn', (req, res) => hostsController.deleteHost(req, res));
+  router.get('/capabilities', (req, res) => capabilitiesController.getCapabilities(req, res));
 
   // Admin API routes
   router.delete('/admin/nodes/:id', (req, res) => adminController.deleteNode(req, res));
