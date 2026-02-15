@@ -7,6 +7,7 @@ This guide defines the required steps to roll protocol or auth changes safely ac
 - Node-agent matrix: `apps/node-agent/docs/compatibility.md`
 - C&C matrix: `apps/cnc/docs/compatibility.md`
 - Protocol contract policy: `docs/PROTOCOL_COMPATIBILITY.md`
+- Protocol external publish workflow: `docs/PROTOCOL_PUBLISH_WORKFLOW.md`
 
 ## Required Upgrade Flow
 

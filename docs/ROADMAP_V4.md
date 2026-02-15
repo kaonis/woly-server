@@ -41,7 +41,7 @@ Acceptance criteria:
 - Cover missing token, malformed token, invalid signature, expired token, and role mismatch.
 - Update checklist status to reflect delivered coverage.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #137)
 
 ### Phase 3: Protocol external publish readiness
 Issue: #135  
@@ -52,7 +52,7 @@ Acceptance criteria:
 - Document external release + rollback workflow.
 - Align checklist/docs state with publish decision.
 
-Status: `Pending`
+Status: `In Progress` (2026-02-15)
 
 ## 3. Execution Loop Rules
 
@@ -75,3 +75,7 @@ For each phase:
 - 2026-02-15: Ran local gates for #133 (`npm run lint -w apps/cnc`, `npm run typecheck -w apps/cnc`, `npm run test:ci -w apps/cnc`) successfully.
 - 2026-02-15: Merged #133 via PR #136 and verified post-merge `master` checks green (CI + CodeQL).
 - 2026-02-15: Started Phase 2 issue #134 on branch `feat/134-cnc-auth-integration-coverage`.
+- 2026-02-15: Merged #134 via PR #137 and verified post-merge `master` checks green (CI + CodeQL).
+- 2026-02-15: Started Phase 3 issue #135 on branch `feat/135-protocol-publish-readiness-workflow`.
+- 2026-02-15: Added protocol external publish readiness + rollback workflow documentation and linked checklist/docs for decision-state clarity.
+- 2026-02-15: Ran local protocol gates for #135 (`npm run typecheck -w packages/protocol`, `npm run test:ci -w packages/protocol`) successfully.

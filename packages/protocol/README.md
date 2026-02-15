@@ -99,7 +99,10 @@ The package includes schema validation tests in `src/__tests__/schemas.test.ts`.
 
 ## Publishing to npm
 
-This package is also published to npm for the mobile app to consume.
+This package is published to npm only when external consumers (for example, mobile app releases) require updated protocol contracts.
+
+Before publishing, follow the readiness and rollback runbook:
+- [`docs/PROTOCOL_PUBLISH_WORKFLOW.md`](../../docs/PROTOCOL_PUBLISH_WORKFLOW.md)
 
 ### Quick Start (Recommended)
 
