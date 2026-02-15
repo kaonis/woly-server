@@ -12,10 +12,10 @@ Scope: New autonomous cycle after V5 completion.
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #162 `[CI] Temporarily switch all workflows to manual-only dispatch`
+- #164 `[CI] Document manual-only operations and rollback criteria`
 
 ### CI snapshot
-- Post-merge checks for `3bff69a` are green (CI + CodeQL).
+- Post-merge checks for `0763bf7` did not auto-run by design (manual-only mode enabled).
 - Dependency triage workflow and audit/security gates are documented and active.
 
 ## 2. Iterative Phases
@@ -117,6 +117,17 @@ Acceptance criteria:
 - Keep workflows runnable via `workflow_dispatch`.
 - Continue enforcing quality via local gates before merge.
 
+Status: `Completed` (2026-02-15, PR #163)
+
+### Phase 10: Manual CI operations documentation and rollback criteria
+Issue: #164  
+Labels: `priority:low`, `documentation`, `developer-experience`
+
+Acceptance criteria:
+- Add a repo doc defining local CI gate and manual workflow dispatch commands.
+- Define explicit rollback criteria and steps to re-enable automatic workflows.
+- Update README/roadmap references to reflect the temporary manual-only CI mode.
+
 Status: `In Progress` (2026-02-15)
 
 ## 3. Execution Loop Rules
@@ -128,8 +139,8 @@ For each phase:
 4. Run local gate:
    - `npm run typecheck`
    - `npm run test:ci`
-5. Open PR (`Closes #<issue>`) and merge after green CI.
-6. Verify post-merge `master` CI.
+5. Open PR (`Closes #<issue>`) and merge after green CI (or local gate in manual-only mode).
+6. Verify post-merge `master` CI (or confirm no unexpected auto runs in manual-only mode).
 7. Update roadmap progress and continue.
 
 ## 4. Progress Log
@@ -176,3 +187,6 @@ For each phase:
 - 2026-02-15: Manually dispatched `ESLint 10 Compatibility Watchdog` workflow run `22036729002`; it completed successfully and updated sticky comment `#issuecomment-3904488716` on issue #150.
 - 2026-02-15: Added follow-up issue #162 and started Phase 9 on branch `chore/162-manual-only-workflows`.
 - 2026-02-15: Updated workflow triggers to manual-only dispatch in `ci.yml`, `eslint10-compat-watchdog.yml`, and `publish-protocol.yml` to temporarily reduce Actions spend.
+- 2026-02-15: Merged #162 via PR #163 and confirmed no automatic workflow runs were triggered on `master` merge commit `0763bf7`.
+- 2026-02-15: Disabled GitHub CodeQL default setup (`state: not-configured`) to stop automatic `dynamic` CodeQL workflow runs.
+- 2026-02-15: Added follow-up issue #164, started Phase 10 on branch `docs/164-manual-ci-ops`, and drafted manual CI operations documentation.
