@@ -6,15 +6,16 @@ Scope: New autonomous cycle after V5 completion.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `71dd306` (PR #17).
+- `master` synced at merge commit `9182401` (PR #153).
 - Active execution branch: `master`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
+- #154 `[Lint] Migrate to ESLint flat config before ESLint 10 adoption`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
 
 ### CI snapshot
-- Post-merge checks for `71dd306` are green (CI + CodeQL).
+- Post-merge checks for `9182401` are green (CI + CodeQL).
 - Dependency triage workflow and audit/security gates are documented and active.
 
 ## 2. Iterative Phases
@@ -74,6 +75,17 @@ Acceptance criteria:
 
 Status: `Blocked` (2026-02-15; latest `@typescript-eslint/*@8.55.0` peers `eslint ^8.57 || ^9`)
 
+### Phase 6: ESLint flat config migration precondition
+Issue: #154  
+Labels: `priority:low`, `technical-debt`, `testing`
+
+Acceptance criteria:
+- Migrate `cnc` and `node-agent` lint tasks to ESLint flat config mode.
+- Remove legacy `.eslintrc` dependency and `ESLINT_USE_FLAT_CONFIG=false` usage.
+- Keep lint/typecheck/test/build gates green.
+
+Status: `In Progress` (2026-02-15)
+
 ## 3. Execution Loop Rules
 
 For each phase:
@@ -110,3 +122,7 @@ For each phase:
 - 2026-02-15: Adopted npm 11 via PR #17 (`packageManager` set to `npm@11.10.0`), closing #148.
 - 2026-02-15: Verified post-merge checks for npm 11 adoption green on `master` (CI + CodeQL, commit `71dd306`).
 - 2026-02-15: Re-validated ESLint 10 compatibility checkpoint for #150 (`npm view @typescript-eslint/eslint-plugin@latest peerDependencies` still `^8.57.0 || ^9.0.0`), keeping #150 open and blocked.
+- 2026-02-15: Merged roadmap/dependency checkpoint docs via PR #153 and verified post-merge `master` checks green (CI + CodeQL).
+- 2026-02-15: Started Phase 6 issue #154 on branch `feat/154-eslint-flat-config`.
+- 2026-02-15: Migrated lint configuration to root `eslint.config.js`, removed legacy `.eslintrc.json`, and switched app lint scripts to flat-config mode without `ESLINT_USE_FLAT_CONFIG=false`.
+- 2026-02-15: Ran local gates for #154 (`npm run lint`, `npm run typecheck`, `npm run test:ci`, `npm run build`) successfully.
