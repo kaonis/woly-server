@@ -19,6 +19,7 @@
     "lint": "eslint src --max-warnings=0",
     "lint-fix": "eslint --fix src --max-warnings=0",
     "format": "prettier --write src",
+    "security:audit": "npm audit --audit-level=high",
     "pm2:start": "pm2 start ecosystem.config.js",
     "pm2:stop": "pm2 stop woly-node",
     "pm2:restart": "pm2 restart woly-node",

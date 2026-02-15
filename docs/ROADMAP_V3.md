@@ -6,16 +6,15 @@ Scope: Continue autonomous delivery after V2 Phase 5 completion (#47 + #51).
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `8fd58b9` (PR #130).
-- Active execution branch: `feat/128-protocol-schema-ci-gates`.
+- `master` synced at merge commit `25ccf05` (PR #131).
+- Active execution branch: `feat/127-node-agent-security-remediation`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
-- #128 `[CI/Protocol] Close remaining protocol compatibility and schema gates`
 - #127 `[Security] Node-agent dependency vulnerability remediation plan`
 - #4 `Dependency Dashboard`
 
 ### CI snapshot
-- Post-merge checks for `8fd58b9` are green (CI + CodeQL).
+- Post-merge checks for `25ccf05` are green (CI + CodeQL).
 
 ## 2. Iterative Phases
 
@@ -40,7 +39,7 @@ Acceptance criteria:
 - Add cross-repo contract tests for node-agent and C&C in CI.
 - Publish/update compatibility upgrade guide.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #131)
 
 ### Phase 3: Security dependency remediation plan
 Issue: #127  
@@ -51,7 +50,7 @@ Acceptance criteria:
 - Select and document remediation/acceptance strategy with owner and expiry.
 - Implement mitigation and CI policy updates.
 
-Status: `Pending`
+Status: `In Progress` (2026-02-15)
 
 ## 3. Execution Loop Rules
 
@@ -73,3 +72,6 @@ For each phase:
 - 2026-02-15: Merged #129 via PR #130.
 - 2026-02-15: Verified post-merge `master` checks green for #130 (CI + CodeQL).
 - 2026-02-15: Started Phase 2 issue #128 on branch `feat/128-protocol-schema-ci-gates`.
+- 2026-02-15: Merged #128 via PR #131.
+- 2026-02-15: Verified post-merge `master` checks green for #131 (CI + CodeQL).
+- 2026-02-15: Started Phase 3 issue #127 on branch `feat/127-node-agent-security-remediation`.

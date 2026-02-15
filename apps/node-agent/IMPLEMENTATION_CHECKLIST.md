@@ -10,15 +10,13 @@ Owner: Platform Team
 - [x] Ran `npm audit` + `npm audit fix` on branch `feat/phase2-runtime-validation-v2`; safe lockfile updates applied.
 - [~] Phase 3 implementation started on branch `feat/phase3-shared-protocol-adoption`.
 
-## Dependency Security Follow-up (2026-02-07)
+## Dependency Security Follow-up (2026-02-15)
 
-- [x] Apply non-breaking dependency remediations via `npm audit fix`.
-- [ ] Resolve remaining high vulnerabilities tied to `local-devices` -> `get-ip-range` -> `ip` (no upstream fix currently available).
-- [ ] Resolve remaining high vulnerabilities tied to `sqlite3` transitive `node-gyp`/`tar` chain (current npm-proposed fix requires `npm audit fix --force` and a semver-major package change).
-- [ ] Decide remediation strategy:
-- [ ] Option A: replace/remove `local-devices` usage and migrate from `sqlite3` to a maintained storage path.
-- [ ] Option B: accept residual risk temporarily with documented compensating controls and tracked owner/date.
-- [ ] Add a CI/security gate decision for audit behavior (fail on high vs. allowlisted exceptions with expiry).
+- [x] Re-assess dependency risk with fresh `npm audit --json`.
+- [x] Apply non-breaking lockfile remediation (`npm audit fix --package-lock-only`).
+- [x] Confirm current audit state has no high/critical findings.
+- [x] Document remediation strategy, ownership, and exception process in `docs/security/dependency-remediation-plan.md`.
+- [x] Add CI security gate (`npm run security:audit`) to fail on high/critical vulnerabilities.
 
 ## Phase 0 - Baseline and Safety Rails
 
@@ -71,14 +69,14 @@ Definition of done:
 
 ## Phase 4 - Command Execution Reliability
 
-- [ ] Add idempotency guard for duplicate command delivery.
-- [ ] Track local command lifecycle for diagnostics.
-- [ ] Add timeout and bounded retry policies.
-- [ ] Ensure acknowledgment retry semantics are safe.
+- [x] Add idempotency guard for duplicate command delivery.
+- [x] Track local command lifecycle for diagnostics.
+- [x] Add timeout and bounded retry policies.
+- [x] Ensure acknowledgment retry semantics are safe.
 
 Definition of done:
 
-- [ ] Duplicate deliveries do not cause duplicate side effects.
+- [x] Duplicate deliveries do not cause duplicate side effects.
 
 ## Phase 5 - Host Data and Backpressure
 
