@@ -3,10 +3,12 @@ import * as hostsController from '../hosts';
 import HostDatabase from '../../services/hostDatabase';
 import axios from 'axios';
 import wol from 'wake_on_lan';
+import * as networkDiscovery from '../../services/networkDiscovery';
 
 // Mock all external dependencies
 jest.mock('axios');
 jest.mock('wake_on_lan');
+jest.mock('../../services/networkDiscovery');
 
 describe('hosts controller', () => {
   let mockDb: jest.Mocked<HostDatabase>;
@@ -62,6 +64,7 @@ describe('hosts controller', () => {
 
     // Clear all mocks
     jest.clearAllMocks();
+    (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(false);
   });
 
   describe('setHostDatabase', () => {
@@ -202,6 +205,16 @@ describe('hosts controller', () => {
 
       expect(mockDb.getHost).toHaveBeenCalledWith('Host1');
       expect(wol.wake).toHaveBeenCalledWith('AA:BB:CC:DD:EE:FF', expect.any(Function));
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          name: 'Host1',
+          verification: expect.objectContaining({
+            status: 'not_requested',
+          }),
+        })
+      );
     });
 
     it('should return 404 when host not found', async () => {
@@ -217,7 +230,131 @@ describe('hosts controller', () => {
       });
     });
 
-    it('should handle WoL errors', async () => {
+    it('should report verification success when verify=true and ping confirms wake', async () => {
+      const mockHost = {
+        name: 'Host1',
+        mac: 'AA:BB:CC:DD:EE:FF',
+        ip: '192.168.1.1',
+        status: 'asleep',
+        lastSeen: null,
+        discovered: 1,
+      };
+      mockReq.params = { name: 'Host1' };
+      mockReq.query = { verify: 'true', verifyTimeoutMs: '1000', verifyPollIntervalMs: '100' };
+      mockDb.getHost.mockResolvedValue(mockHost as any);
+      (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(true);
+      (wol.wake as jest.Mock).mockImplementation(
+        (_mac: string, callback: (err: Error | null) => void) => callback(null)
+      );
+
+      await hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          verification: expect.objectContaining({
+            enabled: true,
+            status: 'woke',
+            source: 'ping',
+          }),
+        })
+      );
+    });
+
+    it('should report verification timeout when host does not wake within timeout window', async () => {
+      jest.useFakeTimers();
+      const mockHost = {
+        name: 'Host1',
+        mac: 'AA:BB:CC:DD:EE:FF',
+        ip: '192.168.1.1',
+        status: 'asleep',
+        lastSeen: null,
+        discovered: 1,
+      };
+      mockReq.params = { name: 'Host1' };
+      mockReq.query = { verify: 'true', verifyTimeoutMs: '500', verifyPollIntervalMs: '100' };
+      mockDb.getHost.mockResolvedValue(mockHost as any);
+      (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(false);
+      (wol.wake as jest.Mock).mockImplementation(
+        (_mac: string, callback: (err: Error | null) => void) => callback(null)
+      );
+
+      const wakePromise = hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
+      await jest.advanceTimersByTimeAsync(700);
+      await wakePromise;
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          verification: expect.objectContaining({
+            enabled: true,
+            status: 'timeout',
+          }),
+        })
+      );
+      jest.useRealTimers();
+    });
+
+    it('should report host_not_found when host disappears during verification', async () => {
+      const mockHost = {
+        name: 'Host1',
+        mac: 'AA:BB:CC:DD:EE:FF',
+        ip: '192.168.1.1',
+        status: 'asleep',
+        lastSeen: null,
+        discovered: 1,
+      };
+      mockReq.params = { name: 'Host1' };
+      mockReq.query = { verify: 'true', verifyTimeoutMs: '1000', verifyPollIntervalMs: '100' };
+      mockDb.getHost.mockResolvedValueOnce(mockHost as any).mockResolvedValueOnce(undefined);
+      (wol.wake as jest.Mock).mockImplementation(
+        (_mac: string, callback: (err: Error | null) => void) => callback(null)
+      );
+
+      await hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          verification: expect.objectContaining({
+            status: 'host_not_found',
+          }),
+        })
+      );
+    });
+
+    it('should report verification error when probe throws unexpectedly', async () => {
+      const mockHost = {
+        name: 'Host1',
+        mac: 'AA:BB:CC:DD:EE:FF',
+        ip: '192.168.1.1',
+        status: 'asleep',
+        lastSeen: null,
+        discovered: 1,
+      };
+      mockReq.params = { name: 'Host1' };
+      mockReq.query = { verify: 'true', verifyTimeoutMs: '1000', verifyPollIntervalMs: '100' };
+      mockDb.getHost.mockResolvedValue(mockHost as any);
+      (networkDiscovery.isHostAlive as jest.Mock).mockRejectedValueOnce(new Error('probe exploded'));
+      (wol.wake as jest.Mock).mockImplementation(
+        (_mac: string, callback: (err: Error | null) => void) => callback(null)
+      );
+
+      await hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          verification: expect.objectContaining({
+            status: 'error',
+          }),
+        })
+      );
+    });
+
+    it('should handle WoL errors as structured response', async () => {
       const mockHost = {
         name: 'Host1',
         mac: 'AA:BB:CC:DD:EE:FF',
@@ -236,10 +373,34 @@ describe('hosts controller', () => {
         }
       );
 
-      // Controller now throws errors for Express error handler to catch
-      await expect(
-        hostsController.wakeUpHost(mockReq as Request, mockRes as Response)
-      ).rejects.toThrow('WoL failed');
+      await hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(502);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          error: 'WOL_SEND_FAILED',
+          message: 'WoL failed',
+          verification: expect.objectContaining({
+            status: 'error',
+          }),
+        })
+      );
+    });
+
+    it('should return 400 for invalid wake verification query params', async () => {
+      mockReq.params = { name: 'Host1' };
+      mockReq.query = { verify: 'invalid-value' };
+
+      await hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: 'Bad Request',
+        })
+      );
+      expect(mockDb.getHost).not.toHaveBeenCalled();
     });
   });
 

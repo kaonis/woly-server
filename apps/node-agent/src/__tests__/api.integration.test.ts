@@ -244,6 +244,8 @@ describe('API Integration Tests', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.name).toBe('TEST-WOL-HOST');
+      expect(response.body.verification).toBeDefined();
+      expect(response.body.verification.status).toBe('not_requested');
       expect(wol.wake).toHaveBeenCalled();
     });
 
@@ -262,11 +264,32 @@ describe('API Integration Tests', () => {
         }
       );
 
-      const response = await request(app).post('/hosts/wakeup/TEST-WOL-HOST').expect(500);
+      const response = await request(app).post('/hosts/wakeup/TEST-WOL-HOST').expect(502);
 
-      // Error handler wraps errors in error.message format
-      expect(response.body).toHaveProperty('error');
-      expect(response.body.error).toHaveProperty('message');
+      expect(response.body).toMatchObject({
+        success: false,
+        error: 'WOL_SEND_FAILED',
+      });
+      expect(response.body.verification.status).toBe('error');
+    });
+
+    it('should support per-request wake verification via query params', async () => {
+      (wol.wake as jest.Mock).mockImplementation(
+        (_mac: string, callback: (err: Error | null) => void) => {
+          callback(null);
+        }
+      );
+      (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(true);
+
+      const response = await request(app)
+        .post('/hosts/wakeup/TEST-WOL-HOST?verify=true&verifyTimeoutMs=2000&verifyPollIntervalMs=200')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.verification).toMatchObject({
+        enabled: true,
+        status: 'woke',
+      });
     });
   });
 

@@ -105,6 +105,7 @@ describe('config module', () => {
       expect(config).toHaveProperty('cache');
       expect(config).toHaveProperty('cors');
       expect(config).toHaveProperty('logging');
+      expect(config).toHaveProperty('wakeVerification');
     });
 
     it('should have reasonable default values', () => {
@@ -135,6 +136,8 @@ describe('config module', () => {
         config.network.pingTimeout,
         config.cache.macVendorTTL,
         config.cache.macVendorRateLimit,
+        config.wakeVerification.timeoutMs,
+        config.wakeVerification.pollIntervalMs,
       ];
 
       numberProps.forEach((prop) => {
@@ -154,6 +157,12 @@ describe('config module', () => {
         expect(typeof prop).toBe('string');
         expect(prop.length).toBeGreaterThan(0);
       });
+    });
+
+    it('should expose wake verification settings with valid ranges', () => {
+      expect(typeof config.wakeVerification.enabled).toBe('boolean');
+      expect(config.wakeVerification.timeoutMs).toBeGreaterThan(0);
+      expect(config.wakeVerification.pollIntervalMs).toBeGreaterThan(0);
     });
   });
 });
