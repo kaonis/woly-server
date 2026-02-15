@@ -6,13 +6,12 @@ Scope: New autonomous cycle after V6 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `69adf2e` (PR #165).
-- Active execution branch: `docs/166-roadmap-v7-bootstrap`.
+- `master` synced at merge commit `88cf0fc` (PR #168).
+- Active execution branch: `docs/167-ci-review-cadence`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #166 `[Roadmap] Close V6 and bootstrap ROADMAP_V7`
 - #167 `[CI] Define review cadence and exit criteria for manual-only mode`
 
 ### CI snapshot
@@ -35,7 +34,7 @@ Acceptance criteria:
 - Add V6 post-merge log entries for #164 / PR #165.
 - Publish `docs/ROADMAP_V7.md` with current status audit and phased plan.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #168)
 
 ### Phase 2: ESLint 10 compatibility unblock monitoring
 Issue: #150  
@@ -57,7 +56,7 @@ Acceptance criteria:
 - Define objective exit criteria for re-enabling automatic workflows.
 - Document decision ownership and recording process.
 
-Status: `Planned` (2026-02-15)
+Status: `In Progress` (2026-02-15)
 
 ## 3. Execution Loop Rules
 
@@ -79,3 +78,5 @@ For each phase:
 - 2026-02-15: Created ROADMAP_V7 from issue #166 after V6 manual-only CI transition merged.
 - 2026-02-15: Re-checked ESLint 10 blocker for #150: `eslint@10.0.0` exists, but latest `@typescript-eslint/*@8.55.0` still peers `eslint ^8.57.0 || ^9.0.0`.
 - 2026-02-15: Added follow-up issue #167 to formalize manual-only CI review cadence and re-enable criteria.
+- 2026-02-15: Merged roadmap bootstrap issue #166 via PR #168 and advanced V7 execution to Phase 3.
+- 2026-02-15: Started issue #167 on branch `docs/167-ci-review-cadence` to add weekly manual-only CI review process and decision log.
