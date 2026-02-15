@@ -52,7 +52,7 @@ Acceptance criteria:
 - Document decision categories and defer/acceptance policy.
 - Link triage process from roadmap/checklist docs.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #145)
 
 ## 3. Execution Loop Rules
 
@@ -83,3 +83,5 @@ For each phase:
 - 2026-02-15: Linked dependency triage workflow from README and node-agent checklist.
 - 2026-02-15: Ran local node-agent gates for #141 (`npm run typecheck -w apps/node-agent`, `npm run test:ci -w apps/node-agent`) successfully.
 - 2026-02-15: Added triage output comment on issue #4 and created follow-up issue #144 for deferred major dependency upgrades.
+- 2026-02-15: Merged #141 via PR #145 and verified post-merge `master` checks green (CI + CodeQL).
+- 2026-02-15: V5 phase set completed; next cycle planned in `docs/ROADMAP_V6.md`.
