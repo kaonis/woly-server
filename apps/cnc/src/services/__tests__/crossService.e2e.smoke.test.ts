@@ -102,7 +102,10 @@ function startService(params: {
     }
 
     child.kill('SIGTERM');
-    const exited = await Promise.race([once(child, 'exit').then(() => true), sleep(5_000).then(() => false)]);
+    const exited = await Promise.race([
+      once(child, 'exit').then(() => true),
+      sleep(5_000, false, { ref: false }),
+    ]);
     if (exited) {
       return;
     }
