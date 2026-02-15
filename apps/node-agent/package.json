@@ -49,7 +49,7 @@
     "wake_on_lan": "1.0.0",
     "winston": "^3.17.0",
     "ws": "^8.18.3",
-    "zod": "^3.24.1"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

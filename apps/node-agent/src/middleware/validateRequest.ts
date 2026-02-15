@@ -28,10 +28,15 @@ export const validateRequest = (schema: z.ZodTypeAny, target: ValidationTarget =
     } catch (error) {
       if (error instanceof ZodError) {
         // Format errors to match Joi format: comma-separated error messages with field paths
-        const errorMessage = error.errors
+        const errorMessage = error.issues
           .map((err) => {
             const path = err.path.length > 0 ? `"${err.path.join('.')}" ` : '';
-            return `${path}${err.message}`;
+            const isMissingRequiredField =
+              err.code === 'invalid_type' &&
+              (err as { input?: unknown }).input === undefined &&
+              err.path.length > 0;
+            const message = isMissingRequiredField ? 'is required' : err.message;
+            return `${path}${message}`;
           })
           .join(', ');
         throw new AppError(errorMessage, 400, 'VALIDATION_ERROR');

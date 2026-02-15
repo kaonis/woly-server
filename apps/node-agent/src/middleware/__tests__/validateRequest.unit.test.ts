@@ -62,6 +62,15 @@ describe('validateRequest middleware', () => {
         middleware(mockReq as Request, mockRes as Response, mockNext);
       }).toThrow(AppError);
 
+      try {
+        middleware(mockReq as Request, mockRes as Response, mockNext);
+        fail('Should have thrown AppError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError);
+        expect((error as AppError).message.toLowerCase()).toContain('required');
+        expect((error as AppError).message).toContain('email');
+      }
+
       expect(mockNext).not.toHaveBeenCalled();
     });
 
