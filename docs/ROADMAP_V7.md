@@ -6,13 +6,13 @@ Scope: New autonomous cycle after V6 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `164659f` (PR #175).
-- Active execution branch: `feat/176-renovate-eslint-suppress`.
+- `master` synced at merge commit `ea6f0aa` (PR #177).
+- Active execution branch: `docs/178-roadmap-v8-bootstrap`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #176 `[Dependencies] Temporarily suppress Renovate ESLint 10 major updates while blocked`
+- #178 `[Roadmap] Close V7 and bootstrap ROADMAP_V8`
 
 ### CI snapshot
 - Repository workflows are in temporary manual-only mode (`workflow_dispatch` only).
@@ -90,7 +90,7 @@ Acceptance criteria:
 - Keep all non-ESLint-major dependency updates unaffected.
 - Document temporary rationale and traceability in config + roadmap.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #177)
 
 ## 3. Execution Loop Rules
 
@@ -122,3 +122,5 @@ For each phase:
 - 2026-02-15: Added issue #174, manually dispatched watchdog workflow run `22037969724`, and validated success with sticky issue #150 comment refresh at `2026-02-15T15:11:45Z`.
 - 2026-02-15: Merged issue #174 via PR #175 and logged successful post-extraction watchdog validation evidence on master.
 - 2026-02-15: Added issue #176 and started Phase 6 on branch `feat/176-renovate-eslint-suppress`.
+- 2026-02-15: Merged issue #176 via PR #177, adding temporary Renovate suppression for blocked ESLint major updates and reducing dependency dashboard churn.
+- 2026-02-15: Added issue #178 to close out V7 and bootstrap ROADMAP_V8 with refreshed status audit.
