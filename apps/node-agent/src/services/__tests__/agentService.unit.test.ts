@@ -574,6 +574,8 @@ describe('AgentService command handlers', () => {
       status: undefined,
       notes: undefined,
       tags: undefined,
+    }, {
+      emitLifecycleEvent: false,
     });
     expect(hostDbMock.getHost).toHaveBeenNthCalledWith(2, 'RENAMED-HOST');
     expect(sendHostUpdatedSpy).toHaveBeenCalledWith(updatedHost);
@@ -638,6 +640,8 @@ describe('AgentService command handlers', () => {
       status: undefined,
       notes: 'Rack 9',
       tags: ['lab', 'primary'],
+    }, {
+      emitLifecycleEvent: false,
     });
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -767,7 +771,9 @@ describe('AgentService command handlers', () => {
       data: { name: 'PHANTOM-MBP' },
     });
 
-    expect(hostDbMock.deleteHost).toHaveBeenCalledWith('PHANTOM-MBP');
+    expect(hostDbMock.deleteHost).toHaveBeenCalledWith('PHANTOM-MBP', {
+      emitLifecycleEvent: false,
+    });
     expect(sendHostRemovedSpy).toHaveBeenCalledWith('PHANTOM-MBP');
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -943,6 +943,8 @@ export class AgentService extends EventEmitter {
         status: data.status,
         notes: data.notes,
         tags: data.tags,
+      }, {
+        emitLifecycleEvent: false,
       });
 
       const updated = await this.hostDb.getHost(data.name);
@@ -974,7 +976,7 @@ export class AgentService extends EventEmitter {
         throw new NonRetryableCommandError('Host database not initialized');
       }
 
-      await this.hostDb.deleteHost(name);
+      await this.hostDb.deleteHost(name, { emitLifecycleEvent: false });
       this.sendHostRemoved(name);
 
       return {

@@ -138,7 +138,9 @@ class ScanOrchestrator {
           try {
             const hostName = host.hostname ?? `device-${host.ip.replace(/\./g, '-')}`;
 
-            await this.hostDb.addHost(hostName, formattedMac, host.ip);
+            await this.hostDb.addHost(hostName, formattedMac, host.ip, undefined, {
+              emitLifecycleEvent: false,
+            });
             await this.hostDb.updateHostStatus(hostName, status);
             await this.hostDb.updateHostSeen(formattedMac, status, pingResponsive);
             newHostCount++;
