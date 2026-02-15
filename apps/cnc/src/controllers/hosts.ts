@@ -3,6 +3,7 @@
  */
 
 import { Request, Response } from 'express';
+import { isIP } from 'node:net';
 import { z } from 'zod';
 import { hostStatusSchema } from '@kaonis/woly-protocol';
 import { HostAggregator } from '../services/hostAggregator';
@@ -11,10 +12,14 @@ import { lookupMacVendor, MAC_ADDRESS_PATTERN } from '../services/macVendorServi
 import logger from '../utils/logger';
 
 // Validation schema for updateHost request body
+const ipAddressSchema = z.string().refine((value) => isIP(value) !== 0, {
+  message: 'IP address must be a valid IPv4 or IPv6 address',
+});
+
 const updateHostBodySchema = z.object({
   name: z.string().min(1).optional(),
   mac: z.string().regex(MAC_ADDRESS_PATTERN).optional(),
-  ip: z.string().ip().optional(),
+  ip: ipAddressSchema.optional(),
   status: hostStatusSchema.optional(),
 }).strict();
 
@@ -322,7 +327,7 @@ export class HostsController {
         res.status(400).json({
           error: 'Bad Request',
           message: 'Invalid request body',
-          details: parseResult.error.errors,
+          details: parseResult.error.issues,
         });
         return;
       }

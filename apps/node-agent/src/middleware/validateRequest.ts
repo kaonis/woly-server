@@ -28,7 +28,7 @@ export const validateRequest = (schema: z.ZodTypeAny, target: ValidationTarget =
     } catch (error) {
       if (error instanceof ZodError) {
         // Format errors to match Joi format: comma-separated error messages with field paths
-        const errorMessage = error.errors
+        const errorMessage = error.issues
           .map((err) => {
             const path = err.path.length > 0 ? `"${err.path.join('.')}" ` : '';
             return `${path}${err.message}`;

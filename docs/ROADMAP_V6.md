@@ -6,19 +6,17 @@ Scope: New autonomous cycle after V5 completion.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `9b027df` (PR #145).
+- `master` synced at merge commit `1c82368` (PR #151).
 - Active execution branch: `master`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
-- #144 `[Dependencies] Plan major dashboard upgrade wave (ESLint 10, TS-ESLint 8, Zod 4, npm 11)`
-- #146 `[Dependencies] Execute tooling major upgrade set (ESLint 9 + typescript-eslint 8)`
 - #147 `[Dependencies] Evaluate and stage Zod v4 migration across protocol and services`
 - #148 `[Dependencies] Evaluate npm 11 adoption and CI/runtime compatibility`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
 
 ### CI snapshot
-- Post-merge checks for `9b027df` are green (CI + CodeQL).
+- Post-merge checks for `1c82368` are green (CI + CodeQL).
 - Dependency triage workflow and audit/security gates are documented and active.
 
 ## 2. Iterative Phases
@@ -43,7 +41,7 @@ Acceptance criteria:
 - Keep lint/typecheck/test gates green across workspaces.
 - Document any lint rule/config migration adjustments.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #151)
 
 ### Phase 3: Zod v4 migration validation
 Issue: #147  
@@ -54,7 +52,7 @@ Acceptance criteria:
 - Preserve contract compatibility or document deliberate breaking changes.
 - Keep CI and contract/schema suites green.
 
-Status: `Pending`
+Status: `In Progress` (2026-02-15)
 
 ## 3. Execution Loop Rules
 
@@ -82,3 +80,7 @@ For each phase:
 - 2026-02-15: Started Phase 2 issue #146 on branch `feat/146-tooling-major-upgrade-set`.
 - 2026-02-15: Upgraded lint tooling to ESLint 9 + typescript-eslint 8 + eslint-config-prettier 10 and stabilized ESLint v9 compatibility for current `.eslintrc` workflow.
 - 2026-02-15: Ran local root gates for #146 (`npm run lint`, `npm run typecheck`, `npm run test:ci`) successfully.
+- 2026-02-15: Merged #146 via PR #151 and verified post-merge `master` checks green (CI + CodeQL).
+- 2026-02-15: Started Phase 3 issue #147 on branch `feat/147-zod-v4-migration-validation`.
+- 2026-02-15: Applied Zod v4 migration updates across protocol/C&C/node-agent (`zod` dependency majors, IP validation migration from `z.string().ip()` to `node:net` `isIP` refinements, `ZodError.errors` -> `ZodError.issues`).
+- 2026-02-15: Ran full local gates for #147 (`npm run typecheck`, `npm run test:ci`, `npm run lint`, `npm run build`) successfully.
