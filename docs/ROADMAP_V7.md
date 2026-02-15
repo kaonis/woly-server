@@ -6,13 +6,13 @@ Scope: New autonomous cycle after V6 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `88cf0fc` (PR #168).
-- Active execution branch: `docs/167-ci-review-cadence`.
+- `master` synced at merge commit `fab2643` (PR #169).
+- Active execution branch: `docs/170-roadmap-v7-sync`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #167 `[CI] Define review cadence and exit criteria for manual-only mode`
+- #170 `[Roadmap] Sync ROADMAP_V7 after #167 merge`
 
 ### CI snapshot
 - Repository workflows are in temporary manual-only mode (`workflow_dispatch` only).
@@ -56,7 +56,7 @@ Acceptance criteria:
 - Define objective exit criteria for re-enabling automatic workflows.
 - Document decision ownership and recording process.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #169)
 
 ## 3. Execution Loop Rules
 
@@ -80,3 +80,5 @@ For each phase:
 - 2026-02-15: Added follow-up issue #167 to formalize manual-only CI review cadence and re-enable criteria.
 - 2026-02-15: Merged roadmap bootstrap issue #166 via PR #168 and advanced V7 execution to Phase 3.
 - 2026-02-15: Started issue #167 on branch `docs/167-ci-review-cadence` to add weekly manual-only CI review process and decision log.
+- 2026-02-15: Merged issue #167 via PR #169, adding weekly review cadence, ownership, objective exit criteria, and `docs/CI_MANUAL_REVIEW_LOG.md`.
+- 2026-02-15: Started issue #170 to sync ROADMAP_V7 after #167 merge and refresh open-issue snapshot.
