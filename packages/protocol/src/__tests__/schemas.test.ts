@@ -1,4 +1,7 @@
 import {
+  cncCapabilitiesResponseSchema,
+  cncCapabilityDescriptorSchema,
+  hostPortScanResponseSchema,
   hostSchema,
   hostStatusSchema,
   commandStateSchema,
@@ -147,6 +150,121 @@ describe('errorResponseSchema', () => {
 
   it('rejects missing message', () => {
     expect(errorResponseSchema.safeParse({ error: 'ERR' }).success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cncCapabilityDescriptorSchema / cncCapabilitiesResponseSchema
+// ---------------------------------------------------------------------------
+
+describe('cncCapabilityDescriptorSchema', () => {
+  it('accepts minimal capability descriptor', () => {
+    expect(cncCapabilityDescriptorSchema.safeParse({ supported: true }).success).toBe(true);
+  });
+
+  it('accepts descriptor with routes/persistence/transport/note', () => {
+    expect(
+      cncCapabilityDescriptorSchema.safeParse({
+        supported: true,
+        routes: ['/api/hosts/scan-ports/:fqn'],
+        persistence: 'backend',
+        transport: 'websocket',
+        note: 'Feature is available',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects unsupported persistence value', () => {
+    expect(
+      cncCapabilityDescriptorSchema.safeParse({
+        supported: true,
+        persistence: 'remote',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('cncCapabilitiesResponseSchema', () => {
+  const capability = { supported: true };
+
+  it('accepts valid CNC capabilities payload', () => {
+    expect(
+      cncCapabilitiesResponseSchema.safeParse({
+        mode: 'cnc',
+        versions: {
+          cncApi: '1.0.0',
+          protocol: '1.0.0',
+        },
+        capabilities: {
+          scan: capability,
+          notesTags: capability,
+          schedules: { supported: false },
+          commandStatusStreaming: { supported: false, transport: null },
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects non-cnc mode', () => {
+    expect(
+      cncCapabilitiesResponseSchema.safeParse({
+        mode: 'standalone',
+        versions: {
+          cncApi: '1.0.0',
+          protocol: '1.0.0',
+        },
+        capabilities: {
+          scan: capability,
+          notesTags: capability,
+          schedules: capability,
+          commandStatusStreaming: capability,
+        },
+      }).success
+    ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hostPortScanResponseSchema
+// ---------------------------------------------------------------------------
+
+describe('hostPortScanResponseSchema', () => {
+  it('accepts valid host port scan response', () => {
+    expect(
+      hostPortScanResponseSchema.safeParse({
+        target: 'Office-Mac@Home',
+        scannedAt: '2026-02-15T00:00:00.000Z',
+        openPorts: [
+          { port: 22, protocol: 'tcp', service: 'SSH' },
+          { port: 443, protocol: 'tcp', service: 'HTTPS' },
+        ],
+        scan: {
+          commandId: 'cmd-1',
+          state: 'acknowledged',
+          nodeId: 'node-1',
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts empty open ports array', () => {
+    expect(
+      hostPortScanResponseSchema.safeParse({
+        target: 'Office-Mac@Home',
+        scannedAt: '2026-02-15T00:00:00.000Z',
+        openPorts: [],
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects invalid port protocol', () => {
+    expect(
+      hostPortScanResponseSchema.safeParse({
+        target: 'Office-Mac@Home',
+        scannedAt: '2026-02-15T00:00:00.000Z',
+        openPorts: [{ port: 80, protocol: 'udp', service: 'HTTP' }],
+      }).success
+    ).toBe(false);
   });
 });
 

@@ -2,7 +2,14 @@
  * Core type definitions for WoLy C&C Backend
  */
 
-import type { CommandState, Host, NodeMetadata as ProtocolNodeMetadata } from '@kaonis/woly-protocol';
+import type {
+  CncCapabilitiesResponse as ProtocolCncCapabilitiesResponse,
+  CncCapabilityDescriptor as ProtocolCncCapabilityDescriptor,
+  CommandState,
+  Host,
+  HostPortScanResponse as ProtocolHostPortScanResponse,
+  NodeMetadata as ProtocolNodeMetadata,
+} from '@kaonis/woly-protocol';
 
 // Node Types
 export interface Node {
@@ -66,27 +73,9 @@ export interface HostsResponse {
   };
 }
 
-export interface CapabilityDescriptor {
-  supported: boolean;
-  routes?: string[];
-  persistence?: 'backend' | 'local' | 'none';
-  transport?: 'websocket' | 'sse' | null;
-  note?: string;
-}
-
-export interface CncCapabilitiesResponse {
-  mode: 'cnc';
-  versions: {
-    cncApi: string;
-    protocol: string;
-  };
-  capabilities: {
-    scan: CapabilityDescriptor;
-    notesTags: CapabilityDescriptor;
-    schedules: CapabilityDescriptor;
-    commandStatusStreaming: CapabilityDescriptor;
-  };
-}
+export type CapabilityDescriptor = ProtocolCncCapabilityDescriptor;
+export type CncCapabilitiesResponse = ProtocolCncCapabilitiesResponse;
+export type HostPortScanResponse = ProtocolHostPortScanResponse;
 
 export interface WakeupResponse {
   success: boolean;

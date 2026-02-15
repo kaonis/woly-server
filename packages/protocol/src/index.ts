@@ -61,6 +61,48 @@ export interface ErrorResponse {
   details?: unknown;
 }
 
+export interface CncCapabilityDescriptor {
+  supported: boolean;
+  routes?: string[];
+  persistence?: 'backend' | 'local' | 'none';
+  transport?: 'websocket' | 'sse' | null;
+  note?: string;
+}
+
+export interface CncCapabilitiesResponse {
+  mode: 'cnc';
+  versions: {
+    cncApi: string;
+    protocol: string;
+  };
+  capabilities: {
+    scan: CncCapabilityDescriptor;
+    notesTags: CncCapabilityDescriptor;
+    schedules: CncCapabilityDescriptor;
+    commandStatusStreaming: CncCapabilityDescriptor;
+  };
+}
+
+export interface HostPort {
+  port: number;
+  protocol: 'tcp';
+  service: string;
+}
+
+export interface HostPortScanResponse {
+  target: string;
+  scannedAt: string;
+  openPorts: HostPort[];
+  scan?: {
+    commandId?: string;
+    state?: CommandState;
+    nodeId?: string;
+    message?: string;
+  };
+  message?: string;
+  correlationId?: string;
+}
+
 // --- WebSocket message types ---
 
 export type NodeMessage =
@@ -142,6 +184,48 @@ export const errorResponseSchema = z.object({
   message: z.string().min(1),
   code: z.string().optional(),
   details: z.unknown().optional(),
+});
+
+export const cncCapabilityDescriptorSchema: z.ZodType<CncCapabilityDescriptor> = z.object({
+  supported: z.boolean(),
+  routes: z.array(z.string().min(1)).optional(),
+  persistence: z.enum(['backend', 'local', 'none']).optional(),
+  transport: z.enum(['websocket', 'sse']).nullable().optional(),
+  note: z.string().min(1).optional(),
+});
+
+export const cncCapabilitiesResponseSchema: z.ZodType<CncCapabilitiesResponse> = z.object({
+  mode: z.literal('cnc'),
+  versions: z.object({
+    cncApi: z.string().min(1),
+    protocol: z.string().min(1),
+  }),
+  capabilities: z.object({
+    scan: cncCapabilityDescriptorSchema,
+    notesTags: cncCapabilityDescriptorSchema,
+    schedules: cncCapabilityDescriptorSchema,
+    commandStatusStreaming: cncCapabilityDescriptorSchema,
+  }),
+});
+
+export const hostPortSchema: z.ZodType<HostPort> = z.object({
+  port: z.number().int().positive(),
+  protocol: z.literal('tcp'),
+  service: z.string().min(1),
+});
+
+export const hostPortScanResponseSchema: z.ZodType<HostPortScanResponse> = z.object({
+  target: z.string().min(1),
+  scannedAt: z.string().min(1),
+  openPorts: z.array(hostPortSchema),
+  scan: z.object({
+    commandId: z.string().min(1).optional(),
+    state: commandStateSchema.optional(),
+    nodeId: z.string().min(1).optional(),
+    message: z.string().min(1).optional(),
+  }).optional(),
+  message: z.string().min(1).optional(),
+  correlationId: z.string().min(1).optional(),
 });
 
 const nodeMetadataSchema = z.object({
