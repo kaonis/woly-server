@@ -152,6 +152,14 @@ POST   /api/auth/token         # Exchange operator token for JWT (mobile sign-in
 GET    /health                 # Server health check
 ```
 
+### Protected Metadata API
+
+Requires `Authorization: Bearer <jwt>` with role `operator` or `admin`.
+
+```
+GET    /api/capabilities       # Feature negotiation map for CNC clients
+```
+
 ### Protected Node API
 
 Requires `Authorization: Bearer <jwt>` with role `operator` or `admin`.

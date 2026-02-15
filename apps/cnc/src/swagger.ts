@@ -54,6 +54,10 @@ const options: swaggerJsdoc.Options = {
         description: 'Aggregated host management across nodes',
       },
       {
+        name: 'Meta',
+        description: 'Capability negotiation and metadata endpoints',
+      },
+      {
         name: 'Admin',
         description: 'Administrative operations (requires admin role)',
       },

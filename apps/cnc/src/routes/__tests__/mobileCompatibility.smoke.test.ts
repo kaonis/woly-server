@@ -6,6 +6,8 @@ import { HostAggregator } from '../../services/hostAggregator';
 import { CommandRouter } from '../../services/commandRouter';
 import { createToken } from './testUtils';
 import { NodeModel } from '../../models/Node';
+import { PROTOCOL_VERSION } from '@kaonis/woly-protocol';
+import { CNC_VERSION } from '../../utils/cncVersion';
 
 jest.mock('../../config', () => ({
   __esModule: true,
@@ -192,6 +194,48 @@ describe('Mobile API compatibility smoke checks', () => {
       const response = await request(app)
         .get('/api/nodes')
         .set('Authorization', 'InvalidHeader');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+  });
+
+  describe('GET /api/capabilities', () => {
+    const operatorJwt = createToken({
+      sub: 'mobile-client',
+      role: 'operator',
+      iss: 'test-issuer',
+      aud: 'test-audience',
+      exp: now + 3600,
+      nbf: now - 10,
+    });
+
+    it('returns capabilities payload compatible with mobile feature negotiation', async () => {
+      const response = await request(app)
+        .get('/api/capabilities')
+        .set('Authorization', `Bearer ${operatorJwt}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        mode: 'cnc',
+        versions: {
+          cncApi: CNC_VERSION,
+          protocol: PROTOCOL_VERSION,
+        },
+        capabilities: {
+          scan: { supported: false },
+          notesTags: { supported: true, persistence: 'backend' },
+          schedules: { supported: false },
+          commandStatusStreaming: { supported: false, transport: null },
+        },
+      });
+    });
+
+    it('returns auth error envelope when JWT is missing', async () => {
+      const response = await request(app).get('/api/capabilities');
 
       expect(response.status).toBe(401);
       expect(response.body).toMatchObject({

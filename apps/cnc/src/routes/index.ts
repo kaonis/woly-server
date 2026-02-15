@@ -7,6 +7,7 @@ import { NodesController } from '../controllers/nodes';
 import { AdminController } from '../controllers/admin';
 import { HostsController } from '../controllers/hosts';
 import { AuthController } from '../controllers/auth';
+import { MetaController } from '../controllers/meta';
 import { NodeManager } from '../services/nodeManager';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
@@ -30,9 +31,13 @@ export function createRoutes(
   const adminController = new AdminController(hostAggregator, nodeManager, commandRouter);
   const hostsController = new HostsController(hostAggregator, commandRouter);
   const authController = new AuthController();
+  const metaController = new MetaController();
 
   // Public API routes with rate limiting
   router.post('/auth/token', strictAuthLimiter, (req, res) => authController.issueToken(req, res));
+  router.get('/capabilities', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'), (req, res) =>
+    metaController.getCapabilities(req, res),
+  );
 
   // Route group protection
   router.use('/nodes', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
