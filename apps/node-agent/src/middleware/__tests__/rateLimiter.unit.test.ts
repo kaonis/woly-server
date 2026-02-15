@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { apiLimiter, scanLimiter, wakeLimiter } from '../rateLimiter';
+import { apiLimiter, healthLimiter, scanLimiter, wakeLimiter } from '../rateLimiter';
 
 // Mock logger
 jest.mock('../../utils/logger', () => ({
@@ -64,6 +64,17 @@ describe('rateLimiter middleware', () => {
     it('should be a middleware function', () => {
       // Rate limiters from express-rate-limit are middleware functions
       expect(wakeLimiter.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe('healthLimiter', () => {
+    it('should be defined', () => {
+      expect(healthLimiter).toBeDefined();
+      expect(typeof healthLimiter).toBe('function');
+    });
+
+    it('should be a middleware function', () => {
+      expect(healthLimiter.length).toBeGreaterThanOrEqual(2);
     });
   });
 });

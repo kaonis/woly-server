@@ -72,7 +72,7 @@ Acceptance criteria:
 - Validate auth and error envelope compatibility with `kaonis/woly` service layer expectations.
 - Ensure CI fails on breaking API drift.
 
-Status: `In Progress`
+Status: `Completed` (2026-02-15 via PR #115)
 
 ### Phase 4: Node-agent security and API parity
 Issues:
@@ -83,7 +83,7 @@ Acceptance criteria:
 - Restrictive default CORS in production and health endpoint rate limiting (#83).
 - Standalone REST `PUT /hosts/:name` and `DELETE /hosts/:name` with tests/docs (#89).
 
-Status: `Planned`
+Status: `In Progress` (starting with #83)
 
 ## 3. Execution Loop Rules for V1
 
@@ -111,4 +111,7 @@ For each issue phase:
 - 2026-02-15: Merged PR #114 (`test: harden protocol/CORS coverage checks (#93)`).
 - 2026-02-15: Verified post-merge `master` CI and CodeQL runs are green.
 - 2026-02-15: Started Phase 3 implementation on issue #112 (`test/112-mobile-compat-smoke`).
-- Next: Open and merge PR for #112, then continue to Phase 4.
+- 2026-02-15: Merged PR #115 (`test: add mobile API compatibility smoke suite (#112)`).
+- 2026-02-15: Verified post-merge `master` CI and CodeQL runs are green.
+- 2026-02-15: Started Phase 4 implementation on issue #83 (`fix/83-node-agent-cors-health-hardening`).
+- Next: Open and merge PR for #83, then continue to #89.

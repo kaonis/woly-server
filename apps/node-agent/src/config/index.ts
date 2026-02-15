@@ -3,6 +3,13 @@ import dotenv from 'dotenv';
 // Load environment variables from .env file
 dotenv.config();
 
+const parsedCorsOrigins = process.env.CORS_ORIGINS
+  ?.split(',')
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
+
+const defaultCorsOrigins = process.env.NODE_ENV === 'production' ? [] : ['*'];
+
 export const config = {
   server: {
     port: parseInt(process.env.PORT || '8082', 10),
@@ -26,7 +33,9 @@ export const config = {
     macVendorRateLimit: parseInt(process.env.MAC_VENDOR_RATE_LIMIT || '1000', 10), // 1 second
   },
   cors: {
-    origins: process.env.CORS_ORIGINS?.split(',') || ['*'],
+    origins: parsedCorsOrigins && parsedCorsOrigins.length > 0
+      ? parsedCorsOrigins
+      : defaultCorsOrigins,
   },
   logging: {
     level: process.env.LOG_LEVEL || 'info',

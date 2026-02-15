@@ -70,3 +70,25 @@ export const wakeLimiter = rateLimit({
     });
   },
 });
+
+/**
+ * Health check rate limiter
+ * Generous limit to reduce accidental DoS while keeping monitoring friendly
+ */
+export const healthLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60,
+  message: {
+    error: 'Too many health check requests. Please try again later.',
+    retryAfter: '1 minute',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logger.warn(`Health endpoint rate limit exceeded for IP: ${req.ip}`);
+    res.status(429).json({
+      error: 'Too many health check requests. Please try again later.',
+      retryAfter: '1 minute',
+    });
+  },
+});
