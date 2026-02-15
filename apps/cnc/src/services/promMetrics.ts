@@ -85,6 +85,13 @@ const commandOutcomeByTypeGauge = new Gauge({
   registers: [registry],
 });
 
+const commandUnknownOutcomeGauge = new Gauge({
+  name: 'woly_cnc_command_outcomes_unknown_total',
+  help: 'Terminal command outcomes attributed to unknown command type',
+  labelNames: ['state'],
+  registers: [registry],
+});
+
 export function updatePrometheusRuntimeMetrics(snapshot: RuntimeMetricsSnapshot): void {
   nodesConnectedGauge.set(snapshot.nodes.connected);
   nodesPeakConnectedGauge.set(snapshot.nodes.peakConnected);
@@ -116,6 +123,16 @@ export function updatePrometheusRuntimeMetrics(snapshot: RuntimeMetricsSnapshot)
     commandOutcomeByTypeGauge.set({ type: commandType, state: 'failed' }, outcomes.failed);
     commandOutcomeByTypeGauge.set({ type: commandType, state: 'timed_out' }, outcomes.timedOut);
   }
+
+  commandUnknownOutcomeGauge.set(
+    { state: 'acknowledged' },
+    snapshot.commands.unknownAttribution.acknowledged
+  );
+  commandUnknownOutcomeGauge.set({ state: 'failed' }, snapshot.commands.unknownAttribution.failed);
+  commandUnknownOutcomeGauge.set(
+    { state: 'timed_out' },
+    snapshot.commands.unknownAttribution.timedOut
+  );
 }
 
 export async function renderPrometheusMetrics(snapshot: RuntimeMetricsSnapshot): Promise<string> {
@@ -131,4 +148,5 @@ export function resetPrometheusMetricsForTests(): void {
   registry.resetMetrics();
   commandByTypeGauge.reset();
   commandOutcomeByTypeGauge.reset();
+  commandUnknownOutcomeGauge.reset();
 }
