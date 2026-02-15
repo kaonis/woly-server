@@ -2,6 +2,7 @@
 'use strict';
 
 const { execFileSync } = require('node:child_process');
+const { resolveSinceCheckpoint } = require('./manual-ci-review-template.cjs');
 
 function parseIssueNumber(raw, flag) {
   const issue = Number.parseInt(raw || '', 10);
@@ -54,12 +55,12 @@ function runNpmCommand(args) {
   });
 }
 
-function parseAuditOutput(output) {
+function parseAuditOutput(output, fallbackSince = 'unknown') {
   const status = output.match(/Status:\s+\*\*([^*]+)\*\*/)?.[1]?.trim() || 'unknown';
   const checkedAt = output.match(/Checked at:\s+`([^`]+)`/)?.[1] || 'unknown';
   const since =
     output.match(/Using latest checkpoint --since\s+([^\n]+)/)?.[1]?.trim() ||
-    'unknown';
+    fallbackSince;
 
   return { status, checkedAt, since };
 }
@@ -115,13 +116,14 @@ function buildCycleSummary(result) {
 }
 
 function runCycle(afterIssue, commandRunner) {
+  const fallbackSince = resolveSinceCheckpoint(null);
   const auditOutput = commandRunner(['ci:audit:latest', '--', '--fail-on-unexpected']);
   const followupOutput = commandRunner(['ci:followup:create', '--', '--after', String(afterIssue)]);
   const depsOutput = commandRunner(['deps:checkpoint:eslint10:post']);
 
   return {
     afterIssue,
-    audit: parseAuditOutput(auditOutput),
+    audit: parseAuditOutput(auditOutput, fallbackSince),
     followup: parseFollowupOutput(followupOutput),
     deps: parseDepsCheckpointOutput(depsOutput),
     raw: {

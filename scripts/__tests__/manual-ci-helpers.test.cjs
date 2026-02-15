@@ -342,6 +342,22 @@ test('parseAuditOutput extracts status, checkedAt and since', () => {
   });
 });
 
+test('parseAuditOutput falls back to provided since checkpoint', () => {
+  const parsed = parseAuditOutput(
+    [
+      'Checked at: `2026-02-15T22:14:29Z`',
+      'Status: **PASS** (manual-only workflow policy observed in this scope)',
+    ].join('\n'),
+    '2026-02-15T21:31:02Z'
+  );
+
+  assert.deepEqual(parsed, {
+    status: 'PASS',
+    checkedAt: '2026-02-15T22:14:29Z',
+    since: '2026-02-15T21:31:02Z',
+  });
+});
+
 test('parseFollowupOutput and parseDepsCheckpointOutput extract URLs', () => {
   const followup = parseFollowupOutput(
     'Created follow-up issue: https://github.com/kaonis/woly-server/issues/247'
