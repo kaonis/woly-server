@@ -23,6 +23,64 @@ const updateHostBodySchema = z.object({
   status: hostStatusSchema.optional(),
 }).strict();
 
+type PortScanEndpointResponse = {
+  target: string;
+  scannedAt: string;
+  openPorts: Array<{ port: number; protocol: 'tcp'; service: string }>;
+  scan?: {
+    commandId?: string;
+    state?: 'acknowledged' | 'failed';
+    nodeId?: string;
+    message?: string;
+  };
+  message?: string;
+  correlationId?: string;
+};
+
+function mapCommandError(error: unknown, fallbackMessage: string): {
+  statusCode: number;
+  errorTitle: string;
+  message: string;
+} {
+  let statusCode = 500;
+  let message = fallbackMessage;
+
+  if (error instanceof Error) {
+    message = error.message;
+    if (error.message.includes('Invalid FQN')) {
+      statusCode = 400;
+    } else if (error.message.includes('not found')) {
+      statusCode = 404;
+    } else if (error.message.includes('offline')) {
+      statusCode = 503;
+    } else if (error.message.includes('timeout')) {
+      statusCode = 504;
+    }
+  }
+
+  let errorTitle: string;
+  switch (statusCode) {
+    case 400:
+      errorTitle = 'Bad Request';
+      break;
+    case 404:
+      errorTitle = 'Not Found';
+      break;
+    case 503:
+      errorTitle = 'Service Unavailable';
+      break;
+    case 504:
+      errorTitle = 'Gateway Timeout';
+      break;
+    case 500:
+    default:
+      errorTitle = 'Internal Server Error';
+      break;
+  }
+
+  return { statusCode, errorTitle, message };
+}
+
 export class HostsController {
   constructor(
     private hostAggregator: HostAggregator,
@@ -263,6 +321,170 @@ export class HostsController {
       }
 
       res.status(statusCode).json(errorBody);
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/hosts/ports/{fqn}:
+   *   get:
+   *     summary: Get cached/synthetic host port-scan payload
+   *     description: |
+   *       Returns a mobile-compatible port-scan payload shape for CNC mode.
+   *       The current protocol does not include per-host open-port telemetry, so
+   *       `openPorts` is returned as an empty list.
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Fully qualified name (hostname@location)
+   *         example: PHANTOM-MBP@home-network
+   *     responses:
+   *       200:
+   *         description: Port payload shape returned
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
+   */
+  async getHostPorts(req: Request, res: Response): Promise<void> {
+    try {
+      const fqn = req.params.fqn as string;
+      const host = await this.hostAggregator.getHostByFQN(fqn);
+
+      if (!host) {
+        res.status(404).json({
+          error: 'Not Found',
+          message: `Host ${fqn} not found`,
+        });
+        return;
+      }
+
+      const response: PortScanEndpointResponse = {
+        target: fqn,
+        scannedAt: new Date().toISOString(),
+        openPorts: [],
+        message: 'Per-host open-port telemetry is not yet available in CNC protocol.',
+      };
+
+      res.json(response);
+    } catch (error) {
+      logger.error('Failed to get host ports', { fqn: req.params.fqn, error });
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Failed to retrieve host port data',
+      });
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/hosts/scan-ports/{fqn}:
+   *   get:
+   *     summary: Trigger host-side scan operation and return compatible port payload
+   *     description: |
+   *       Dispatches a node scan command for the host's managing node and returns
+   *       a mobile-compatible port payload shape.
+   *       The current protocol does not provide per-host open-port telemetry, so
+   *       `openPorts` remains an empty list.
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Fully qualified name (hostname@location)
+   *         example: PHANTOM-MBP@home-network
+   *     responses:
+   *       200:
+   *         description: Scan dispatched/completed and payload returned
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       503:
+   *         $ref: '#/components/responses/ServiceUnavailable'
+   *       504:
+   *         $ref: '#/components/responses/GatewayTimeout'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
+   */
+  async scanHostPorts(req: Request, res: Response): Promise<void> {
+    try {
+      const fqn = req.params.fqn as string;
+      const correlationId = req.correlationId ?? null;
+      const host = await this.hostAggregator.getHostByFQN(fqn);
+
+      if (!host) {
+        res.status(404).json({
+          error: 'Not Found',
+          message: `Host ${fqn} not found`,
+        });
+        return;
+      }
+
+      const routeOptions: { correlationId?: string } = {};
+      if (correlationId) {
+        routeOptions.correlationId = correlationId;
+      }
+
+      const result = await this.commandRouter.routeScanCommand(host.nodeId, true, routeOptions);
+
+      const response: PortScanEndpointResponse = {
+        target: fqn,
+        scannedAt: new Date().toISOString(),
+        openPorts: [],
+        scan: {
+          commandId: result.commandId,
+          state: result.success ? 'acknowledged' : 'failed',
+          nodeId: host.nodeId,
+          message: result.success
+            ? 'Node network scan completed; per-host open-port telemetry is not yet available.'
+            : result.error ?? 'Node scan failed',
+        },
+        message: result.success
+          ? 'Scan command executed successfully'
+          : result.error ?? 'Scan command failed',
+      };
+
+      const responseCorrelationId = result.correlationId ?? correlationId ?? undefined;
+      if (responseCorrelationId) {
+        response.correlationId = responseCorrelationId;
+      }
+
+      if (!result.success) {
+        res.status(500).json({
+          error: 'Internal Server Error',
+          message: result.error || 'Failed to execute scan command',
+          ...(response.correlationId ? { correlationId: response.correlationId } : {}),
+        });
+        return;
+      }
+
+      res.json(response);
+    } catch (error: unknown) {
+      logger.error('Failed to scan host ports', { fqn: req.params.fqn, error });
+
+      const mapped = mapCommandError(error, 'Failed to scan host ports');
+      const errorBody: { error: string; message: string; correlationId?: string } = {
+        error: mapped.errorTitle,
+        message: mapped.message,
+      };
+      if (req.correlationId) {
+        errorBody.correlationId = req.correlationId;
+      }
+
+      res.status(mapped.statusCode).json(errorBody);
     }
   }
 

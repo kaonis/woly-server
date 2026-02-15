@@ -48,6 +48,7 @@ describe('Host Routes Authentication and Authorization', () => {
 
     const commandRouter = {
       sendWakeCommand: jest.fn().mockResolvedValue({ success: false, error: 'Node not connected' }),
+      routeScanCommand: jest.fn().mockResolvedValue({ success: true, commandId: 'scan-1' }),
       routeUpdateHostCommand: jest.fn().mockResolvedValue({ success: false, error: 'Node not connected' }),
       routeDeleteHostCommand: jest.fn().mockResolvedValue({ success: false, error: 'Node not connected' }),
     } as unknown as CommandRouter;
@@ -236,6 +237,106 @@ describe('Host Routes Authentication and Authorization', () => {
 
       const response = await request(app)
         .get('/api/hosts/node1.example.com')
+        .set('Authorization', `Bearer ${token}`);
+
+      // Will be 404 since host doesn't exist in mock, but auth passed
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/hosts/ports/:fqn', () => {
+    it('returns 401 when no authorization header is provided', async () => {
+      const response = await request(app).get('/api/hosts/ports/node1.example.com');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 for unsupported role', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/ports/node1.example.com')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        code: 'AUTH_FORBIDDEN',
+      });
+    });
+
+    it('allows access with valid operator token', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'operator',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/ports/node1.example.com')
+        .set('Authorization', `Bearer ${token}`);
+
+      // Will be 404 since host doesn't exist in mock, but auth passed
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/hosts/scan-ports/:fqn', () => {
+    it('returns 401 when no authorization header is provided', async () => {
+      const response = await request(app).get('/api/hosts/scan-ports/node1.example.com');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 for unsupported role', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/scan-ports/node1.example.com')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        code: 'AUTH_FORBIDDEN',
+      });
+    });
+
+    it('allows access with valid operator token', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'operator',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/scan-ports/node1.example.com')
         .set('Authorization', `Bearer ${token}`);
 
       // Will be 404 since host doesn't exist in mock, but auth passed
