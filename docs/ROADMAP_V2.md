@@ -6,8 +6,8 @@ Scope: Continue autonomous delivery on `kaonis/woly-server` after V1 completion.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `woly-server` synced with `origin/master` at merge commit `6e05237` (PR #121).
-- Active execution branch for next phase: `feat/55-websocket-message-rate-limit`.
+- `woly-server` synced with `origin/master` at merge commit `4584ae0` (PR #122).
+- Active execution branch for next phase: `feat/56-websocket-connection-limit-per-ip`.
 
 ### GitHub issues snapshot (`kaonis/woly-server`)
 - Open issues reviewed on 2026-02-15.
@@ -21,8 +21,8 @@ Scope: Continue autonomous delivery on `kaonis/woly-server` after V1 completion.
   - #51 `[C&C] Phase 6: Observability and operations`
 
 ### CI snapshot
-- Recent merged PRs on 2026-02-15: #118, #119, #120, #121.
-- Post-merge checks on `master` for #121 are green (CI + CodeQL).
+- Recent merged PRs on 2026-02-15: #118, #119, #120, #121, #122.
+- Post-merge checks on `master` for #122 are green (CI + CodeQL).
 
 ### Local gate health (`woly-server`)
 - `npm run typecheck`: pass.
@@ -116,4 +116,6 @@ For each issue phase:
 - 2026-02-15: Started Phase 2 branch for #63 (`feat/63-node-agent-lint-type-hygiene`) and added zero-warning lint gate enforcement in `apps/node-agent`.
 - 2026-02-15: Merged #63 via PR #121; verified post-merge `master` checks green.
 - 2026-02-15: Started Phase 3 issue #55 on branch `feat/55-websocket-message-rate-limit`.
-- Next: Open PR for #55, merge after CI, then implement #56.
+- 2026-02-15: Merged #55 via PR #122; verified post-merge `master` checks green.
+- 2026-02-15: Started follow-up Phase 3 issue #56 on branch `feat/56-websocket-connection-limit-per-ip`.
+- Next: Open PR for #56 and complete Phase 3.

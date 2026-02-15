@@ -108,6 +108,7 @@ export interface ServerConfig {
   wsSessionTokenAudience: string;
   wsSessionTokenTtlSeconds: number;
   wsMessageRateLimitPerSecond: number;
+  wsMaxConnectionsPerIp: number;
   nodeHeartbeatInterval: number;
   nodeTimeout: number;
   commandTimeout: number;
