@@ -6,19 +6,20 @@ Scope: New autonomous cycle after V7 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `86524fa` (PR #184).
-- Active execution branch: `feat/185-manual-ci-audit-command`.
+- `master` synced at merge commit `38daddf` (PR #186).
+- Active execution branch: `docs/187-roadmap-v9-bootstrap`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #185 `[CI] Add local manual-only run audit command`
+- #187 `[Roadmap] Close V8 and bootstrap ROADMAP_V9`
+- #188 `[CI] Run next weekly manual-only operations review log update`
 
 ### CI snapshot
 - Repository workflows remain in temporary manual-only mode (`workflow_dispatch` only).
 - GitHub CodeQL default setup remains disabled (`state: not-configured`).
 - Workflow timeout cap standard (`timeout-minutes: 8`) is enforced across manual workflows (PR #183).
-- Local manual-only run audit command is being implemented in issue #185.
+- Local manual-only run audit command is available via `npm run ci:audit:manual` (PR #186).
 - Latest manual ESLint10 watchdog run succeeded: `22037969724` (2026-02-15).
 - Latest local validation gate passed on 2026-02-15:
   - `npm run lint`
@@ -82,6 +83,17 @@ Acceptance criteria:
 - Document command usage in manual CI operations guidance.
 - Validate local gate remains green.
 
+Status: `Completed` (2026-02-15, PR #186)
+
+### Phase 6: V8 closeout and V9 bootstrap
+Issue: #187  
+Labels: `priority:low`, `documentation`, `developer-experience`
+
+Acceptance criteria:
+- Mark V8 phase #185 completed with merged PR reference.
+- Refresh V8 status audit and open issue snapshot.
+- Create `docs/ROADMAP_V9.md` with carry-forward phases and issue links.
+
 Status: `In Progress` (2026-02-15)
 
 ## 3. Execution Loop Rules
@@ -112,3 +124,6 @@ For each phase:
 - 2026-02-15: Ran another ESLint 10 compatibility checkpoint for issue #150; blocker unchanged (`@typescript-eslint/*@8.55.0` peer range `^8.57 || ^9`).
 - 2026-02-15: Merged issue #150 checkpoint refresh via PR #184 with blocker still unchanged.
 - 2026-02-15: Created issue #185 and started branch `feat/185-manual-ci-audit-command` for local manual-run audit automation.
+- 2026-02-15: Merged issue #185 via PR #186 and published `ci:audit:manual` for weekly manual-only run audits.
+- 2026-02-15: Created issue #187 and started branch `docs/187-roadmap-v9-bootstrap` to close V8 and bootstrap V9.
+- 2026-02-15: Created issue #188 for the next weekly manual-only operations review cycle.

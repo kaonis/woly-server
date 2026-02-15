@@ -1,0 +1,88 @@
+# Woly-Server Roadmap V9
+
+Date: 2026-02-15
+Scope: New autonomous cycle after V8 closeout.
+
+## 1. Status Audit
+
+### Repository and branch status
+- `master` synced at merge commit `38daddf` (PR #186).
+- Active execution branch: `docs/187-roadmap-v9-bootstrap`.
+
+### Open issue snapshot (`kaonis/woly-server`)
+- #4 `Dependency Dashboard`
+- #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
+- #187 `[Roadmap] Close V8 and bootstrap ROADMAP_V9`
+- #188 `[CI] Run next weekly manual-only operations review log update`
+
+### CI snapshot
+- Repository workflows are in temporary manual-only mode (`workflow_dispatch` only).
+- GitHub CodeQL default setup remains disabled (`state: not-configured`).
+- Manual workflow jobs are capped to `timeout-minutes: 8`.
+- Local manual-only run audit command is available: `npm run ci:audit:manual`.
+- Latest manual ESLint10 watchdog run succeeded: `22037969724` (2026-02-15).
+
+## 2. Iterative Phases
+
+### Phase 1: V8 closeout and V9 bootstrap
+Issue: #187  
+Labels: `priority:low`, `documentation`, `developer-experience`
+
+Acceptance criteria:
+- Finalize V8 status after #185 merge.
+- Publish `docs/ROADMAP_V9.md` with carry-forward phases and issue links.
+
+Status: `In Progress` (2026-02-15)
+
+### Phase 2: ESLint 10 compatibility unblock monitoring
+Issue: #150  
+Labels: `priority:low`, `technical-debt`, `testing`
+
+Acceptance criteria:
+- Re-check latest `@typescript-eslint/*` peer compatibility for ESLint 10.
+- If unblocked, execute upgrade with full local validation.
+- If still blocked, record current evidence and continue monitoring.
+
+Status: `Blocked` (2026-02-15 checkpoint: `@typescript-eslint/*@8.55.0` peers `eslint ^8.57 || ^9`)
+
+### Phase 3: Weekly manual-only CI operations review
+Issue: #188  
+Labels: `priority:low`, `developer-experience`, `technical-debt`
+
+Acceptance criteria:
+- Run `npm run ci:audit:manual -- --since <previous-review-iso> --fail-on-unexpected`.
+- Append decision entry to `docs/CI_MANUAL_REVIEW_LOG.md`.
+- Update roadmap progress with decision outcome.
+
+Status: `Planned` (2026-02-15)
+
+### Phase 4: Dependency dashboard checkpoint cadence
+Issue: #4  
+Labels: `technical-debt`
+
+Acceptance criteria:
+- Post dependency/operations checkpoints after each roadmap phase merge.
+- Keep blocker issue links current (especially #150).
+
+Status: `Planned` (2026-02-15)
+
+## 3. Execution Loop Rules
+
+For each phase:
+1. Create branch `feat/<issue>-<slug>` or `fix/<issue>-<slug>` (or `docs/<issue>-<slug>` for docs-only work).
+2. Implement smallest complete change meeting acceptance criteria.
+3. Add/update tests when behavior changes.
+4. Run local gate:
+   - `npm run lint`
+   - `npm run typecheck`
+   - `npm run test:ci`
+   - `npm run build`
+5. Open PR (`Closes #<issue>` when issue is done, otherwise `Refs #<issue>`) and merge after validation.
+6. Verify post-merge state and confirm no unexpected automatic workflow runs.
+7. Update roadmap progress and continue.
+
+## 4. Progress Log
+
+- 2026-02-15: Bootstrapped ROADMAP_V9 from issue #187 after merging phase #185 (PR #186).
+- 2026-02-15: Carried forward blocker issue #150 pending ESLint 10 peer support in `@typescript-eslint/*`.
+- 2026-02-15: Added issue #188 for the next weekly manual-only CI review cycle.
