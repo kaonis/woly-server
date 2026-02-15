@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { isIP } from 'node:net';
+import type { CommandState } from '@kaonis/woly-protocol';
 import { cncClient } from './cncClient';
 import { agentConfig, validateAgentConfig } from '../config/agent';
 import { logger } from '../utils/logger';
@@ -12,10 +13,13 @@ type WakeCommand = Extract<CncCommand, { type: 'wake' }>;
 type ScanCommand = Extract<CncCommand, { type: 'scan' }>;
 type UpdateHostCommand = Extract<CncCommand, { type: 'update-host' }>;
 type DeleteHostCommand = Extract<CncCommand, { type: 'delete-host' }>;
+type DispatchableCommand = WakeCommand | ScanCommand | UpdateHostCommand | DeleteHostCommand;
 type HostEventMessage = Extract<
   NodeMessage,
   { type: 'host-discovered' | 'host-updated' | 'host-removed' | 'scan-complete' }
 >;
+type CommandResultMessage = Extract<NodeMessage, { type: 'command-result' }>;
+type CommandResultPayload = Pick<CommandResultMessage['data'], 'success' | 'message' | 'error'>;
 
 type ValidatedUpdateHostData = {
   currentName?: string;
@@ -26,6 +30,59 @@ type ValidatedUpdateHostData = {
 };
 
 const MAC_ADDRESS_REGEX = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^([0-9A-Fa-f]{12})$/;
+const COMMAND_EXECUTION_TIMEOUT_CODE = 'COMMAND_EXECUTION_TIMEOUT';
+
+type CommandExecutionPolicy = {
+  timeoutMs: number;
+  maxAttempts: number;
+  retryDelayMs: number;
+  retryOnFailure: boolean;
+};
+
+type CommandExecutionRecord = {
+  commandId: string;
+  commandType: DispatchableCommand['type'];
+  state: CommandState;
+  attempts: number;
+  receivedAtMs: number;
+  updatedAtMs: number;
+  lastError?: string;
+  result?: CommandResultPayload;
+};
+
+const COMMAND_EXECUTION_POLICIES: Record<DispatchableCommand['type'], CommandExecutionPolicy> = {
+  wake: {
+    timeoutMs: 7_500,
+    maxAttempts: 2,
+    retryDelayMs: 250,
+    retryOnFailure: true,
+  },
+  scan: {
+    timeoutMs: 90_000,
+    maxAttempts: 1,
+    retryDelayMs: 0,
+    retryOnFailure: false,
+  },
+  'update-host': {
+    timeoutMs: 5_000,
+    maxAttempts: 1,
+    retryDelayMs: 200,
+    retryOnFailure: false,
+  },
+  'delete-host': {
+    timeoutMs: 5_000,
+    maxAttempts: 1,
+    retryDelayMs: 200,
+    retryOnFailure: false,
+  },
+};
+
+class NonRetryableCommandError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NonRetryableCommandError';
+  }
+}
 
 /**
  * Agent Service
@@ -41,8 +98,13 @@ export class AgentService extends EventEmitter {
   private readonly hostUpdateDebounceMs = Math.max(agentConfig.hostUpdateDebounceMs, 0);
   private readonly initialSyncChunkSize = Math.max(agentConfig.initialSyncChunkSize, 1);
   private readonly hostStaleAfterMs = Math.max(agentConfig.hostStaleAfterMs, 0);
+  private readonly maxTrackedCommandExecutions = 500;
+  private readonly commandExecutionRetentionMs = 30 * 60 * 1000;
+  private readonly maxBufferedCommandResults = 250;
   private readonly bufferedHostEvents: HostEventMessage[] = [];
   private readonly pendingHostUpdates: Map<string, Host> = new Map();
+  private readonly commandExecutions: Map<string, CommandExecutionRecord> = new Map();
+  private readonly bufferedCommandResults: Map<string, CommandResultMessage> = new Map();
   private hostUpdateDebounceTimer: NodeJS.Timeout | null = null;
   private hostEventFlushTimer: NodeJS.Timeout | null = null;
 
@@ -197,6 +259,7 @@ export class AgentService extends EventEmitter {
     }
 
     this.flushPendingHostUpdates();
+    this.flushBufferedCommandResults();
     this.flushBufferedHostEvents();
 
     // Send current host list to C&C
@@ -204,6 +267,7 @@ export class AgentService extends EventEmitter {
       const hosts = await this.hostDb.getAllHosts();
       logger.info(`Sending ${hosts.length} hosts to C&C backend`);
       await this.sendHostsInChunks(hosts);
+      this.flushBufferedCommandResults();
       this.flushBufferedHostEvents();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -415,18 +479,20 @@ export class AgentService extends EventEmitter {
   }
 
   private sendCommandResult(
-    commandType: CncCommand['type'],
+    commandType: DispatchableCommand['type'],
     commandId: string,
-    payload: { success: boolean; message?: string; error?: string },
-    startedAtMs?: number
+    payload: CommandResultPayload,
+    options?: { startedAtMs?: number; replay?: boolean }
   ): void {
-    runtimeTelemetry.recordCommandResult(
-      commandType,
-      payload.success,
-      startedAtMs !== undefined ? Date.now() - startedAtMs : 0
-    );
+    if (!options?.replay) {
+      runtimeTelemetry.recordCommandResult(
+        commandType,
+        payload.success,
+        options?.startedAtMs !== undefined ? Date.now() - options.startedAtMs : 0
+      );
+    }
 
-    cncClient.send({
+    const message: CommandResultMessage = {
       type: 'command-result',
       data: {
         nodeId: agentConfig.nodeId,
@@ -434,7 +500,307 @@ export class AgentService extends EventEmitter {
         ...payload,
         timestamp: new Date(),
       },
+    };
+
+    if (cncClient.isConnected()) {
+      cncClient.send(message);
+      this.bufferedCommandResults.delete(commandId);
+      return;
+    }
+
+    this.enqueueBufferedCommandResult(message);
+  }
+
+  private enqueueBufferedCommandResult(message: CommandResultMessage): void {
+    const commandId = message.data.commandId;
+    if (!this.bufferedCommandResults.has(commandId) &&
+      this.bufferedCommandResults.size >= this.maxBufferedCommandResults
+    ) {
+      const oldestCommandId = this.bufferedCommandResults.keys().next().value;
+      if (oldestCommandId) {
+        this.bufferedCommandResults.delete(oldestCommandId);
+        logger.warn('Command result buffer reached capacity; dropping oldest entry', {
+          maxBufferedCommandResults: this.maxBufferedCommandResults,
+        });
+      }
+    }
+
+    this.bufferedCommandResults.set(commandId, message);
+  }
+
+  private flushBufferedCommandResults(): void {
+    if (!cncClient.isConnected() || this.bufferedCommandResults.size === 0) {
+      return;
+    }
+
+    for (const [commandId, message] of this.bufferedCommandResults.entries()) {
+      cncClient.send(message);
+      this.bufferedCommandResults.delete(commandId);
+    }
+  }
+
+  private async executeCommandWithReliability(
+    command: DispatchableCommand,
+    execute: () => Promise<CommandResultPayload>
+  ): Promise<void> {
+    const existingRecord = this.commandExecutions.get(command.commandId);
+    if (existingRecord) {
+      this.handleDuplicateCommand(command, existingRecord);
+      return;
+    }
+
+    const record: CommandExecutionRecord = {
+      commandId: command.commandId,
+      commandType: command.type,
+      state: 'queued',
+      attempts: 0,
+      receivedAtMs: Date.now(),
+      updatedAtMs: Date.now(),
+    };
+    this.commandExecutions.set(command.commandId, record);
+
+    logger.debug('Command lifecycle transition', {
+      commandId: record.commandId,
+      commandType: record.commandType,
+      from: null,
+      to: record.state,
+      attempts: record.attempts,
     });
+
+    const policy = COMMAND_EXECUTION_POLICIES[command.type];
+    let finalResult: CommandResultPayload | null = null;
+
+    for (let attempt = 1; attempt <= policy.maxAttempts; attempt++) {
+      record.attempts = attempt;
+      this.transitionCommandState(record, 'sent');
+
+      try {
+        const attemptResult = await this.executeWithTimeout(
+          command,
+          attempt,
+          policy.timeoutMs,
+          execute
+        );
+
+        if (attemptResult.success) {
+          finalResult = attemptResult;
+          this.transitionCommandState(record, 'acknowledged');
+          break;
+        }
+
+        record.lastError = attemptResult.error ?? 'Command failed';
+        finalResult = attemptResult;
+
+        const shouldRetry = attempt < policy.maxAttempts && policy.retryOnFailure;
+        if (shouldRetry) {
+          logger.warn('Command attempt failed; retrying', {
+            commandId: command.commandId,
+            commandType: command.type,
+            attempt,
+            maxAttempts: policy.maxAttempts,
+            retryDelayMs: policy.retryDelayMs,
+            error: record.lastError,
+          });
+          await this.delay(policy.retryDelayMs);
+          continue;
+        }
+
+        this.transitionCommandState(record, 'failed');
+        break;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        const timedOut = this.isCommandTimeoutError(error);
+        const nonRetryable = error instanceof NonRetryableCommandError;
+        record.lastError = message;
+
+        const shouldRetry = !nonRetryable && attempt < policy.maxAttempts;
+        if (shouldRetry) {
+          logger.warn('Command attempt failed; retrying', {
+            commandId: command.commandId,
+            commandType: command.type,
+            attempt,
+            maxAttempts: policy.maxAttempts,
+            retryDelayMs: policy.retryDelayMs,
+            timedOut,
+            error: message,
+          });
+          await this.delay(policy.retryDelayMs);
+          continue;
+        }
+
+        finalResult = {
+          success: false,
+          error: message,
+        };
+        this.transitionCommandState(record, timedOut ? 'timed_out' : 'failed');
+        break;
+      }
+    }
+
+    if (!finalResult) {
+      finalResult = {
+        success: false,
+        error: 'Command failed with no terminal result',
+      };
+      record.lastError = finalResult.error;
+      this.transitionCommandState(record, 'failed');
+    }
+
+    record.result = finalResult;
+    if (!finalResult.success) {
+      logger.error('Command execution failed', {
+        commandId: command.commandId,
+        commandType: command.type,
+        attempts: record.attempts,
+        error: finalResult.error,
+      });
+    }
+
+    this.sendCommandResult(command.type, command.commandId, finalResult, {
+      startedAtMs: record.receivedAtMs,
+    });
+    this.pruneCommandExecutionRecords();
+  }
+
+  private handleDuplicateCommand(
+    command: DispatchableCommand,
+    existingRecord: CommandExecutionRecord
+  ): void {
+    if (existingRecord.commandType !== command.type) {
+      logger.error('Command id collision detected across command types', {
+        commandId: command.commandId,
+        incomingCommandType: command.type,
+        existingCommandType: existingRecord.commandType,
+      });
+      return;
+    }
+
+    logger.warn('Duplicate command delivery detected', {
+      commandId: command.commandId,
+      commandType: command.type,
+      state: existingRecord.state,
+      attempts: existingRecord.attempts,
+    });
+
+    if (this.isTerminalCommandState(existingRecord.state) && existingRecord.result) {
+      this.sendCommandResult(command.type, command.commandId, existingRecord.result, {
+        startedAtMs: existingRecord.receivedAtMs,
+        replay: true,
+      });
+      return;
+    }
+
+    logger.info('Ignoring duplicate command while original execution remains in-flight', {
+      commandId: command.commandId,
+      commandType: command.type,
+      state: existingRecord.state,
+      attempts: existingRecord.attempts,
+    });
+  }
+
+  private transitionCommandState(record: CommandExecutionRecord, nextState: CommandState): void {
+    const previousState = record.state;
+    record.state = nextState;
+    record.updatedAtMs = Date.now();
+
+    const transitionContext = {
+      commandId: record.commandId,
+      commandType: record.commandType,
+      from: previousState,
+      to: nextState,
+      attempts: record.attempts,
+      error: record.lastError,
+    };
+
+    if (this.isTerminalCommandState(nextState)) {
+      logger.info('Command lifecycle transition', transitionContext);
+      return;
+    }
+
+    logger.debug('Command lifecycle transition', transitionContext);
+  }
+
+  private executeWithTimeout<T>(
+    command: DispatchableCommand,
+    attempt: number,
+    timeoutMs: number,
+    execute: () => Promise<T>
+  ): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timeoutHandle = setTimeout(() => {
+        const timeoutError = new Error(
+          `Command ${command.commandId} (${command.type}) timed out after ${timeoutMs}ms on attempt ${attempt}`
+        ) as Error & { code?: string };
+        timeoutError.code = COMMAND_EXECUTION_TIMEOUT_CODE;
+        reject(timeoutError);
+      }, timeoutMs);
+
+      Promise.resolve()
+        .then(() => execute())
+        .then((result) => {
+          clearTimeout(timeoutHandle);
+          resolve(result);
+        })
+        .catch((error: unknown) => {
+          clearTimeout(timeoutHandle);
+          reject(error);
+        });
+    });
+  }
+
+  private async delay(ms: number): Promise<void> {
+    if (ms <= 0) {
+      return;
+    }
+
+    await new Promise<void>((resolve) => setTimeout(resolve, ms));
+  }
+
+  private isCommandTimeoutError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    return (error as { code?: unknown }).code === COMMAND_EXECUTION_TIMEOUT_CODE;
+  }
+
+  private isTerminalCommandState(state: CommandState): boolean {
+    return state === 'acknowledged' || state === 'failed' || state === 'timed_out';
+  }
+
+  private pruneCommandExecutionRecords(): void {
+    const nowMs = Date.now();
+
+    for (const [commandId, record] of this.commandExecutions.entries()) {
+      if (
+        this.isTerminalCommandState(record.state) &&
+        nowMs - record.updatedAtMs > this.commandExecutionRetentionMs
+      ) {
+        this.commandExecutions.delete(commandId);
+      }
+    }
+
+    if (this.commandExecutions.size <= this.maxTrackedCommandExecutions) {
+      return;
+    }
+
+    for (const [commandId, record] of this.commandExecutions.entries()) {
+      if (this.commandExecutions.size <= this.maxTrackedCommandExecutions) {
+        break;
+      }
+
+      if (this.isTerminalCommandState(record.state)) {
+        this.commandExecutions.delete(commandId);
+      }
+    }
+
+    while (this.commandExecutions.size > this.maxTrackedCommandExecutions) {
+      const oldestCommandId = this.commandExecutions.keys().next().value;
+      if (!oldestCommandId) {
+        break;
+      }
+      this.commandExecutions.delete(oldestCommandId);
+    }
   }
 
   /**
@@ -443,20 +809,14 @@ export class AgentService extends EventEmitter {
   private async handleWakeCommand(command: WakeCommand): Promise<void> {
     const { commandId, data } = command;
     const { hostName, mac } = data;
-    const startedAtMs = Date.now();
 
     logger.info('Received wake command from C&C', { commandId, hostName, mac });
 
-    if (!this.hostDb) {
-      logger.error('Host database not initialized');
-      this.sendCommandResult(command.type, commandId, {
-        success: false,
-        error: 'Host database not initialized',
-      }, startedAtMs);
-      return;
-    }
+    await this.executeCommandWithReliability(command, async () => {
+      if (!this.hostDb) {
+        throw new NonRetryableCommandError('Host database not initialized');
+      }
 
-    try {
       // Prefer hostname lookup, but fall back to MAC for stale/missing hostnames.
       let host = await this.hostDb.getHost(hostName);
       if (!host) {
@@ -465,7 +825,7 @@ export class AgentService extends EventEmitter {
 
       const targetMac = host?.mac ?? mac;
       if (!targetMac) {
-        throw new Error(`Host ${hostName} not found`);
+        throw new NonRetryableCommandError(`Host ${hostName} not found`);
       }
 
       // Send Wake-on-LAN packet
@@ -480,21 +840,13 @@ export class AgentService extends EventEmitter {
         });
       });
 
-      this.sendCommandResult(command.type, commandId, {
+      logger.info('Wake command completed', { commandId, hostName });
+
+      return {
         success: true,
         message: `Wake-on-LAN packet sent to ${host?.name || hostName} (${targetMac})`,
-      }, startedAtMs);
-
-      logger.info('Wake command completed', { commandId, hostName });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Wake command failed', { commandId, error: message });
-
-      this.sendCommandResult(command.type, commandId, {
-        success: false,
-        error: message,
-      }, startedAtMs);
-    }
+      };
+    });
   }
 
   /**
@@ -503,64 +855,45 @@ export class AgentService extends EventEmitter {
   private async handleScanCommand(command: ScanCommand): Promise<void> {
     const { commandId, data } = command;
     const { immediate } = data;
-    const startedAtMs = Date.now();
 
     logger.info('Received scan command from C&C', { commandId, immediate });
 
-    if (!this.hostDb) {
-      logger.error('Host database not initialized');
-      this.sendCommandResult(command.type, commandId, {
-        success: false,
-        error: 'Host database not initialized',
-      }, startedAtMs);
-      return;
-    }
-    if (!this.scanOrchestrator) {
-      logger.error('Scan orchestrator not initialized');
-      this.sendCommandResult(command.type, commandId, {
-        success: false,
-        error: 'Scan orchestrator not initialized',
-      }, startedAtMs);
-      return;
-    }
+    await this.executeCommandWithReliability(command, async () => {
+      if (!this.hostDb) {
+        throw new NonRetryableCommandError('Host database not initialized');
+      }
+      if (!this.scanOrchestrator) {
+        throw new NonRetryableCommandError('Scan orchestrator not initialized');
+      }
 
-    try {
       if (immediate) {
         await this.scanOrchestrator.syncWithNetwork();
         const hosts = await this.hostDb.getAllHosts();
 
-        this.sendCommandResult(command.type, commandId, {
+        logger.info('Scan command completed', { commandId, hostCount: hosts.length });
+
+        return {
           success: true,
           message: `Scan completed, found ${hosts.length} hosts`,
-        }, startedAtMs);
-
-        logger.info('Scan command completed', { commandId, hostCount: hosts.length });
-      } else {
-        const scanOrchestrator = this.scanOrchestrator;
-        setTimeout(() => {
-          scanOrchestrator.syncWithNetwork().catch((backgroundError: unknown) => {
-            const message =
-              backgroundError instanceof Error ? backgroundError.message : 'Unknown error';
-            logger.error('Background scan command failed', { commandId, error: message });
-          });
-        }, 0);
-
-        this.sendCommandResult(command.type, commandId, {
-          success: true,
-          message: 'Background scan scheduled',
-        }, startedAtMs);
-
-        logger.info('Scan command scheduled in background', { commandId });
+        };
       }
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Scan command failed', { commandId, error: message });
 
-      this.sendCommandResult(command.type, commandId, {
-        success: false,
-        error: message,
-      }, startedAtMs);
-    }
+      const scanOrchestrator = this.scanOrchestrator;
+      setTimeout(() => {
+        scanOrchestrator.syncWithNetwork().catch((backgroundError: unknown) => {
+          const message =
+            backgroundError instanceof Error ? backgroundError.message : 'Unknown error';
+          logger.error('Background scan command failed', { commandId, error: message });
+        });
+      }, 0);
+
+      logger.info('Scan command scheduled in background', { commandId });
+
+      return {
+        success: true,
+        message: 'Background scan scheduled',
+      };
+    });
   }
 
   /**
@@ -568,19 +901,20 @@ export class AgentService extends EventEmitter {
    */
   private async handleUpdateHostCommand(command: UpdateHostCommand): Promise<void> {
     const { commandId } = command;
-    const startedAtMs = Date.now();
 
-    if (!this.hostDb) {
-      logger.error('Host database not initialized');
-      this.sendCommandResult(command.type, commandId, {
-        success: false,
-        error: 'Host database not initialized',
-      }, startedAtMs);
-      return;
-    }
+    await this.executeCommandWithReliability(command, async () => {
+      if (!this.hostDb) {
+        throw new NonRetryableCommandError('Host database not initialized');
+      }
 
-    try {
-      const data = this.validateUpdateHostData(command.data);
+      let data: ValidatedUpdateHostData;
+      try {
+        data = this.validateUpdateHostData(command.data);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Invalid update-host payload';
+        throw new NonRetryableCommandError(message);
+      }
+
       const currentName = data.currentName ?? data.name;
 
       logger.info('Received update-host command from C&C', {
@@ -591,7 +925,7 @@ export class AgentService extends EventEmitter {
 
       const existing = await this.hostDb.getHost(currentName);
       if (!existing) {
-        throw new Error(`Host ${currentName} not found`);
+        throw new NonRetryableCommandError(`Host ${currentName} not found`);
       }
 
       await this.hostDb.updateHost(currentName, {
@@ -606,22 +940,14 @@ export class AgentService extends EventEmitter {
         this.sendHostUpdated(updated);
       }
 
-      this.sendCommandResult(command.type, commandId, {
+      return {
         success: true,
         message:
           currentName === data.name
             ? `Host ${data.name} updated successfully`
             : `Host ${currentName} renamed to ${data.name} and updated successfully`,
-      }, startedAtMs);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Update-host command failed', { commandId, error: message });
-
-      this.sendCommandResult(command.type, commandId, {
-        success: false,
-        error: message,
-      }, startedAtMs);
-    }
+      };
+    });
   }
 
   /**
@@ -630,36 +956,22 @@ export class AgentService extends EventEmitter {
   private async handleDeleteHostCommand(command: DeleteHostCommand): Promise<void> {
     const { commandId, data } = command;
     const { name } = data;
-    const startedAtMs = Date.now();
 
     logger.info('Received delete-host command from C&C', { commandId, name });
 
-    if (!this.hostDb) {
-      logger.error('Host database not initialized');
-      this.sendCommandResult(command.type, commandId, {
-        success: false,
-        error: 'Host database not initialized',
-      }, startedAtMs);
-      return;
-    }
+    await this.executeCommandWithReliability(command, async () => {
+      if (!this.hostDb) {
+        throw new NonRetryableCommandError('Host database not initialized');
+      }
 
-    try {
       await this.hostDb.deleteHost(name);
       this.sendHostRemoved(name);
 
-      this.sendCommandResult(command.type, commandId, {
+      return {
         success: true,
         message: `Host ${name} deleted successfully`,
-      }, startedAtMs);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error('Delete-host command failed', { commandId, error: message });
-
-      this.sendCommandResult(command.type, commandId, {
-        success: false,
-        error: message,
-      }, startedAtMs);
-    }
+      };
+    });
   }
 
   private validateUpdateHostData(data: unknown): ValidatedUpdateHostData {
