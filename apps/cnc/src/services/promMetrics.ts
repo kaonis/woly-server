@@ -78,6 +78,13 @@ const commandByTypeGauge = new Gauge({
   registers: [registry],
 });
 
+const commandOutcomeByTypeGauge = new Gauge({
+  name: 'woly_cnc_command_outcomes_total',
+  help: 'Terminal command outcomes by command type and state',
+  labelNames: ['type', 'state'],
+  registers: [registry],
+});
+
 export function updatePrometheusRuntimeMetrics(snapshot: RuntimeMetricsSnapshot): void {
   nodesConnectedGauge.set(snapshot.nodes.connected);
   nodesPeakConnectedGauge.set(snapshot.nodes.peakConnected);
@@ -99,6 +106,16 @@ export function updatePrometheusRuntimeMetrics(snapshot: RuntimeMetricsSnapshot)
     commandByTypeGauge.set({ type: commandType, state: 'failed' }, metrics.failed);
     commandByTypeGauge.set({ type: commandType, state: 'timed_out' }, metrics.timedOut);
   }
+
+  commandOutcomeByTypeGauge.reset();
+  for (const [commandType, outcomes] of Object.entries(snapshot.commands.outcomesByType)) {
+    commandOutcomeByTypeGauge.set(
+      { type: commandType, state: 'acknowledged' },
+      outcomes.acknowledged
+    );
+    commandOutcomeByTypeGauge.set({ type: commandType, state: 'failed' }, outcomes.failed);
+    commandOutcomeByTypeGauge.set({ type: commandType, state: 'timed_out' }, outcomes.timedOut);
+  }
 }
 
 export async function renderPrometheusMetrics(snapshot: RuntimeMetricsSnapshot): Promise<string> {
@@ -113,5 +130,5 @@ export function prometheusContentType(): string {
 export function resetPrometheusMetricsForTests(): void {
   registry.resetMetrics();
   commandByTypeGauge.reset();
+  commandOutcomeByTypeGauge.reset();
 }
-

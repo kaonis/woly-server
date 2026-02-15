@@ -45,6 +45,7 @@ export class CommandRouter extends EventEmitter {
     }>;
     timeout: NodeJS.Timeout;
     correlationId: string | null;
+    commandType: DispatchCommand['type'];
   }>;
   readonly commandTimeout: number;
   readonly maxRetries: number;
@@ -331,7 +332,7 @@ export class CommandRouter extends EventEmitter {
       const timeout = setTimeout(() => {
         const pending = this.pendingCommands.get(effectiveCommandId);
         this.pendingCommands.delete(effectiveCommandId);
-        runtimeMetrics.recordCommandTimeout(effectiveCommandId);
+        runtimeMetrics.recordCommandTimeout(effectiveCommandId, Date.now(), command.type);
         
         const attemptNumber = record.retryCount + 1; // Current attempt number
         const error = new Error(`Command ${effectiveCommandId} timed out after ${this.commandTimeout}ms (attempt ${attemptNumber}/${this.maxRetries})`);
@@ -356,6 +357,7 @@ export class CommandRouter extends EventEmitter {
         resolvers: [{ resolve, reject }],
         timeout,
         correlationId: options.correlationId,
+        commandType: command.type,
       });
 
       void (async () => {
@@ -402,7 +404,7 @@ export class CommandRouter extends EventEmitter {
           const err = error instanceof Error ? error : new Error(message);
           
           await CommandModel.markFailed(effectiveCommandId, message);
-          runtimeMetrics.recordCommandResult(effectiveCommandId, false);
+          runtimeMetrics.recordCommandResult(effectiveCommandId, false, Date.now(), command.type);
           
           logger.error('Failed to send command', {
             commandId: effectiveCommandId,
@@ -428,15 +430,19 @@ export class CommandRouter extends EventEmitter {
    * @param result Command result
    */
   private handleCommandResult(result: CommandResult): void {
-    runtimeMetrics.recordCommandResult(result.commandId, result.success);
+    const pending = this.pendingCommands.get(result.commandId);
+    runtimeMetrics.recordCommandResult(
+      result.commandId,
+      result.success,
+      Date.now(),
+      pending?.commandType ?? null
+    );
     logger.debug('Received command result', {
       commandId: result.commandId,
       success: result.success,
       error: result.error,
       correlationId: runtimeMetrics.lookupCorrelationId(result.commandId),
     });
-
-    const pending = this.pendingCommands.get(result.commandId);
     
     // Always persist the result state, even if no pending resolver exists
     // (e.g., after a process restart or if the HTTP caller disconnected)
