@@ -141,6 +141,9 @@ npm run protocol:publish:next
 
 **Note**: Monorepo apps continue using workspace links. Publishing is only required for external consumers.
 
+For publish readiness criteria, release steps, and rollback actions, use:
+- [`docs/PROTOCOL_PUBLISH_WORKFLOW.md`](./PROTOCOL_PUBLISH_WORKFLOW.md)
+
 ## Breaking Change Workflow
 
 When introducing breaking changes to the protocol:
@@ -278,4 +281,5 @@ This verifies:
 - [Architecture Plan Phase 3](../apps/node-agent/ARCHITECTURE_PLAN.md)
 - [Implementation Checklist](../apps/node-agent/IMPLEMENTATION_CHECKLIST.md)
 - [Protocol Package README](../packages/protocol/README.md)
+- [Protocol Publish Workflow](./PROTOCOL_PUBLISH_WORKFLOW.md)
 - [CI Workflow](../.github/workflows/ci.yml)

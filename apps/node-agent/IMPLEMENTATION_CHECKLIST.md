@@ -61,7 +61,8 @@ Definition of done:
 - [x] Add protocol version negotiation at connect.
 - [x] Add cross-repo contract tests.
 - [x] Add CI workflow to enforce protocol compatibility checks.
-- [ ] Publish `@kaonis/woly-protocol` to shared registry (monorepo uses workspace links; publishing only needed for external consumers like mobile app).
+- [x] Define external publish readiness + rollback workflow for `@kaonis/woly-protocol` in `docs/PROTOCOL_PUBLISH_WORKFLOW.md`.
+- [~] Publish `@kaonis/woly-protocol` when an external consumer release requires it (follow `docs/PROTOCOL_PUBLISH_WORKFLOW.md`).
 
 Definition of done:
 
