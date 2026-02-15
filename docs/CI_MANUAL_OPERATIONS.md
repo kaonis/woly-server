@@ -101,6 +101,7 @@ Weekly checklist:
 3. Confirm local validation gate remains standard before merge:
    - `npm run validate:standard`
 4. Record decision in the review log:
+   - template helper: `npm run ci:review:template`
    - `Continue manual-only` or `Start rollback`
 
 ## Objective Exit Criteria
