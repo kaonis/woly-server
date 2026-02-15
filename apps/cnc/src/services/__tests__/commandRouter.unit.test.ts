@@ -160,6 +160,14 @@ describe('CommandRouter unit behavior', () => {
     router.cleanup();
   });
 
+  it('rejects malformed encoded FQN location before host lookup', async () => {
+    const { router, hostAggregator } = createRouter();
+
+    await expect(router.routeWakeCommand('desk-pc@Lab%ZZ')).rejects.toThrow('Invalid FQN encoding');
+    expect(hostAggregator.getHostByFQN).not.toHaveBeenCalled();
+    router.cleanup();
+  });
+
   it('builds update-host payload with fallback fields from stored host', async () => {
     const { router, hostAggregator, nodeManager } = createRouter();
     hostAggregator.getHostByFQN.mockResolvedValue({
@@ -353,6 +361,46 @@ describe('CommandRouter unit behavior', () => {
       timestamp: now,
       correlationId: 'corr-cache',
     });
+    router.cleanup();
+  });
+
+  it('scopes idempotency keys by command type before enqueue', async () => {
+    const { internals, router } = createRouter();
+    const now = new Date();
+    const enqueueSpy = jest.spyOn(CommandModel, 'enqueue').mockResolvedValue({
+      id: 'cmd-scope-1',
+      nodeId: 'node-1',
+      type: 'wake',
+      payload: {
+        type: 'wake',
+        commandId: 'cmd-scope-1',
+        data: { hostName: 'desk-pc', mac: 'AA:BB:CC:DD:EE:FF' },
+      },
+      idempotencyKey: 'wake:idem-shared',
+      state: 'acknowledged',
+      error: null,
+      retryCount: 1,
+      createdAt: now,
+      updatedAt: now,
+      sentAt: now,
+      completedAt: now,
+    });
+
+    await internals.executeCommand(
+      'node-1',
+      {
+        type: 'wake',
+        commandId: 'cmd-scope-1',
+        data: { hostName: 'desk-pc', mac: 'AA:BB:CC:DD:EE:FF' },
+      },
+      { idempotencyKey: 'idem-shared', correlationId: null }
+    );
+
+    expect(enqueueSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: 'wake:idem-shared',
+      })
+    );
     router.cleanup();
   });
 

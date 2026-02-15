@@ -13,6 +13,8 @@ try {
   const message = error && error.message ? error.message : String(error);
   console.error('[preflight] better-sqlite3 failed to load.');
   console.error(`[preflight] ${message}`);
+  console.error(`[preflight] node execPath: ${process.execPath}`);
+  console.error(`[preflight] node modules ABI: ${process.versions.modules}`);
   console.error('[preflight] Run: npm rebuild better-sqlite3 --build-from-source');
   process.exit(1);
 }

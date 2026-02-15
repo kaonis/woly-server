@@ -9,6 +9,21 @@ type NetworkDiscoveryDeps = Pick<
   'scanNetworkARP' | 'isHostAlive' | 'formatMAC'
 >;
 
+export type ScanSyncResult =
+  | {
+      success: true;
+      discoveredHosts: number;
+      updatedHosts: number;
+      newHosts: number;
+      awakeHosts: number;
+      hostCount: number;
+    }
+  | {
+      success: false;
+      error: string;
+      code: 'SCAN_IN_PROGRESS' | 'SCAN_FAILED';
+    };
+
 /**
  * Coordinates network scans independently from database CRUD operations.
  */
@@ -31,10 +46,14 @@ class ScanOrchestrator {
     return this.lastScanTime ? this.lastScanTime.toISOString() : null;
   }
 
-  async syncWithNetwork(): Promise<void> {
+  async syncWithNetwork(): Promise<ScanSyncResult> {
     if (this.scanInProgress) {
       logger.info('Scan already in progress, skipping...');
-      return;
+      return {
+        success: false,
+        error: 'Scan already in progress',
+        code: 'SCAN_IN_PROGRESS',
+      };
     }
 
     this.scanInProgress = true;
@@ -45,7 +64,16 @@ class ScanOrchestrator {
 
       if (discoveredHosts.length === 0) {
         logger.info('No hosts discovered in network scan');
-        return;
+        const allHosts = await this.hostDb.getAllHosts();
+        this.hostDb.emit('scan-complete', allHosts.length);
+        return {
+          success: true,
+          discoveredHosts: 0,
+          updatedHosts: 0,
+          newHosts: 0,
+          awakeHosts: 0,
+          hostCount: allHosts.length,
+        };
       }
 
       logger.info(`Discovered ${discoveredHosts.length} hosts on network`);
@@ -133,9 +161,22 @@ class ScanOrchestrator {
 
       const allHosts = await this.hostDb.getAllHosts();
       this.hostDb.emit('scan-complete', allHosts.length);
+      return {
+        success: true,
+        discoveredHosts: discoveredHosts.length,
+        updatedHosts: updatedHostCount,
+        newHosts: newHostCount,
+        awakeHosts: awakeCount,
+        hostCount: allHosts.length,
+      };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error(`Network sync error: ${message}`);
+      return {
+        success: false,
+        error: message,
+        code: 'SCAN_FAILED',
+      };
     } finally {
       this.scanInProgress = false;
       this.lastScanTime = new Date();
@@ -146,19 +187,31 @@ class ScanOrchestrator {
     logger.info(`Starting periodic network sync every ${intervalMs / 1000}s`);
 
     if (immediateSync) {
-      this.syncWithNetwork();
+      void this.syncWithNetwork().then((result) => {
+        if (!result.success && result.code !== 'SCAN_IN_PROGRESS') {
+          logger.warn('Initial network sync failed', { error: result.error });
+        }
+      });
     } else {
       logger.info(
         `Deferring initial network scan to background (${config.network.scanDelay / 1000} seconds)`
       );
       this.deferredSyncTimeout = setTimeout(() => {
         logger.info('Running deferred initial network scan...');
-        this.syncWithNetwork();
+        void this.syncWithNetwork().then((result) => {
+          if (!result.success && result.code !== 'SCAN_IN_PROGRESS') {
+            logger.warn('Deferred initial network sync failed', { error: result.error });
+          }
+        });
       }, config.network.scanDelay);
     }
 
     this.syncInterval = setInterval(() => {
-      this.syncWithNetwork();
+      void this.syncWithNetwork().then((result) => {
+        if (!result.success && result.code !== 'SCAN_IN_PROGRESS') {
+          logger.warn('Periodic network sync failed', { error: result.error });
+        }
+      });
     }, intervalMs);
   }
 

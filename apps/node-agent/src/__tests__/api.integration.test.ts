@@ -290,16 +290,16 @@ describe('API Integration Tests', () => {
       expect(Array.isArray(response.body.hosts)).toBe(true);
     });
 
-    it('should handle network scan errors gracefully', async () => {
+    it('should return 500 when network scan fails', async () => {
       // Mock network discovery failure
       (networkDiscovery.scanNetworkARP as jest.Mock).mockRejectedValue(new Error('Network error'));
 
-      // syncWithNetwork catches errors internally, so it still returns 200
-      // but the scan will log the error
-      const response = await request(app).post('/hosts/scan').expect(200);
+      const response = await request(app).post('/hosts/scan').expect(500);
 
-      expect(response.body).toHaveProperty('message');
-      expect(response.body.message).toContain('Network scan completed');
+      expect(response.body).toEqual({
+        error: 'Internal Server Error',
+        message: 'Network error',
+      });
     });
   });
 

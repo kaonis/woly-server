@@ -269,6 +269,21 @@ describe('HostsController additional branches', () => {
       });
     });
 
+    it('maps invalid FQN errors to 400', async () => {
+      commandRouter.routeWakeCommand.mockRejectedValue(new Error('Invalid FQN encoding: desktop@Lab%ZZ'));
+
+      const req = createMockRequest({ params: { fqn: 'desktop@Lab%ZZ' } });
+      const res = createMockResponse();
+
+      await controller.wakeupHost(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Bad Request',
+        message: 'Invalid FQN encoding: desktop@Lab%ZZ',
+      });
+    });
+
     it('uses generic 500 mapping for non-Error throw values', async () => {
       commandRouter.routeWakeCommand.mockRejectedValue('unknown');
 
@@ -372,6 +387,21 @@ describe('HostsController additional branches', () => {
       });
     });
 
+    it('maps invalid FQN errors to 400', async () => {
+      commandRouter.routeDeleteHostCommand.mockRejectedValue(new Error('Invalid FQN format: bad-fqn. Expected hostname@location'));
+
+      const req = createMockRequest({ params: { fqn: 'bad-fqn' } });
+      const res = createMockResponse();
+
+      await controller.deleteHost(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Bad Request',
+        message: 'Invalid FQN format: bad-fqn. Expected hostname@location',
+      });
+    });
+
     it('uses generic 500 mapping for non-Error throw values and keeps correlation id', async () => {
       commandRouter.routeDeleteHostCommand.mockRejectedValue('unknown');
 
@@ -432,6 +462,26 @@ describe('HostsController additional branches', () => {
         error: 'Internal Server Error',
         message: 'unexpected failure',
         correlationId: 'cid-request',
+      });
+    });
+
+    it('maps invalid FQN errors to 400 in update flow', async () => {
+      commandRouter.routeUpdateHostCommand.mockRejectedValue(
+        new Error('Invalid FQN encoding: desktop@Lab%ZZ')
+      );
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@Lab%ZZ' },
+        body: { name: 'new-name' },
+      });
+      const res = createMockResponse();
+
+      await controller.updateHost(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Bad Request',
+        message: 'Invalid FQN encoding: desktop@Lab%ZZ',
       });
     });
   });

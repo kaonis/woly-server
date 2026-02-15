@@ -82,7 +82,13 @@ describe('AgentService command handlers', () => {
       deleteHost: jest.fn().mockResolvedValue(undefined),
     };
     scanOrchestratorMock = {
-      syncWithNetwork: jest.fn().mockResolvedValue(undefined),
+      syncWithNetwork: jest.fn().mockResolvedValue({
+        success: true,
+        updated: 0,
+        created: 0,
+        awake: 0,
+        hostCount: 0,
+      }),
     };
     ((service as unknown) as { hostDb: unknown }).hostDb = hostDbMock;
     ((service as unknown) as { scanOrchestrator: unknown }).scanOrchestrator = scanOrchestratorMock;
@@ -491,8 +497,12 @@ describe('AgentService command handlers', () => {
     expect(scanOrchestratorMock.syncWithNetwork).toHaveBeenCalledTimes(1);
   });
 
-  it('sends scan failure when immediate scan throws', async () => {
-    scanOrchestratorMock.syncWithNetwork.mockRejectedValueOnce(new Error('scan failed'));
+  it('sends scan failure when immediate scan fails', async () => {
+    scanOrchestratorMock.syncWithNetwork.mockResolvedValueOnce({
+      success: false,
+      code: 'SCAN_FAILED',
+      error: 'scan failed',
+    });
 
     await ((service as unknown) as {
       handleScanCommand: (command: unknown) => Promise<void>;

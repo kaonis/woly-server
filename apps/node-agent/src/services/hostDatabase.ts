@@ -12,7 +12,7 @@ import { Host } from '../types';
  */
 
 class HostDatabase extends EventEmitter {
-  private db!: Database.Database; // Definite assignment assertion - assigned in connectWithRetry
+  private db: Database.Database | null = null;
   private maxRetries: number = 3;
   private retryDelay: number = 1000; // 1 second
   private ready: Promise<void>;
@@ -26,6 +26,14 @@ class HostDatabase extends EventEmitter {
       this.readyReject = reject;
     });
     this.connectWithRetry(dbPath);
+  }
+
+  private assertReady(): Database.Database {
+    if (!this.db) {
+      throw new Error('Database is not connected');
+    }
+
+    return this.db;
   }
 
   /**
@@ -77,7 +85,8 @@ class HostDatabase extends EventEmitter {
    * Create hosts table if not exists
    */
   createTable(): void {
-    this.db.exec(`CREATE TABLE IF NOT EXISTS hosts(
+    const db = this.assertReady();
+    db.exec(`CREATE TABLE IF NOT EXISTS hosts(
       name text PRIMARY KEY UNIQUE,
       mac text NOT NULL UNIQUE,
       ip text NOT NULL UNIQUE,
@@ -89,7 +98,7 @@ class HostDatabase extends EventEmitter {
 
     // Try to add pingResponsive column if it doesn't exist
     try {
-      this.db.exec(`ALTER TABLE hosts ADD COLUMN pingResponsive integer`);
+      db.exec(`ALTER TABLE hosts ADD COLUMN pingResponsive integer`);
     } catch (err) {
       const error = err as Error;
       if (!error.message.includes('duplicate column')) {
@@ -103,7 +112,8 @@ class HostDatabase extends EventEmitter {
    */
   async getAllHosts(): Promise<Host[]> {
     try {
-      return this.db
+      const db = this.assertReady();
+      return db
         .prepare(
           'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts ORDER BY name'
         )
@@ -120,7 +130,8 @@ class HostDatabase extends EventEmitter {
    */
   async getHost(name: string): Promise<Host | undefined> {
     try {
-      return this.db
+      const db = this.assertReady();
+      return db
         .prepare(
           'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts WHERE name = ?'
         )
@@ -137,8 +148,9 @@ class HostDatabase extends EventEmitter {
    */
   async getHostByMAC(mac: string): Promise<Host | undefined> {
     try {
+      const db = this.assertReady();
       const formattedMac = networkDiscovery.formatMAC(mac);
-      return this.db
+      return db
         .prepare(
           'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts WHERE mac = ?'
         )
@@ -158,8 +170,9 @@ class HostDatabase extends EventEmitter {
       const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered, pingResponsive)
                    VALUES(?, ?, ?, ?, datetime('now'), 0, NULL)`;
       try {
+        const db = this.assertReady();
         const formattedMac = networkDiscovery.formatMAC(mac);
-        this.db.prepare(sql).run(name, formattedMac, ip, 'asleep');
+        db.prepare(sql).run(name, formattedMac, ip, 'asleep');
         logger.info(`Added host: ${name}`);
         resolve({
           name,
@@ -192,8 +205,9 @@ class HostDatabase extends EventEmitter {
     return new Promise((resolve, reject) => {
       const sql = `UPDATE hosts SET lastSeen = datetime('now'), discovered = 1, status = ?, pingResponsive = ? WHERE mac = ?`;
       try {
+        const db = this.assertReady();
         const formattedMac = networkDiscovery.formatMAC(mac);
-        const info = this.db.prepare(sql).run(status, pingResponsive, formattedMac);
+        const info = db.prepare(sql).run(status, pingResponsive, formattedMac);
         if (info.changes === 0) {
           // No rows were updated - MAC doesn't exist
           reject(new Error(`Host with MAC ${formattedMac} not found in database`));
@@ -214,6 +228,13 @@ class HostDatabase extends EventEmitter {
     updates: Partial<Pick<Host, 'name' | 'mac' | 'ip' | 'status'>>
   ): Promise<void> {
     return new Promise((resolve, reject) => {
+      let db: Database.Database;
+      try {
+        db = this.assertReady();
+      } catch (err) {
+        reject(err);
+        return;
+      }
       const fields: string[] = [];
       const values: Array<string> = [];
 
@@ -243,10 +264,10 @@ class HostDatabase extends EventEmitter {
 
       const sql = `UPDATE hosts SET ${fields.join(', ')} WHERE name = ?`;
       try {
-        const info = this.db.prepare(sql).run(values);
+        const info = db.prepare(sql).run(values);
         if (info.changes === 0) {
           // Check if host exists
-          const exists = this.db.prepare('SELECT 1 FROM hosts WHERE name = ?').get(name);
+          const exists = db.prepare('SELECT 1 FROM hosts WHERE name = ?').get(name);
           if (exists) {
             resolve(); // Host exists but no changes needed
           } else {
@@ -268,7 +289,8 @@ class HostDatabase extends EventEmitter {
     return new Promise((resolve, reject) => {
       const sql = 'DELETE FROM hosts WHERE name = ?';
       try {
-        const info = this.db.prepare(sql).run(name);
+        const db = this.assertReady();
+        const info = db.prepare(sql).run(name);
         if (info.changes === 0) {
           reject(new Error(`Host ${name} not found`));
         } else {
@@ -287,7 +309,8 @@ class HostDatabase extends EventEmitter {
     return new Promise((resolve, reject) => {
       const sql = 'UPDATE hosts SET status = ? WHERE name = ?';
       try {
-        this.db.prepare(sql).run(status, name);
+        const db = this.assertReady();
+        db.prepare(sql).run(status, name);
         resolve();
       } catch (err) {
         reject(err);
@@ -301,7 +324,13 @@ class HostDatabase extends EventEmitter {
   close(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       try {
+        if (!this.db) {
+          logger.info('Database connection already closed');
+          resolve();
+          return;
+        }
         this.db.close();
+        this.db = null;
         logger.info('Database connection closed');
         resolve();
       } catch (error) {

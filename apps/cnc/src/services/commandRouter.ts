@@ -273,12 +273,13 @@ export class CommandRouter extends EventEmitter {
     command: DispatchCommand,
     options: { idempotencyKey: string | null; correlationId: string | null }
   ): Promise<CommandResult> {
+    const scopedIdempotencyKey = this.scopeIdempotencyKey(command.type, options.idempotencyKey);
     const record = await CommandModel.enqueue({
       id: command.commandId,
       nodeId,
       type: command.type,
       payload: command,
-      idempotencyKey: options.idempotencyKey,
+      idempotencyKey: scopedIdempotencyKey,
     });
 
     const effectiveCommandId = record.id;
@@ -497,9 +498,26 @@ export class CommandRouter extends EventEmitter {
       throw new Error(`Invalid FQN format: ${fqn}. Expected hostname@location`);
     }
 
+    const hostname = parts[0]?.trim();
+    const encodedLocation = parts[1]?.trim();
+    if (!hostname || !encodedLocation) {
+      throw new Error(`Invalid FQN format: ${fqn}. Expected hostname@location`);
+    }
+
+    let location: string;
+    try {
+      location = decodeURIComponent(encodedLocation);
+    } catch {
+      throw new Error(`Invalid FQN encoding: ${fqn}`);
+    }
+
+    if (location.length === 0) {
+      throw new Error(`Invalid FQN format: ${fqn}. Expected hostname@location`);
+    }
+
     return {
-      hostname: parts[0],
-      location: decodeURIComponent(parts[1]) // Decode URL-encoded location
+      hostname,
+      location,
     };
   }
 
@@ -510,6 +528,22 @@ export class CommandRouter extends EventEmitter {
    */
   private generateCommandId(): string {
     return `cmd_${randomUUID()}`;
+  }
+
+  private scopeIdempotencyKey(
+    commandType: DispatchCommand['type'],
+    idempotencyKey: string | null
+  ): string | null {
+    if (!idempotencyKey) {
+      return null;
+    }
+
+    const trimmed = idempotencyKey.trim();
+    if (trimmed.length === 0) {
+      return null;
+    }
+
+    return `${commandType}:${trimmed}`;
   }
 
   /**
