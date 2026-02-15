@@ -1,4 +1,7 @@
 import { EventEmitter } from 'events';
+import { readFileSync } from 'fs';
+import os from 'os';
+import { join } from 'path';
 
 const mockAxiosPost = jest.fn();
 
@@ -74,6 +77,10 @@ import { CncClient } from '../cncClient';
 import { logger } from '../../utils/logger';
 import { PROTOCOL_VERSION } from '@kaonis/woly-protocol';
 
+const nodeAgentPackage = JSON.parse(
+  readFileSync(join(__dirname, '../../../package.json'), 'utf-8')
+) as { version: string };
+
 describe('CncClient Phase 1 auth lifecycle', () => {
   let client: CncClient;
 
@@ -95,6 +102,7 @@ describe('CncClient Phase 1 auth lifecycle', () => {
 
   afterEach(() => {
     client.disconnect();
+    jest.restoreAllMocks();
     jest.clearAllTimers();
     jest.useRealTimers();
   });
@@ -115,6 +123,33 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     const registrationMessage = JSON.parse(mockSockets[0].sentMessages[0]);
     expect(registrationMessage.type).toBe('register');
     expect(registrationMessage.data.metadata.protocolVersion).toBe(PROTOCOL_VERSION);
+    expect(registrationMessage.data.metadata.version).toBe(nodeAgentPackage.version);
+    expect(registrationMessage.data.metadata.networkInfo.subnet).toEqual(expect.any(String));
+    expect(registrationMessage.data.metadata.networkInfo.gateway).toEqual(expect.any(String));
+  });
+
+  it('derives subnet and gateway metadata from active network interface', async () => {
+    jest.spyOn(os, 'networkInterfaces').mockReturnValue({
+      en0: [
+        {
+          address: '192.168.50.24',
+          netmask: '255.255.255.0',
+          family: 'IPv4',
+          mac: 'aa:bb:cc:dd:ee:ff',
+          internal: false,
+          cidr: '192.168.50.24/24',
+        },
+      ] as any[],
+    });
+
+    await client.connect();
+    mockSockets[0].emit('open');
+
+    const registrationMessage = JSON.parse(mockSockets[0].sentMessages[0]);
+    expect(registrationMessage.data.metadata.networkInfo).toEqual({
+      subnet: '192.168.50.24/24',
+      gateway: '192.168.50.1',
+    });
   });
 
   it('optionally keeps query token fallback for transition mode', async () => {

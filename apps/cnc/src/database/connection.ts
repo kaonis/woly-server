@@ -15,7 +15,8 @@ export interface DatabaseQueryResult<T = unknown> {
 }
 
 // Database interface for type safety
-interface IDatabase {
+export interface IDatabase {
+  isSqlite: boolean;
   connect(): Promise<void>;
   query<T = unknown>(text: string, params?: unknown[]): Promise<DatabaseQueryResult<T>>;
   getClient(): Promise<PoolClient | { query: IDatabase['query']; release: () => void }>;
@@ -24,6 +25,7 @@ interface IDatabase {
 }
 
 class PostgresDatabase implements IDatabase {
+  public readonly isSqlite = false;
   private pool: Pool;
 
   constructor() {

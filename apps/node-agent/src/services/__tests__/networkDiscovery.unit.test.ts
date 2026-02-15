@@ -1,6 +1,6 @@
 import * as networkDiscovery from '../networkDiscovery';
 import ping from 'ping';
-import { execFileSync, execFile } from 'child_process';
+import { execFile } from 'child_process';
 import { promises as dns } from 'dns';
 import os from 'os';
 
@@ -186,12 +186,20 @@ describe('networkDiscovery', () => {
     it('should fallback to NetBIOS lookup when DNS fails', async () => {
       // Use win32 platform so readArpTable uses the Windows parser
       (os.platform as jest.MockedFunction<typeof os.platform>).mockReturnValue('win32');
-      mockArpOutput(WINDOWS_ARP_OUTPUT);
+      mockedExecFile.mockImplementation((cmd, _args, _opts, cb) => {
+        if (cmd === 'arp') {
+          cb(null, WINDOWS_ARP_OUTPUT, '');
+          return undefined as any;
+        }
+        if (cmd === 'nbtstat') {
+          cb(null, '   TESTPC       <00>  UNIQUE\n', '');
+          return undefined as any;
+        }
+        cb(new Error(`Unexpected command ${cmd}`), '', '');
+        return undefined as any;
+      });
       (dns.reverse as jest.MockedFunction<typeof dns.reverse>).mockRejectedValue(
         new Error('DNS lookup failed')
-      );
-      (execFileSync as jest.MockedFunction<typeof execFileSync>).mockReturnValue(
-        '   TESTPC       <00>  UNIQUE\n' as any
       );
 
       const hosts = await networkDiscovery.scanNetworkARP();
@@ -202,13 +210,21 @@ describe('networkDiscovery', () => {
 
     it('should handle hostname as IP address', async () => {
       // arp -a sometimes shows hostname as the IP itself
-      mockArpOutput('192.168.1.100 (192.168.1.100) at aa:bb:cc:dd:ee:ff [ether] on eth0');
+      mockedExecFile.mockImplementation((cmd, _args, _opts, cb) => {
+        if (cmd === 'arp') {
+          cb(null, '192.168.1.100 (192.168.1.100) at aa:bb:cc:dd:ee:ff [ether] on eth0', '');
+          return undefined as any;
+        }
+        if (cmd === 'nmblookup') {
+          cb(new Error('NetBIOS lookup failed'), '', '');
+          return undefined as any;
+        }
+        cb(new Error(`Unexpected command ${cmd}`), '', '');
+        return undefined as any;
+      });
       (dns.reverse as jest.MockedFunction<typeof dns.reverse>).mockRejectedValue(
         new Error('DNS lookup failed')
       );
-      (execFileSync as jest.MockedFunction<typeof execFileSync>).mockImplementation(() => {
-        throw new Error('NetBIOS lookup failed');
-      });
 
       const hosts = await networkDiscovery.scanNetworkARP();
 

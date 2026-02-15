@@ -1,7 +1,6 @@
 import db from '../database/connection';
 import logger from '../utils/logger';
 import type { CommandRecord, CommandState } from '../types';
-import config from '../config';
 
 // Database row shape for commands table
 interface CommandRow {
@@ -19,16 +18,14 @@ interface CommandRow {
   completed_at: string | Date | null;
 }
 
-function isSqlite(): boolean {
-  return config.dbType === 'sqlite';
-}
+const isSqlite = db.isSqlite;
 
 function serializePayload(payload: unknown): unknown {
-  return isSqlite() ? JSON.stringify(payload ?? null) : payload ?? null;
+  return isSqlite ? JSON.stringify(payload ?? null) : payload ?? null;
 }
 
 function deserializePayload(value: unknown): unknown {
-  if (!isSqlite()) {
+  if (!isSqlite) {
     return value;
   }
 
@@ -73,7 +70,7 @@ export class CommandModel {
     const state: CommandState = 'queued';
 
     try {
-      if (isSqlite()) {
+      if (isSqlite) {
         // SQLite: Check first, then insert if not exists
         if (idempotencyKey) {
           const existing = await this.findByIdempotencyKey(nodeId, idempotencyKey);
@@ -139,7 +136,7 @@ export class CommandModel {
       return rowToRecord(result.rows[0]);
     } catch (error) {
       // Catch SQLite unique constraint violations and return existing record
-      if (isSqlite() && error instanceof Error && error.message.includes('UNIQUE constraint')) {
+      if (isSqlite && error instanceof Error && error.message.includes('UNIQUE constraint')) {
         if (idempotencyKey) {
           const existing = await this.findByIdempotencyKey(nodeId, idempotencyKey);
           if (existing) {
@@ -154,7 +151,7 @@ export class CommandModel {
   }
 
   static async markSent(id: string): Promise<void> {
-    const query = isSqlite()
+    const query = isSqlite
       ? `
         UPDATE commands
         SET state = ?, sent_at = CURRENT_TIMESTAMP, retry_count = retry_count + 1
@@ -166,11 +163,11 @@ export class CommandModel {
         WHERE id = $1
       `;
 
-    await db.query(query, isSqlite() ? ['sent', id] : [id, 'sent']);
+    await db.query(query, isSqlite ? ['sent', id] : [id, 'sent']);
   }
 
   static async markAcknowledged(id: string): Promise<void> {
-    const query = isSqlite()
+    const query = isSqlite
       ? `
         UPDATE commands
         SET state = ?, completed_at = CURRENT_TIMESTAMP
@@ -182,11 +179,11 @@ export class CommandModel {
         WHERE id = $1
       `;
 
-    await db.query(query, isSqlite() ? ['acknowledged', id] : [id, 'acknowledged']);
+    await db.query(query, isSqlite ? ['acknowledged', id] : [id, 'acknowledged']);
   }
 
   static async markFailed(id: string, errorMessage: string): Promise<void> {
-    const query = isSqlite()
+    const query = isSqlite
       ? `
         UPDATE commands
         SET state = ?, error = ?, completed_at = CURRENT_TIMESTAMP
@@ -198,11 +195,11 @@ export class CommandModel {
         WHERE id = $1
       `;
 
-    await db.query(query, isSqlite() ? ['failed', errorMessage, id] : [id, 'failed', errorMessage]);
+    await db.query(query, isSqlite ? ['failed', errorMessage, id] : [id, 'failed', errorMessage]);
   }
 
   static async markTimedOut(id: string, errorMessage: string): Promise<void> {
-    const query = isSqlite()
+    const query = isSqlite
       ? `
         UPDATE commands
         SET state = ?, error = ?, completed_at = CURRENT_TIMESTAMP
@@ -214,7 +211,7 @@ export class CommandModel {
         WHERE id = $1
       `;
 
-    await db.query(query, isSqlite() ? ['timed_out', errorMessage, id] : [id, 'timed_out', errorMessage]);
+    await db.query(query, isSqlite ? ['timed_out', errorMessage, id] : [id, 'timed_out', errorMessage]);
   }
 
   static async findById(id: string): Promise<CommandRecord | null> {
@@ -259,7 +256,7 @@ export class CommandModel {
       return 0;
     }
 
-    const query = isSqlite()
+    const query = isSqlite
       ? `
         UPDATE commands
         SET state = 'timed_out',
@@ -288,7 +285,7 @@ export class CommandModel {
       return 0;
     }
 
-    const query = isSqlite()
+    const query = isSqlite
       ? `
         DELETE FROM commands
         WHERE datetime(created_at) < datetime('now', '-' || $1 || ' days')

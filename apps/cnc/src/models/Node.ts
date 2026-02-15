@@ -3,7 +3,6 @@
  */
 
 import db from '../database/connection';
-import config from '../config';
 import { Node, NodeRegistration } from '../types';
 import logger from '../utils/logger';
 
@@ -22,7 +21,7 @@ interface NodeRow {
 }
 
 export class NodeModel {
-  private static isSqlite = config.dbType === 'sqlite';
+  private static isSqlite = db.isSqlite;
 
   /**
    * Register a new node or update existing
