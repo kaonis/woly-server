@@ -13,6 +13,7 @@ This plan covers the currently deferred or high-risk major dependency updates:
 - eslint-config-prettier v10
 - Zod v4
 - npm v11
+- Turbo v2.8.9
 
 ## 2. Risk Profile
 
@@ -54,6 +55,8 @@ Primary impact:
    Tracking issue: #150
 5. Wave E: ESLint flat config migration precondition  
    Tracking issue: #154
+6. Wave F: Turbo workspace runner update  
+   Tracking issue: #156
 
 ## 4. Decision Table (2026-02-15)
 
@@ -65,7 +68,8 @@ Primary impact:
 | eslint-config-prettier v10 | Merged | Upgraded with ESLint v9 toolchain migration via PR #151 | #146 |
 | Zod v4 | Merged | Runtime schema compatibility validated across protocol/C&C/node-agent and merged via PR #152 | #147 |
 | npm v11 | Merged | Workspace tooling and CI remained stable; adopted via PR #17 | #148 |
-| ESLint flat config mode | In progress | Removes legacy `.eslintrc`/`ESLINT_USE_FLAT_CONFIG=false` dependency to clear ESLint 10 precondition | #154 |
+| ESLint flat config mode | Merged | Migrated to root `eslint.config.js` and removed legacy `.eslintrc` mode via PR #155 | #154 |
+| Turbo v2.8.9 | In progress | Renovate PR #75 is green; adoption tracked as the next execution phase | #156 |
 
 ## 5. Exit Criteria for #144
 

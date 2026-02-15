@@ -6,16 +6,16 @@ Scope: New autonomous cycle after V5 completion.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `9182401` (PR #153).
+- `master` synced at merge commit `e8e7aa8` (PR #155).
 - Active execution branch: `master`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
-- #154 `[Lint] Migrate to ESLint flat config before ESLint 10 adoption`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
+- #156 `[Dependencies] Adopt Turbo 2.8.9 workspace runner update`
 
 ### CI snapshot
-- Post-merge checks for `9182401` are green (CI + CodeQL).
+- Post-merge checks for `e8e7aa8` are green (CI + CodeQL).
 - Dependency triage workflow and audit/security gates are documented and active.
 
 ## 2. Iterative Phases
@@ -84,6 +84,17 @@ Acceptance criteria:
 - Remove legacy `.eslintrc` dependency and `ESLINT_USE_FLAT_CONFIG=false` usage.
 - Keep lint/typecheck/test/build gates green.
 
+Status: `Completed` (2026-02-15, PR #155)
+
+### Phase 7: Turbo workspace runner update
+Issue: #156  
+Labels: `priority:low`, `technical-debt`, `testing`
+
+Acceptance criteria:
+- Adopt Turbo `2.8.9` update from dependency dashboard track.
+- Keep lint/typecheck/test/build gates green after the update.
+- Verify PR and post-merge `master` CI + CodeQL are green.
+
 Status: `In Progress` (2026-02-15)
 
 ## 3. Execution Loop Rules
@@ -126,3 +137,9 @@ For each phase:
 - 2026-02-15: Started Phase 6 issue #154 on branch `feat/154-eslint-flat-config`.
 - 2026-02-15: Migrated lint configuration to root `eslint.config.js`, removed legacy `.eslintrc.json`, and switched app lint scripts to flat-config mode without `ESLINT_USE_FLAT_CONFIG=false`.
 - 2026-02-15: Ran local gates for #154 (`npm run lint`, `npm run typecheck`, `npm run test:ci`, `npm run build`) successfully.
+- 2026-02-15: Merged #154 via PR #155 and verified post-merge `master` checks green (CI + CodeQL, commit `e8e7aa8`).
+- 2026-02-15: Re-validated ESLint 10 compatibility for #150: `eslint@10.0.0` is available but latest `@typescript-eslint/*@8.55.0` still peers `eslint ^8.57.0 || ^9.0.0`; phase remains blocked.
+- 2026-02-15: Added follow-up issue #156 for Turbo `2.8.9` adoption and started Phase 7 on branch `feat/156-turbo-runner-update`.
+- 2026-02-15: Applied Turbo `2.8.9` lockfile update on #156 (`npm update turbo --save-dev --package-lock-only`) matching dependency dashboard PR #75 scope.
+- 2026-02-15: Ran local gates for #156 (`npm run lint`, `npm run typecheck`, `npm run test:ci`, `npm run build`) successfully.
+- 2026-02-15: Re-installed workspace dependencies with `npm ci`, confirmed `npx turbo --version` = `2.8.9`, and re-ran `npm run lint` successfully under Turbo `2.8.9`.
