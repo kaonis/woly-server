@@ -65,3 +65,8 @@ V21 is complete when all four items (`#244`, `#243`, `#150`, `#4`) are resolved 
 - 2026-02-15: Added helper tests for follow-up issue parser, title/body rendering, label handling, and delegated issue creation calls.
 - 2026-02-15: Validated helper behavior with dry-run:
   - `npm run ci:followup:create -- --after 243 --dry-run`.
+- 2026-02-15: Completed scoped rolling policy audit for `#243`:
+  - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+- 2026-02-15: Used the new helper to create follow-up review issue `#245` via:
+  - `npm run ci:followup:create -- --after 243`.
+- 2026-02-15: Posted ESLint10 checkpoint updates to both `#150` and `#4` via `npm run deps:checkpoint:eslint10:post` (`2026-02-15T22:11:32Z` payload; still blocked).
