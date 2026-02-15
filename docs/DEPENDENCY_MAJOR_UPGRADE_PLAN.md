@@ -110,3 +110,11 @@ Issue #144 is complete when:
   - Ran rolling policy audit via helper:
     - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
   - ESLint 10 compatibility status unchanged (`#150` remains blocked; latest watchdog checkpoint `2026-02-15T21:35:59Z`).
+- 2026-02-15 (V18 / issue #150 checkpoint refresh):
+  - Re-ran watchdog: `npm run deps:check-eslint10` at `2026-02-15T21:49:51Z`.
+  - Result: blocked (no upstream peer range change).
+  - Current values:
+    - `eslint`: `10.0.0`
+    - `@typescript-eslint/eslint-plugin`: `8.55.0`
+    - `@typescript-eslint/parser`: `8.55.0`
+    - peer `eslint` range: `^8.57.0 || ^9.0.0`
