@@ -8,6 +8,10 @@ type CommandOutcomeSnapshot = {
   timedOut: number;
 };
 
+type UnknownOutcomeAttributionSnapshot = CommandOutcomeSnapshot & {
+  total: number;
+};
+
 type CommandMetricBucket = {
   dispatched: number;
   acknowledged: number;
@@ -61,6 +65,7 @@ export type RuntimeMetricsSnapshot = {
     timeoutRate: number;
     avgLatencyMs: number;
     lastLatencyMs: number | null;
+    unknownAttribution: UnknownOutcomeAttributionSnapshot;
     outcomesByType: Record<string, CommandOutcomeSnapshot>;
     byType: Record<string, CommandMetricBucketSnapshot>;
   };
@@ -208,6 +213,9 @@ export class RuntimeMetrics {
         this.toOutcomeSnapshot(bucket),
       ])
     );
+    const unknownOutcomeAttribution = this.toUnknownOutcomeSnapshot(
+      this.commandByType.get('unknown') ?? null
+    );
 
     return {
       startedAtMs: this.startedAtMs,
@@ -235,6 +243,7 @@ export class RuntimeMetrics {
             ? Math.round(this.commandTotals.cumulativeLatencyMs / this.commandTotals.completed)
             : 0,
         lastLatencyMs: this.commandTotals.lastLatencyMs,
+        unknownAttribution: unknownOutcomeAttribution,
         outcomesByType,
         byType,
       },
@@ -340,6 +349,25 @@ export class RuntimeMetrics {
       acknowledged: bucket.acknowledged,
       failed: bucket.failed,
       timedOut: bucket.timedOut,
+    };
+  }
+
+  private toUnknownOutcomeSnapshot(
+    bucket: CommandMetricBucket | null
+  ): UnknownOutcomeAttributionSnapshot {
+    if (!bucket) {
+      return {
+        acknowledged: 0,
+        failed: 0,
+        timedOut: 0,
+        total: 0,
+      };
+    }
+
+    const outcomes = this.toOutcomeSnapshot(bucket);
+    return {
+      ...outcomes,
+      total: outcomes.acknowledged + outcomes.failed + outcomes.timedOut,
     };
   }
 
