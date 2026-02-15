@@ -6,17 +6,15 @@ Scope: New autonomous cycle after V5 completion.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `1c82368` (PR #151).
+- `master` synced at merge commit `71dd306` (PR #17).
 - Active execution branch: `master`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
-- #147 `[Dependencies] Evaluate and stage Zod v4 migration across protocol and services`
-- #148 `[Dependencies] Evaluate npm 11 adoption and CI/runtime compatibility`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
 
 ### CI snapshot
-- Post-merge checks for `1c82368` are green (CI + CodeQL).
+- Post-merge checks for `71dd306` are green (CI + CodeQL).
 - Dependency triage workflow and audit/security gates are documented and active.
 
 ## 2. Iterative Phases
@@ -52,7 +50,29 @@ Acceptance criteria:
 - Preserve contract compatibility or document deliberate breaking changes.
 - Keep CI and contract/schema suites green.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #152)
+
+### Phase 4: npm 11 adoption decision and execution
+Issue: #148  
+Labels: `priority:low`, `technical-debt`, `testing`
+
+Acceptance criteria:
+- Validate npm 11 behavior with workspace scripts and turbo tasks.
+- Verify CI/local toolchain compatibility and lockfile stability.
+- Produce explicit adopt/defer decision with rationale.
+
+Status: `Completed` (2026-02-15, PR #17)
+
+### Phase 5: ESLint 10 revisit checkpoint
+Issue: #150  
+Labels: `priority:low`, `technical-debt`, `testing`
+
+Acceptance criteria:
+- Track typescript-eslint peer dependency support for ESLint 10.
+- Upgrade ESLint to 10 when compatibility is available.
+- Validate lint behavior and CI stability after upgrade.
+
+Status: `Blocked` (2026-02-15; latest `@typescript-eslint/*@8.55.0` peers `eslint ^8.57 || ^9`)
 
 ## 3. Execution Loop Rules
 
@@ -86,3 +106,7 @@ For each phase:
 - 2026-02-15: Ran full local gates for #147 (`npm run typecheck`, `npm run test:ci`, `npm run lint`, `npm run build`) successfully.
 - 2026-02-15: Addressed PR #152 CI regression in node-agent validation messaging by normalizing missing-field errors back to `is required` semantics and adding unit coverage for the behavior.
 - 2026-02-15: Re-ran full local gates for #147 (`npm run typecheck`, `npm run test:ci`, `npm run lint`, `npm run build`) successfully after CI-fix patch.
+- 2026-02-15: Merged #147 via PR #152 and verified post-merge `master` checks green (CI + CodeQL).
+- 2026-02-15: Adopted npm 11 via PR #17 (`packageManager` set to `npm@11.10.0`), closing #148.
+- 2026-02-15: Verified post-merge checks for npm 11 adoption green on `master` (CI + CodeQL, commit `71dd306`).
+- 2026-02-15: Re-validated ESLint 10 compatibility checkpoint for #150 (`npm view @typescript-eslint/eslint-plugin@latest peerDependencies` still `^8.57.0 || ^9.0.0`), keeping #150 open and blocked.

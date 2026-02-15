@@ -50,17 +50,19 @@ Primary impact:
    Tracking issue: #147
 3. Wave C: npm 11 adoption decision  
    Tracking issue: #148
+4. Wave D: ESLint 10 compatibility revisit  
+   Tracking issue: #150
 
 ## 4. Decision Table (2026-02-15)
 
 | Dependency | Decision | Rationale | Tracking |
 |---|---|---|---|
 | ESLint v9 | Merge candidate | Compatible major with typescript-eslint v8 peer requirements | #146 |
-| ESLint v10 | Deferred pending upstream compatibility | Blocked by current typescript-eslint peer dependency range | #150 |
+| ESLint v10 | Deferred pending upstream compatibility | Still blocked: latest `@typescript-eslint/*@8.55.0` peers `eslint ^8.57.0 || ^9.0.0` | #150 |
 | typescript-eslint v8 | Merge candidate | Coupled with ESLint v9 upgrade under current compatibility constraints | #146 |
 | eslint-config-prettier v10 | Merge candidate | Companion lint stack upgrade with low runtime risk | #146 |
-| Zod v4 | Deferred pending validation | Runtime schema behavior can affect protocol/API contract guarantees | #147 |
-| npm v11 | Deferred pending compatibility evaluation | Potential workspace/CI/lockfile behavior changes require explicit validation | #148 |
+| Zod v4 | Merged | Runtime schema compatibility validated across protocol/C&C/node-agent and merged via PR #152 | #147 |
+| npm v11 | Merged | Workspace tooling and CI remained stable; adopted via PR #17 | #148 |
 
 ## 5. Exit Criteria for #144
 
