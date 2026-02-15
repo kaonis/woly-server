@@ -1,7 +1,9 @@
 import dotenv from 'dotenv';
 
 // Load environment variables from .env file
-dotenv.config();
+dotenv.config({
+  quiet: process.env.NODE_ENV === 'test' || process.env.DOTENV_CONFIG_QUIET === 'true',
+});
 
 const parsedCorsOrigins = process.env.CORS_ORIGINS
   ?.split(',')
