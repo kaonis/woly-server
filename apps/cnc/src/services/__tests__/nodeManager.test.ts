@@ -15,6 +15,7 @@ import { mintWsSessionToken } from '../../websocket/sessionTokens';
 jest.mock('ws');
 
 describe('NodeManager', () => {
+  const defaultWsMessageRateLimitPerSecond = config.wsMessageRateLimitPerSecond;
   let nodeManager: NodeManager;
   let hostAggregator: HostAggregator;
   let mockWs: any;
@@ -24,6 +25,7 @@ describe('NodeManager', () => {
   });
 
   beforeEach(async () => {
+    (config as any).wsMessageRateLimitPerSecond = defaultWsMessageRateLimitPerSecond;
     hostAggregator = new HostAggregator();
     nodeManager = new NodeManager(hostAggregator);
 
@@ -265,6 +267,21 @@ describe('NodeManager', () => {
       expect(mockWs.send).toHaveBeenCalledWith(
         expect.stringContaining('error')
       );
+    });
+
+    it('closes connection when inbound message rate exceeds configured limit', async () => {
+      (config as any).wsMessageRateLimitPerSecond = 2;
+      nodeManager.shutdown();
+      nodeManager = new NodeManager(hostAggregator);
+
+      await nodeManager.handleConnection(mockWs, { kind: 'static-token', token: 'dev-token-home' });
+      const messageHandler = mockWs.on.mock.calls.find((call: any) => call[0] === 'message')[1];
+
+      await messageHandler(Buffer.from('invalid json'));
+      await messageHandler(Buffer.from('invalid json'));
+      await messageHandler(Buffer.from('invalid json'));
+
+      expect(mockWs.close).toHaveBeenCalledWith(4408, 'Message rate limit exceeded');
     });
 
     it('should reject registration with unsupported protocol version', async () => {
