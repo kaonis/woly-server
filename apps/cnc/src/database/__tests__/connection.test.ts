@@ -1,3 +1,5 @@
+export {};
+
 type MockPgPool = {
   connect: jest.Mock;
   query: jest.Mock;

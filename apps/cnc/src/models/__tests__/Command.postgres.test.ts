@@ -1,3 +1,5 @@
+export {};
+
 type MockDb = {
   isSqlite: boolean;
   query: jest.Mock;
