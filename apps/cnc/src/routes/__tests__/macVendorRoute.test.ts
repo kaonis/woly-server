@@ -2,13 +2,13 @@
  * Integration tests for MAC vendor lookup endpoint
  */
 
-import { createHmac } from 'crypto';
 import express, { Express } from 'express';
 import request from 'supertest';
 import { createRoutes } from '../index';
 import { NodeManager } from '../../services/nodeManager';
 import { HostAggregator } from '../../services/hostAggregator';
 import { CommandRouter } from '../../services/commandRouter';
+import { createToken } from './testUtils';
 
 // Mock config before importing middleware
 jest.mock('../../config', () => ({
@@ -59,20 +59,6 @@ import { lookupMacVendor } from '../../services/macVendorService';
 
 const mockLookup = lookupMacVendor as jest.MockedFunction<typeof lookupMacVendor>;
 
-function encodeBase64Url(value: object): string {
-  return Buffer.from(JSON.stringify(value)).toString('base64url');
-}
-
-function createToken(payload: Record<string, unknown>, secret = 'test-secret'): string {
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const encodedHeader = encodeBase64Url(header);
-  const encodedPayload = encodeBase64Url(payload);
-  const signature = createHmac('sha256', secret)
-    .update(`${encodedHeader}.${encodedPayload}`)
-    .digest('base64url');
-  return `${encodedHeader}.${encodedPayload}.${signature}`;
-}
-
 describe('MAC Vendor Lookup Route Integration', () => {
   let app: Express;
   const now = Math.floor(Date.now() / 1000);
@@ -108,6 +94,82 @@ describe('MAC Vendor Lookup Route Integration', () => {
       expect(response.body).toMatchObject({
         error: 'Unauthorized',
         code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 401 for malformed authorization header', async () => {
+      const response = await request(app)
+        .get('/api/hosts/mac-vendor/80:6D:97:60:39:08')
+        .set('Authorization', 'Token abc123');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 401 for invalid token signature', async () => {
+      const invalidSignatureToken = createToken(
+        {
+          sub: 'user-1',
+          role: 'operator',
+          iss: 'test-issuer',
+          aud: 'test-audience',
+          exp: now + 3600,
+        },
+        'wrong-secret'
+      );
+
+      const response = await request(app)
+        .get('/api/hosts/mac-vendor/80:6D:97:60:39:08')
+        .set('Authorization', `Bearer ${invalidSignatureToken}`);
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 401 for expired token', async () => {
+      const expiredToken = createToken({
+        sub: 'user-1',
+        role: 'operator',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/mac-vendor/80:6D:97:60:39:08')
+        .set('Authorization', `Bearer ${expiredToken}`);
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 for role mismatch', async () => {
+      const viewerToken = createToken({
+        sub: 'viewer-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/mac-vendor/80:6D:97:60:39:08')
+        .set('Authorization', `Bearer ${viewerToken}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        error: 'Forbidden',
+        code: 'AUTH_FORBIDDEN',
       });
     });
 
