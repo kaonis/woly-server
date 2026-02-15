@@ -25,9 +25,10 @@ const cncCapabilities: CncCapabilitiesResponse = {
       note: 'Host notes/tags are accepted via PUT /api/hosts/:fqn.',
     },
     schedules: {
-      supported: false,
-      routes: [],
-      note: 'Planned in kaonis/woly-server#255.',
+      supported: true,
+      routes: ['/api/hosts/:fqn/schedules', '/api/hosts/schedules/:id'],
+      persistence: 'backend',
+      note: 'Host wake schedules are persisted in CNC backend.',
     },
     commandStatusStreaming: {
       supported: false,

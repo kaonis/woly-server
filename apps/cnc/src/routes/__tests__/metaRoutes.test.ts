@@ -106,7 +106,10 @@ describe('Capabilities Route', () => {
         capabilities: {
           scan: { supported: true },
           notesTags: { supported: true, persistence: 'backend' },
-          schedules: { supported: false },
+          schedules: {
+            supported: true,
+            persistence: 'backend',
+          },
           commandStatusStreaming: { supported: false, transport: null },
         },
       });

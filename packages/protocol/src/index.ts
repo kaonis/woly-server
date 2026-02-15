@@ -103,6 +103,49 @@ export interface HostPortScanResponse {
   correlationId?: string;
 }
 
+export type ScheduleFrequency = 'once' | 'daily' | 'weekly' | 'weekdays' | 'weekends';
+
+export interface HostWakeSchedule {
+  id: string;
+  hostFqn: string;
+  hostName: string;
+  hostMac: string;
+  scheduledTime: string;
+  frequency: ScheduleFrequency;
+  enabled: boolean;
+  notifyOnWake: boolean;
+  timezone: string;
+  createdAt: string;
+  updatedAt: string;
+  lastTriggered?: string;
+  nextTrigger?: string;
+}
+
+export interface HostSchedulesResponse {
+  schedules: HostWakeSchedule[];
+}
+
+export interface CreateHostWakeScheduleRequest {
+  scheduledTime: string;
+  frequency: ScheduleFrequency;
+  enabled?: boolean;
+  notifyOnWake?: boolean;
+  timezone?: string;
+}
+
+export interface UpdateHostWakeScheduleRequest {
+  scheduledTime?: string;
+  frequency?: ScheduleFrequency;
+  enabled?: boolean;
+  notifyOnWake?: boolean;
+  timezone?: string;
+}
+
+export interface DeleteHostWakeScheduleResponse {
+  success: boolean;
+  id: string;
+}
+
 // --- WebSocket message types ---
 
 export type NodeMessage =
@@ -227,6 +270,58 @@ export const hostPortScanResponseSchema: z.ZodType<HostPortScanResponse> = z.obj
   message: z.string().min(1).optional(),
   correlationId: z.string().min(1).optional(),
 });
+
+export const scheduleFrequencySchema = z.enum(['once', 'daily', 'weekly', 'weekdays', 'weekends']);
+
+export const hostWakeScheduleSchema: z.ZodType<HostWakeSchedule> = z.object({
+  id: z.string().min(1),
+  hostFqn: z.string().min(1),
+  hostName: z.string().min(1),
+  hostMac: z.string().min(1),
+  scheduledTime: z.string().datetime(),
+  frequency: scheduleFrequencySchema,
+  enabled: z.boolean(),
+  notifyOnWake: z.boolean(),
+  timezone: z.string().min(1).max(64),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  lastTriggered: z.string().datetime().optional(),
+  nextTrigger: z.string().datetime().optional(),
+});
+
+export const hostSchedulesResponseSchema: z.ZodType<HostSchedulesResponse> = z.object({
+  schedules: z.array(hostWakeScheduleSchema),
+});
+
+export const createHostWakeScheduleRequestSchema: z.ZodType<CreateHostWakeScheduleRequest> = z
+  .object({
+    scheduledTime: z.string().datetime(),
+    frequency: scheduleFrequencySchema,
+    enabled: z.boolean().optional(),
+    notifyOnWake: z.boolean().optional(),
+    timezone: z.string().min(1).max(64).optional(),
+  })
+  .strict();
+
+export const updateHostWakeScheduleRequestSchema: z.ZodType<UpdateHostWakeScheduleRequest> = z
+  .object({
+    scheduledTime: z.string().datetime().optional(),
+    frequency: scheduleFrequencySchema.optional(),
+    enabled: z.boolean().optional(),
+    notifyOnWake: z.boolean().optional(),
+    timezone: z.string().min(1).max(64).optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field must be provided',
+  });
+
+export const deleteHostWakeScheduleResponseSchema: z.ZodType<DeleteHostWakeScheduleResponse> = z
+  .object({
+    success: z.literal(true),
+    id: z.string().min(1),
+  })
+  .strict();
 
 const nodeMetadataSchema = z.object({
   version: z.string().min(1),

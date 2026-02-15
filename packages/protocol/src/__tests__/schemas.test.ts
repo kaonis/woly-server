@@ -1,12 +1,18 @@
 import {
   cncCapabilitiesResponseSchema,
   cncCapabilityDescriptorSchema,
+  createHostWakeScheduleRequestSchema,
+  deleteHostWakeScheduleResponseSchema,
   hostPortScanResponseSchema,
+  hostSchedulesResponseSchema,
+  hostWakeScheduleSchema,
   hostSchema,
   hostStatusSchema,
+  scheduleFrequencySchema,
   commandStateSchema,
   errorResponseSchema,
   outboundNodeMessageSchema,
+  updateHostWakeScheduleRequestSchema,
   inboundCncCommandSchema,
   PROTOCOL_VERSION,
 } from '../index';
@@ -263,6 +269,141 @@ describe('hostPortScanResponseSchema', () => {
         target: 'Office-Mac@Home',
         scannedAt: '2026-02-15T00:00:00.000Z',
         openPorts: [{ port: 80, protocol: 'udp', service: 'HTTP' }],
+      }).success
+    ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hostWakeScheduleSchema and related schedule schemas
+// ---------------------------------------------------------------------------
+
+describe('scheduleFrequencySchema', () => {
+  it.each(['once', 'daily', 'weekly', 'weekdays', 'weekends'])('accepts "%s"', (frequency) => {
+    expect(scheduleFrequencySchema.safeParse(frequency).success).toBe(true);
+  });
+
+  it('rejects unknown schedule frequency', () => {
+    expect(scheduleFrequencySchema.safeParse('monthly').success).toBe(false);
+  });
+});
+
+describe('hostWakeScheduleSchema', () => {
+  const validSchedule = {
+    id: 'schedule-1',
+    hostFqn: 'Office-Mac@Home',
+    hostName: 'Office-Mac',
+    hostMac: '00:11:22:33:44:55',
+    scheduledTime: '2026-02-15T09:00:00.000Z',
+    frequency: 'daily',
+    enabled: true,
+    notifyOnWake: true,
+    timezone: 'America/New_York',
+    createdAt: '2026-02-15T00:00:00.000Z',
+    updatedAt: '2026-02-15T00:00:00.000Z',
+  };
+
+  it('accepts a valid host wake schedule', () => {
+    expect(hostWakeScheduleSchema.safeParse(validSchedule).success).toBe(true);
+  });
+
+  it('accepts optional trigger metadata', () => {
+    expect(
+      hostWakeScheduleSchema.safeParse({
+        ...validSchedule,
+        lastTriggered: '2026-02-15T08:00:00.000Z',
+        nextTrigger: '2026-02-16T09:00:00.000Z',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects invalid scheduled time format', () => {
+    expect(
+      hostWakeScheduleSchema.safeParse({
+        ...validSchedule,
+        scheduledTime: 'not-a-date',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('hostSchedulesResponseSchema', () => {
+  it('accepts schedules response payload', () => {
+    expect(
+      hostSchedulesResponseSchema.safeParse({
+        schedules: [
+          {
+            id: 'schedule-1',
+            hostFqn: 'Office-Mac@Home',
+            hostName: 'Office-Mac',
+            hostMac: '00:11:22:33:44:55',
+            scheduledTime: '2026-02-15T09:00:00.000Z',
+            frequency: 'daily',
+            enabled: true,
+            notifyOnWake: true,
+            timezone: 'UTC',
+            createdAt: '2026-02-15T00:00:00.000Z',
+            updatedAt: '2026-02-15T00:00:00.000Z',
+          },
+        ],
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('createHostWakeScheduleRequestSchema', () => {
+  it('accepts valid schedule create request', () => {
+    expect(
+      createHostWakeScheduleRequestSchema.safeParse({
+        scheduledTime: '2026-02-15T09:00:00.000Z',
+        frequency: 'weekly',
+        enabled: true,
+        notifyOnWake: false,
+        timezone: 'UTC',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects unknown fields', () => {
+    expect(
+      createHostWakeScheduleRequestSchema.safeParse({
+        scheduledTime: '2026-02-15T09:00:00.000Z',
+        frequency: 'daily',
+        extra: 'nope',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('updateHostWakeScheduleRequestSchema', () => {
+  it('accepts valid partial update request', () => {
+    expect(
+      updateHostWakeScheduleRequestSchema.safeParse({
+        enabled: false,
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects empty update request', () => {
+    expect(updateHostWakeScheduleRequestSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('deleteHostWakeScheduleResponseSchema', () => {
+  it('accepts valid delete response payload', () => {
+    expect(
+      deleteHostWakeScheduleResponseSchema.safeParse({
+        success: true,
+        id: 'schedule-1',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects delete response without success=true', () => {
+    expect(
+      deleteHostWakeScheduleResponseSchema.safeParse({
+        success: false,
+        id: 'schedule-1',
       }).success
     ).toBe(false);
   });

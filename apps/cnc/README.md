@@ -178,6 +178,10 @@ Requires `Authorization: Bearer <jwt>` with role `operator` or `admin`.
 GET    /api/hosts
 GET    /api/hosts/ports/:fqn
 GET    /api/hosts/scan-ports/:fqn
+GET    /api/hosts/:fqn/schedules
+POST   /api/hosts/:fqn/schedules
+PUT    /api/hosts/schedules/:id
+DELETE /api/hosts/schedules/:id
 GET    /api/hosts/:fqn
 POST   /api/hosts/wakeup/:fqn
 PUT    /api/hosts/:fqn

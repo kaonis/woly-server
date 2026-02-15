@@ -344,6 +344,186 @@ describe('Host Routes Authentication and Authorization', () => {
     });
   });
 
+  describe('GET /api/hosts/:fqn/schedules', () => {
+    it('returns 401 when no authorization header is provided', async () => {
+      const response = await request(app).get('/api/hosts/node1.example.com/schedules');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 for unsupported role', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/node1.example.com/schedules')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        code: 'AUTH_FORBIDDEN',
+      });
+    });
+
+    it('allows access with valid operator token', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'operator',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/node1.example.com/schedules')
+        .set('Authorization', `Bearer ${token}`);
+
+      // Will be 404 since host doesn't exist in mock, but auth passed
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/hosts/:fqn/schedules', () => {
+    it('returns 401 when no authorization header is provided', async () => {
+      const response = await request(app)
+        .post('/api/hosts/node1.example.com/schedules')
+        .send({
+          scheduledTime: '2026-02-16T09:00:00.000Z',
+          frequency: 'daily',
+        });
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 for unsupported role', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .post('/api/hosts/node1.example.com/schedules')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          scheduledTime: '2026-02-16T09:00:00.000Z',
+          frequency: 'daily',
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        code: 'AUTH_FORBIDDEN',
+      });
+    });
+
+    it('allows access with valid operator token', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'operator',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .post('/api/hosts/node1.example.com/schedules')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          scheduledTime: '2026-02-16T09:00:00.000Z',
+          frequency: 'daily',
+        });
+
+      // Will be 404 since host doesn't exist in mock, but auth passed
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('PUT /api/hosts/schedules/:id', () => {
+    it('returns 401 when no authorization header is provided', async () => {
+      const response = await request(app)
+        .put('/api/hosts/schedules/schedule-1')
+        .send({ enabled: false });
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 for unsupported role', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .put('/api/hosts/schedules/schedule-1')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ enabled: false });
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        code: 'AUTH_FORBIDDEN',
+      });
+    });
+  });
+
+  describe('DELETE /api/hosts/schedules/:id', () => {
+    it('returns 401 when no authorization header is provided', async () => {
+      const response = await request(app).delete('/api/hosts/schedules/schedule-1');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 for unsupported role', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .delete('/api/hosts/schedules/schedule-1')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        code: 'AUTH_FORBIDDEN',
+      });
+    });
+  });
+
   describe('POST /api/hosts/wakeup/:fqn', () => {
     it('returns 401 when no authorization header is provided', async () => {
       const response = await request(app).post('/api/hosts/wakeup/node1.example.com');

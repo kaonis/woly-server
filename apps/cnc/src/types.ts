@@ -6,9 +6,11 @@ import type {
   CncCapabilitiesResponse as ProtocolCncCapabilitiesResponse,
   CncCapabilityDescriptor as ProtocolCncCapabilityDescriptor,
   CommandState,
+  HostWakeSchedule as ProtocolHostWakeSchedule,
   Host,
   HostPortScanResponse as ProtocolHostPortScanResponse,
   NodeMetadata as ProtocolNodeMetadata,
+  ScheduleFrequency as ProtocolScheduleFrequency,
 } from '@kaonis/woly-protocol';
 
 // Node Types
@@ -76,6 +78,8 @@ export interface HostsResponse {
 export type CapabilityDescriptor = ProtocolCncCapabilityDescriptor;
 export type CncCapabilitiesResponse = ProtocolCncCapabilitiesResponse;
 export type HostPortScanResponse = ProtocolHostPortScanResponse;
+export type ScheduleFrequency = ProtocolScheduleFrequency;
+export type HostWakeSchedule = ProtocolHostWakeSchedule;
 
 export interface WakeupResponse {
   success: boolean;

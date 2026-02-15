@@ -6,6 +6,7 @@ import { Router } from 'express';
 import { NodesController } from '../controllers/nodes';
 import { AdminController } from '../controllers/admin';
 import { HostsController } from '../controllers/hosts';
+import { SchedulesController } from '../controllers/schedules';
 import { AuthController } from '../controllers/auth';
 import { MetaController } from '../controllers/meta';
 import { NodeManager } from '../services/nodeManager';
@@ -30,6 +31,7 @@ export function createRoutes(
   const nodesController = new NodesController(nodeManager);
   const adminController = new AdminController(hostAggregator, nodeManager, commandRouter);
   const hostsController = new HostsController(hostAggregator, commandRouter);
+  const schedulesController = new SchedulesController(hostAggregator);
   const authController = new AuthController();
   const metaController = new MetaController();
 
@@ -57,6 +59,11 @@ export function createRoutes(
   // IMPORTANT: ports/scan-ports must be registered before the :fqn catch-all
   router.get('/hosts/ports/:fqn', (req, res) => hostsController.getHostPorts(req, res));
   router.get('/hosts/scan-ports/:fqn', (req, res) => hostsController.scanHostPorts(req, res));
+  // IMPORTANT: schedule routes must be registered before the :fqn catch-all
+  router.get('/hosts/:fqn/schedules', (req, res) => schedulesController.listHostSchedules(req, res));
+  router.post('/hosts/:fqn/schedules', (req, res) => schedulesController.createHostSchedule(req, res));
+  router.put('/hosts/schedules/:id', (req, res) => schedulesController.updateSchedule(req, res));
+  router.delete('/hosts/schedules/:id', (req, res) => schedulesController.deleteSchedule(req, res));
   router.get('/hosts', (req, res) => hostsController.getHosts(req, res));
   router.get('/hosts/:fqn', (req, res) => hostsController.getHostByFQN(req, res));
   router.post('/hosts/wakeup/:fqn', (req, res) => hostsController.wakeupHost(req, res));

@@ -6,7 +6,15 @@ import { HostAggregator } from '../../services/hostAggregator';
 import { CommandRouter } from '../../services/commandRouter';
 import { createToken } from './testUtils';
 import { NodeModel } from '../../models/Node';
-import { PROTOCOL_VERSION } from '@kaonis/woly-protocol';
+import HostScheduleModel from '../../models/HostSchedule';
+import {
+  createHostWakeScheduleRequestSchema,
+  deleteHostWakeScheduleResponseSchema,
+  hostSchedulesResponseSchema,
+  hostWakeScheduleSchema,
+  PROTOCOL_VERSION,
+  updateHostWakeScheduleRequestSchema,
+} from '@kaonis/woly-protocol';
 import { CNC_VERSION } from '../../utils/cncVersion';
 
 jest.mock('../../config', () => ({
@@ -34,6 +42,16 @@ jest.mock('../../models/Node', () => ({
   },
 }));
 
+jest.mock('../../models/HostSchedule', () => ({
+  __esModule: true,
+  default: {
+    listByHostFqn: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+}));
+
 jest.mock('../../middleware/rateLimiter', () => ({
   authLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   strictAuthLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
@@ -44,9 +62,54 @@ describe('Mobile API compatibility smoke checks', () => {
   let app: Express;
   const now = Math.floor(Date.now() / 1000);
   const mockedNodeModel = NodeModel as jest.Mocked<typeof NodeModel>;
+  const mockedHostScheduleModel = HostScheduleModel as jest.Mocked<typeof HostScheduleModel>;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedHostScheduleModel.listByHostFqn.mockResolvedValue([
+      {
+        id: 'schedule-1',
+        hostFqn: 'Office-Mac@Home',
+        hostName: 'Office-Mac',
+        hostMac: '00:11:22:33:44:55',
+        scheduledTime: '2026-02-16T09:00:00.000Z',
+        frequency: 'daily',
+        enabled: true,
+        notifyOnWake: true,
+        timezone: 'UTC',
+        createdAt: '2026-02-15T00:00:00.000Z',
+        updatedAt: '2026-02-15T00:00:00.000Z',
+        nextTrigger: '2026-02-16T09:00:00.000Z',
+      },
+    ]);
+    mockedHostScheduleModel.create.mockResolvedValue({
+      id: 'schedule-2',
+      hostFqn: 'Office-Mac@Home',
+      hostName: 'Office-Mac',
+      hostMac: '00:11:22:33:44:55',
+      scheduledTime: '2026-02-17T09:00:00.000Z',
+      frequency: 'weekly',
+      enabled: true,
+      notifyOnWake: false,
+      timezone: 'America/New_York',
+      createdAt: '2026-02-15T00:00:00.000Z',
+      updatedAt: '2026-02-15T00:00:00.000Z',
+      nextTrigger: '2026-02-17T09:00:00.000Z',
+    });
+    mockedHostScheduleModel.update.mockResolvedValue({
+      id: 'schedule-1',
+      hostFqn: 'Office-Mac@Home',
+      hostName: 'Office-Mac',
+      hostMac: '00:11:22:33:44:55',
+      scheduledTime: '2026-02-16T09:00:00.000Z',
+      frequency: 'daily',
+      enabled: false,
+      notifyOnWake: true,
+      timezone: 'UTC',
+      createdAt: '2026-02-15T00:00:00.000Z',
+      updatedAt: '2026-02-15T01:00:00.000Z',
+    });
+    mockedHostScheduleModel.delete.mockResolvedValue(true);
 
     mockedNodeModel.findAll.mockResolvedValue([
       {
@@ -358,7 +421,7 @@ describe('Mobile API compatibility smoke checks', () => {
         capabilities: {
           scan: { supported: true },
           notesTags: { supported: true, persistence: 'backend' },
-          schedules: { supported: false },
+          schedules: { supported: true, persistence: 'backend' },
           commandStatusStreaming: { supported: false, transport: null },
         },
       });
@@ -366,6 +429,81 @@ describe('Mobile API compatibility smoke checks', () => {
 
     it('returns auth error envelope when JWT is missing', async () => {
       const response = await request(app).get('/api/capabilities');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+  });
+
+  describe('Schedule API contract checks', () => {
+    const operatorJwt = createToken({
+      sub: 'mobile-client',
+      role: 'operator',
+      iss: 'test-issuer',
+      aud: 'test-audience',
+      exp: now + 3600,
+      nbf: now - 10,
+    });
+
+    it('returns schedule list payload compatible with protocol schema', async () => {
+      const response = await request(app)
+        .get('/api/hosts/Office-Mac%40Home/schedules')
+        .set('Authorization', `Bearer ${operatorJwt}`);
+
+      expect(response.status).toBe(200);
+      const parsed = hostSchedulesResponseSchema.safeParse(response.body);
+      expect(parsed.success).toBe(true);
+    });
+
+    it('accepts create payload compatible with protocol request schema', async () => {
+      const payload = createHostWakeScheduleRequestSchema.parse({
+        scheduledTime: '2026-02-17T09:00:00.000Z',
+        frequency: 'weekly',
+        enabled: true,
+        notifyOnWake: false,
+        timezone: 'America/New_York',
+      });
+
+      const response = await request(app)
+        .post('/api/hosts/Office-Mac%40Home/schedules')
+        .set('Authorization', `Bearer ${operatorJwt}`)
+        .send(payload);
+
+      expect(response.status).toBe(201);
+      const parsed = hostWakeScheduleSchema.safeParse(response.body);
+      expect(parsed.success).toBe(true);
+    });
+
+    it('accepts update payload compatible with protocol request schema', async () => {
+      const payload = updateHostWakeScheduleRequestSchema.parse({
+        enabled: false,
+      });
+
+      const response = await request(app)
+        .put('/api/hosts/schedules/schedule-1')
+        .set('Authorization', `Bearer ${operatorJwt}`)
+        .send(payload);
+
+      expect(response.status).toBe(200);
+      const parsed = hostWakeScheduleSchema.safeParse(response.body);
+      expect(parsed.success).toBe(true);
+    });
+
+    it('returns delete payload compatible with protocol response schema', async () => {
+      const response = await request(app)
+        .delete('/api/hosts/schedules/schedule-1')
+        .set('Authorization', `Bearer ${operatorJwt}`);
+
+      expect(response.status).toBe(200);
+      const parsed = deleteHostWakeScheduleResponseSchema.safeParse(response.body);
+      expect(parsed.success).toBe(true);
+    });
+
+    it('returns auth error envelope when JWT is missing', async () => {
+      const response = await request(app).get('/api/hosts/Office-Mac%40Home/schedules');
 
       expect(response.status).toBe(401);
       expect(response.body).toMatchObject({
