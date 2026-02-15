@@ -52,3 +52,12 @@ For each issue:
 ## 6. Exit Criteria
 
 V17 is complete when all four issues (`#234`, `#235`, `#233`, `#150`) are resolved (merged or explicitly updated/closed with documented blocker state) and related docs/scripts are updated.
+
+## 7. Progress Updates
+
+- 2026-02-15: Completed `#234` by adding `npm run ci:audit:latest` and publishing helper usage in CI manual operations docs.
+- 2026-02-15: Completed `#235` by adding `npm run ci:review:template` for standardized manual review log entries.
+- 2026-02-15: Completed scoped rolling policy audit for `#233`:
+  - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+- 2026-02-15: Added CI review log entry for this cycle and created follow-up review issue `#236`.
+- 2026-02-15: Dependency checkpoint status unchanged for `#150` (blocked pending upstream ESLint 10 peer support in `@typescript-eslint`).
