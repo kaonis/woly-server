@@ -58,6 +58,9 @@ gh run view <run-id> --log-failed
 Run structured local audit for weekly review windows:
 
 ```bash
+# Preferred helper: uses latest recorded checkpoint from review log
+npm run ci:audit:latest -- --fail-on-unexpected
+
 # Example: only runs created after previous review timestamp
 npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --fail-on-unexpected
 
@@ -89,7 +92,8 @@ Re-enable automatic CI only when all of the following are true:
 Weekly checklist:
 
 1. Confirm no unexpected automatic workflow runs since previous review:
-   - `npm run ci:audit:manual -- --since <previous-review-iso> --fail-on-unexpected`
+   - `npm run ci:audit:latest -- --fail-on-unexpected`
+   - fallback/manual override: `npm run ci:audit:manual -- --since <previous-review-iso> --fail-on-unexpected`
 2. Verify manual-only policy still matches budget and throughput needs:
    - count merges since last review
    - count manually dispatched runs since last review
