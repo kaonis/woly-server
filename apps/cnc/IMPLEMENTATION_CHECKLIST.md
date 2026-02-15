@@ -13,6 +13,7 @@ Owner: Platform Team
 ## Checklist Reconciliation (2026-02-15)
 
 - [x] Phase 0 Definition-of-Done references audited for ADR/doc/CI discoverability.
+- [x] Coverage ratchet baseline policy documented and enforced (`apps/cnc/docs/coverage-ratchet-policy.md`, `apps/cnc/jest.config.js`).
 
 ## Phase 0 - Baseline and Safety Rails
 
