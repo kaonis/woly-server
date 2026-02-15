@@ -136,6 +136,10 @@ Runs on port 8080 by default. See [apps/cnc/README.md](apps/cnc/README.md) for f
 
 Both apps consume it via npm workspace link. It's also published to npm for the mobile app. See [packages/protocol/README.md](packages/protocol/README.md).
 
+Upgrade sequencing and compatibility requirements are documented in:
+- [docs/compatibility.md](docs/compatibility.md)
+- [docs/PROTOCOL_COMPATIBILITY.md](docs/PROTOCOL_COMPATIBILITY.md)
+
 ### Publishing the Protocol Package
 
 To publish `@kaonis/woly-protocol` to npm (for the mobile app):
@@ -175,7 +179,7 @@ docker run -d --net host \
 
 GitHub Actions runs on every push and PR to `master`:
 
-1. Install dependencies (`npm ci`)
+1. Protocol compatibility gate (schema tests, cross-repo contracts, app protocol contracts, C&C schema gate)
 2. Build, lint, typecheck, and test all workspaces via Turborepo
 3. Upload coverage reports as artifacts
 

@@ -14,7 +14,7 @@ Owner: Platform Team
 - [x] Create and approve ADRs for API auth, shared protocol package, and durable command lifecycle.
 - [x] Maintain `docs/compatibility.md` with every release.
 - [x] Enforce CI gates for lint, tests, build, and typecheck.
-- [ ] Add schema-validation test gate in CI.
+- [x] Add schema-validation test gate in CI.
 
 Definition of done:
 - [ ] ADRs and compatibility docs merged and discoverable.
@@ -65,11 +65,11 @@ Definition of done:
 - [x] Replace duplicated protocol declarations with `@kaonis/woly-protocol`.
 - [x] Add shared-schema contract tests in C&C test suite.
 - [x] Enforce protocol version compatibility checks during registration.
-- [ ] Add cross-repo contract tests across node and C&C in CI.
-- [ ] Publish compatibility upgrade guide.
+- [x] Add cross-repo contract tests across node and C&C in CI.
+- [x] Publish compatibility upgrade guide.
 
 Definition of done:
-- [ ] Incompatible protocol changes fail CI unless versioned correctly.
+- [x] Incompatible protocol changes fail CI unless versioned correctly.
 
 ## Phase 6 - Observability and Operations
 
