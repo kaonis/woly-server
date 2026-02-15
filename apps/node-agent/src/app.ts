@@ -8,6 +8,7 @@ import { logger } from './utils/logger';
 import { AppError, errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { specs } from './swagger';
 import HostDatabase from './services/hostDatabase';
+import ScanOrchestrator from './services/scanOrchestrator';
 import * as hostsController from './controllers/hosts';
 import hosts from './routes/hosts';
 import { agentService } from './services/agentService';
@@ -53,6 +54,7 @@ app.use(express.json({ limit: '100kb' }));
 
 // Initialize database
 const hostDb = new HostDatabase(config.database.path);
+const scanOrchestrator = new ScanOrchestrator(hostDb);
 
 // Initialize and start the server
 async function startServer() {
@@ -62,6 +64,7 @@ async function startServer() {
 
     // Pass database instance to controller
     hostsController.setHostDatabase(hostDb);
+    hostsController.setScanOrchestrator(scanOrchestrator);
 
     // Initialize agent service if in agent mode
     if (agentConfig.mode === 'agent') {
@@ -73,6 +76,7 @@ async function startServer() {
 
       // Pass database instance to agent service
       agentService.setHostDatabase(hostDb);
+      agentService.setScanOrchestrator(scanOrchestrator);
 
       // Start agent service (connects to C&C)
       await agentService.start();
@@ -86,7 +90,7 @@ async function startServer() {
 
     // Start periodic network scanning
     // Initial scan runs in background after configured delay for faster API availability
-    hostDb.startPeriodicSync(config.network.scanInterval, false);
+    scanOrchestrator.startPeriodicSync(config.network.scanInterval, false);
 
     // API Documentation
     app.use(
@@ -143,7 +147,7 @@ async function startServer() {
         health.status = 'degraded';
       }
 
-      health.checks.networkScan = hostDb.isScanInProgress() ? 'running' : 'idle';
+      health.checks.networkScan = scanOrchestrator.isScanInProgress() ? 'running' : 'idle';
 
       res.status(health.status === 'ok' ? 200 : 503).json(health);
     });
@@ -175,6 +179,7 @@ async function startServer() {
         if (agentConfig.mode === 'agent') {
           agentService.stop();
         }
+        scanOrchestrator.stopPeriodicSync();
         await hostDb.close();
         logger.info('Database closed successfully');
         process.exit(0);
@@ -191,6 +196,7 @@ async function startServer() {
         if (agentConfig.mode === 'agent') {
           agentService.stop();
         }
+        scanOrchestrator.stopPeriodicSync();
         await hostDb.close();
         logger.info('Database closed successfully');
         process.exit(0);

@@ -2,7 +2,6 @@ import Database from 'better-sqlite3';
 import { EventEmitter } from 'events';
 import { mkdirSync } from 'fs';
 import { dirname } from 'path';
-import { config } from '../config';
 import { logger } from '../utils/logger';
 import * as networkDiscovery from './networkDiscovery';
 import { Host } from '../types';
@@ -14,10 +13,6 @@ import { Host } from '../types';
 
 class HostDatabase extends EventEmitter {
   private db!: Database.Database; // Definite assignment assertion - assigned in connectWithRetry
-  private syncInterval?: NodeJS.Timeout;
-  private deferredSyncTimeout?: NodeJS.Timeout;
-  private scanInProgress: boolean = false;
-  private lastScanTime: Date | null = null;
   private maxRetries: number = 3;
   private retryDelay: number = 1000; // 1 second
   private ready: Promise<void>;
@@ -118,20 +113,6 @@ class HostDatabase extends EventEmitter {
       logger.error('Failed to get all hosts:', { error: message });
       throw error;
     }
-  }
-
-  /**
-   * Check if a network scan is currently in progress
-   */
-  isScanInProgress(): boolean {
-    return this.scanInProgress;
-  }
-
-  /**
-   * Get the timestamp of the last completed network scan
-   */
-  getLastScanTime(): string | null {
-    return this.lastScanTime ? this.lastScanTime.toISOString() : null;
   }
 
   /**
@@ -315,203 +296,9 @@ class HostDatabase extends EventEmitter {
   }
 
   /**
-   * Synchronize database with discovered network hosts
-   */
-  async syncWithNetwork() {
-    // Prevent concurrent scans
-    if (this.scanInProgress) {
-      logger.info('Scan already in progress, skipping...');
-      return;
-    }
-    // Set scan flag at the start
-    this.scanInProgress = true;
-
-    try {
-      logger.info('Starting network scan...');
-      const discoveredHosts = await networkDiscovery.scanNetworkARP();
-
-      if (discoveredHosts.length === 0) {
-        logger.info('No hosts discovered in network scan');
-        return;
-      }
-
-      logger.info(`Discovered ${discoveredHosts.length} hosts on network`);
-
-      let newHostCount = 0;
-      let updatedHostCount = 0;
-      let awakeCount = 0;
-
-      // Ping all hosts in parallel with concurrency limiting
-      const pingConcurrency = config.network.pingConcurrency;
-      const hostsWithPingResults: Array<{
-        host: typeof discoveredHosts[0];
-        pingResponsive: number | null;
-        status: 'awake' | 'asleep';
-      }> = [];
-
-      // Process hosts in batches for concurrent pinging
-      for (let i = 0; i < discoveredHosts.length; i += pingConcurrency) {
-        const batch = discoveredHosts.slice(i, i + pingConcurrency);
-
-        const batchResults = await Promise.all(
-          batch.map(async (host) => {
-            // Determine if host is alive:
-            // - ARP discovery is prerequisite (host appears in ARP table)
-            // - When usePingValidation=true, ping result determines final status
-            // - When usePingValidation=false, ARP presence alone means awake (default)
-            let isAlive: boolean;
-            let pingResponsive: number | null = null;
-
-            // Always check ping to track responsiveness
-            const pingResult = await networkDiscovery.isHostAlive(host.ip);
-            pingResponsive = pingResult ? 1 : 0;
-
-            if (config.network.usePingValidation) {
-              // Ping validation enabled: ping result determines status
-              // (not recommended as many devices block ping)
-              isAlive = pingResult;
-              if (!isAlive) {
-                logger.debug(
-                  `Host ${host.ip} found via ARP but did not respond to ping - marking as asleep`
-                );
-              }
-            } else {
-              // Default mode: ARP discovery means host is awake
-              isAlive = true;
-            }
-
-            const status: 'awake' | 'asleep' = isAlive ? 'awake' : 'asleep';
-
-            return { host, pingResponsive, status };
-          })
-        );
-
-        hostsWithPingResults.push(...batchResults);
-      }
-
-      // Process database operations sequentially to avoid race conditions
-      for (const { host, pingResponsive, status } of hostsWithPingResults) {
-        const formattedMac = networkDiscovery.formatMAC(host.mac);
-
-        if (status === 'awake') awakeCount++;
-
-        try {
-          // Try to update existing host with status and ping responsiveness
-          await this.updateHostSeen(formattedMac, status, pingResponsive);
-          updatedHostCount++;
-
-          // Emit host-updated event for agent mode
-          // Get host by MAC to emit event
-          const hostByMac = await this.getHostByMAC(formattedMac);
-          if (hostByMac) {
-            this.emit('host-updated', hostByMac);
-          }
-        } catch (err) {
-          // Host not in DB yet, try to add it
-          try {
-            // Generate hostname: prefer actual hostname, fallback to IP-based name
-            let hostName;
-
-            if (host.hostname) {
-              // Use actual network hostname if available
-              hostName = host.hostname;
-            } else {
-              // Generate from IP address (e.g., "device-192-168-1-115")
-              hostName = `device-${host.ip.replace(/\./g, '-')}`;
-            }
-
-            await this.addHost(hostName, formattedMac, host.ip);
-            // Update status and ping responsiveness for newly added host
-            await this.updateHostStatus(hostName, status);
-            await this.updateHostSeen(formattedMac, status, pingResponsive);
-            newHostCount++;
-
-            // Emit host-discovered event for agent mode
-            const newHost = await this.getHost(hostName);
-            if (newHost) {
-              this.emit('host-discovered', newHost);
-            }
-          } catch (addErr) {
-            // Silently skip if adding fails (might be duplicate MAC/IP)
-            logger.debug(`Could not add discovered host ${formattedMac}:`, {
-              error: (addErr as Error).message,
-            });
-          }
-        }
-      }
-
-      logger.info(
-        `Network sync complete: ${updatedHostCount} updated, ${newHostCount} new hosts, ${awakeCount} awake`
-      );
-
-      // Emit scan-complete event for agent mode
-      const allHosts = await this.getAllHosts();
-      this.emit('scan-complete', allHosts.length);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`Network sync error: ${message}`);
-    } finally {
-      // Always clear scan flag and update timestamp, even if scan failed
-      this.scanInProgress = false;
-      this.lastScanTime = new Date();
-    }
-  }
-
-  /**
-   * Start periodic network scanning
-   * @param {number} intervalMs - Scan interval in milliseconds (default: 5 minutes)
-   * @param {boolean} immediateSync - Whether to run initial sync (default: false for better startup)
-   */
-  startPeriodicSync(intervalMs: number = 5 * 60 * 1000, immediateSync: boolean = false): void {
-    logger.info(`Starting periodic network sync every ${intervalMs / 1000}s`);
-
-    if (immediateSync) {
-      // Initial scan (blocks startup)
-      this.syncWithNetwork();
-    } else {
-      // Run initial scan in background after short delay
-      logger.info(
-        `Deferring initial network scan to background (${config.network.scanDelay / 1000} seconds)`
-      );
-      this.deferredSyncTimeout = setTimeout(() => {
-        logger.info('Running deferred initial network scan...');
-        this.syncWithNetwork();
-      }, config.network.scanDelay);
-    }
-
-    // Recurring scans
-    this.syncInterval = setInterval(() => {
-      this.syncWithNetwork();
-    }, intervalMs);
-  }
-
-  /**
-   * Stop periodic network scanning
-   */
-  stopPeriodicSync() {
-    if (this.deferredSyncTimeout) {
-      clearTimeout(this.deferredSyncTimeout);
-      this.deferredSyncTimeout = undefined;
-    }
-    if (this.syncInterval) {
-      clearInterval(this.syncInterval);
-      this.syncInterval = undefined;
-      logger.info('Stopped periodic network sync');
-    }
-  }
-
-  /**
    * Close database connection
    */
   close(): Promise<void> {
-    if (this.deferredSyncTimeout) {
-      clearTimeout(this.deferredSyncTimeout);
-      this.deferredSyncTimeout = undefined;
-    }
-    if (this.syncInterval) {
-      clearInterval(this.syncInterval);
-      this.syncInterval = undefined;
-    }
     return new Promise<void>((resolve, reject) => {
       try {
         this.db.close();

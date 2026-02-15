@@ -1,4 +1,5 @@
 import HostDatabase from '../hostDatabase';
+import ScanOrchestrator from '../scanOrchestrator';
 import * as networkDiscovery from '../networkDiscovery';
 import { DiscoveredHost } from '../../types';
 import * as fs from 'fs';
@@ -36,6 +37,7 @@ jest.mock('../../config', () => ({
 
 describe('HostDatabase', () => {
   let db: HostDatabase;
+  let scanOrchestrator: ScanOrchestrator;
 
   beforeEach(async () => {
     // Clear all mocks before each test
@@ -50,9 +52,11 @@ describe('HostDatabase', () => {
     // better-sqlite3 creates a new isolated :memory: database for each instance
     db = new HostDatabase(':memory:');
     await db.initialize();
+    scanOrchestrator = new ScanOrchestrator(db);
   });
 
   afterEach(async () => {
+    scanOrchestrator.stopPeriodicSync();
     await db.close();
   });
 
@@ -322,7 +326,7 @@ describe('HostDatabase', () => {
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(true);
 
-      await db.syncWithNetwork();
+      await scanOrchestrator.syncWithNetwork();
 
       const host = await db.getHost('SyncTestHost');
       expect(host?.discovered).toBe(1);
@@ -340,7 +344,7 @@ describe('HostDatabase', () => {
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(true);
 
-      await db.syncWithNetwork();
+      await scanOrchestrator.syncWithNetwork();
 
       const host = await db.getHost('NewHost');
       expect(host).toBeDefined();
@@ -367,7 +371,7 @@ describe('HostDatabase', () => {
 
       // Wait to ensure timestamp difference (SQLite uses second precision)
       await new Promise((resolve) => setTimeout(resolve, 1100));
-      await db.syncWithNetwork();
+      await scanOrchestrator.syncWithNetwork();
 
       const hostAfter = await db.getHost('UpdateSyncHost');
       expect(hostAfter?.lastSeen).not.toBe(lastSeenBefore);
@@ -384,7 +388,7 @@ describe('HostDatabase', () => {
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(false);
 
-      await db.syncWithNetwork();
+      await scanOrchestrator.syncWithNetwork();
 
       const host = await db.getHost('OfflineHost');
       // Host found via ARP is marked as awake even if ping fails (default mode)
@@ -411,7 +415,7 @@ describe('HostDatabase', () => {
         .mockResolvedValueOnce(false)
         .mockResolvedValueOnce(true);
 
-      await db.syncWithNetwork();
+      await scanOrchestrator.syncWithNetwork();
 
       // Both hosts should be marked awake because ARP found them
       const host1 = await db.getHost('PingBlockedHost');
@@ -441,7 +445,7 @@ describe('HostDatabase', () => {
         .mockResolvedValueOnce(false)
         .mockResolvedValueOnce(true);
 
-      await db.syncWithNetwork();
+      await scanOrchestrator.syncWithNetwork();
 
       // First host should be asleep because ping failed
       const host1 = await db.getHost('PingFailHost');
@@ -471,7 +475,7 @@ describe('HostDatabase', () => {
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(false);
 
-      await db.syncWithNetwork();
+      await scanOrchestrator.syncWithNetwork();
 
       // Verify debug log was called
       expect(logger.debug).toHaveBeenCalledWith(
@@ -490,7 +494,7 @@ describe('HostDatabase', () => {
     it('should handle empty network scan results', async () => {
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue([]);
 
-      await db.syncWithNetwork();
+      await scanOrchestrator.syncWithNetwork();
 
       // Should not throw error (no data since seed data was removed)
       const hosts = await db.getAllHosts();
@@ -502,7 +506,7 @@ describe('HostDatabase', () => {
         new Error('Network scan failed')
       );
 
-      await db.syncWithNetwork();
+      await scanOrchestrator.syncWithNetwork();
 
       // Should handle error gracefully (no data since seed data was removed)
       const hosts = await db.getAllHosts();
@@ -520,7 +524,7 @@ describe('HostDatabase', () => {
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(true);
 
-      await db.syncWithNetwork();
+      await scanOrchestrator.syncWithNetwork();
 
       const host = await db.getHost('device-192-168-1-200');
       expect(host).toBeDefined();
@@ -549,7 +553,7 @@ describe('HostDatabase', () => {
         return true;
       });
 
-      await db.syncWithNetwork();
+      await scanOrchestrator.syncWithNetwork();
 
       // Verify all hosts were pinged
       expect(networkDiscovery.isHostAlive).toHaveBeenCalledTimes(25);
@@ -581,7 +585,7 @@ describe('HostDatabase', () => {
         .mockResolvedValueOnce(false)
         .mockResolvedValueOnce(true);
 
-      await db.syncWithNetwork();
+      await scanOrchestrator.syncWithNetwork();
 
       // All hosts should be marked as awake (ARP discovery overrides ping)
       const host1 = await db.getHost('Host1');
@@ -606,7 +610,7 @@ describe('HostDatabase', () => {
     afterEach(() => {
       // Always stop periodic sync after each test to avoid timer leaks
       if (db) {
-        db.stopPeriodicSync();
+        scanOrchestrator.stopPeriodicSync();
       }
       jest.useRealTimers();
     });
@@ -614,7 +618,7 @@ describe('HostDatabase', () => {
     it('should start periodic sync with correct interval', async () => {
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue([]);
 
-      db.startPeriodicSync(1000, false);
+      scanOrchestrator.startPeriodicSync(1000, false);
 
       // Fast-forward time by 5 seconds for deferred initial scan
       jest.advanceTimersByTime(5000);
@@ -626,7 +630,7 @@ describe('HostDatabase', () => {
     it('should defer initial scan in background mode', () => {
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue([]);
 
-      db.startPeriodicSync(5000, false);
+      scanOrchestrator.startPeriodicSync(5000, false);
 
       // Should not have called immediately
       expect(networkDiscovery.scanNetworkARP).not.toHaveBeenCalled();
@@ -635,7 +639,7 @@ describe('HostDatabase', () => {
     it('should run immediate scan when requested', () => {
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue([]);
 
-      db.startPeriodicSync(5000, true);
+      scanOrchestrator.startPeriodicSync(5000, true);
 
       // With immediateSync=true, should call immediately (no timeout needed)
       expect(networkDiscovery.scanNetworkARP).toHaveBeenCalled();
@@ -644,10 +648,10 @@ describe('HostDatabase', () => {
     it('should stop periodic sync on close', () => {
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue([]);
 
-      db.startPeriodicSync(1000, false);
+      scanOrchestrator.startPeriodicSync(1000, false);
 
       // Immediately stop
-      db.stopPeriodicSync();
+      scanOrchestrator.stopPeriodicSync();
 
       // Should not have called scan yet (deferred to 5 seconds)
       expect(networkDiscovery.scanNetworkARP).not.toHaveBeenCalled();
