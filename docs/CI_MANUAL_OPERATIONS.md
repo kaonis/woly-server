@@ -10,6 +10,7 @@ Actions workflows are manual-only.
 - Workflow triggers are limited to `workflow_dispatch`.
 - Automatic `push`, `pull_request`, `schedule`, and tag-triggered workflow runs are disabled.
 - GitHub CodeQL default setup is disabled (`state: not-configured`) to prevent automatic dynamic runs.
+- Each workflow job has `timeout-minutes: 8` to cap manual-run spend and prevent hangs.
 
 ## Required Local Gate Before PR
 
