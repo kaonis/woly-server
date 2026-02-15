@@ -2,13 +2,13 @@
  * Integration tests for node routes authentication
  */
 
-import { createHmac } from 'crypto';
 import express, { Express } from 'express';
 import request from 'supertest';
 import { createRoutes } from '../index';
 import { NodeManager } from '../../services/nodeManager';
 import { HostAggregator } from '../../services/hostAggregator';
 import { CommandRouter } from '../../services/commandRouter';
+import { createToken } from './testUtils';
 
 // Mock config before importing middleware
 jest.mock('../../config', () => ({
@@ -34,20 +34,6 @@ jest.mock('../../models/Node', () => ({
     findById: jest.fn().mockResolvedValue(null),
   },
 }));
-
-function encodeBase64Url(value: object): string {
-  return Buffer.from(JSON.stringify(value)).toString('base64url');
-}
-
-function createToken(payload: Record<string, unknown>, secret = 'test-secret'): string {
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const encodedHeader = encodeBase64Url(header);
-  const encodedPayload = encodeBase64Url(payload);
-  const signature = createHmac('sha256', secret)
-    .update(`${encodedHeader}.${encodedPayload}`)
-    .digest('base64url');
-  return `${encodedHeader}.${encodedPayload}.${signature}`;
-}
 
 describe('Node Routes Authentication', () => {
   let app: Express;
@@ -96,6 +82,38 @@ describe('Node Routes Authentication', () => {
         .set('Authorization', `Bearer ${token}`);
 
       expect(response.status).toBe(401);
+    });
+
+    it('returns 401 with malformed authorization header', async () => {
+      const response = await request(app)
+        .get('/api/nodes')
+        .set('Authorization', 'Token invalid');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 401 with expired token', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'operator',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now - 5,
+      });
+
+      const response = await request(app)
+        .get('/api/nodes')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
     });
 
     it('returns 403 when user has insufficient role', async () => {
@@ -185,6 +203,39 @@ describe('Node Routes Authentication', () => {
       // Will be 404 since node doesn't exist in mock, but auth passed
       expect(response.status).toBe(404);
     });
+
+    it('returns 401 with malformed authorization header', async () => {
+      const response = await request(app)
+        .get('/api/nodes/test-node')
+        .set('Authorization', 'Basic xyz123');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 for role mismatch', async () => {
+      const token = createToken({
+        sub: 'viewer-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/nodes/test-node')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        error: 'Forbidden',
+        code: 'AUTH_FORBIDDEN',
+      });
+    });
   });
 
   describe('GET /api/nodes/:id/health', () => {
@@ -214,6 +265,82 @@ describe('Node Routes Authentication', () => {
 
       // Will be 404 since node doesn't exist in mock, but auth passed
       expect(response.status).toBe(404);
+    });
+
+    it('returns 401 with malformed authorization header', async () => {
+      const response = await request(app)
+        .get('/api/nodes/test-node/health')
+        .set('Authorization', 'Basic xyz123');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 401 with invalid token signature', async () => {
+      const token = createToken(
+        {
+          sub: 'admin-1',
+          role: 'admin',
+          iss: 'test-issuer',
+          aud: 'test-audience',
+          exp: now + 3600,
+        },
+        'wrong-secret'
+      );
+
+      const response = await request(app)
+        .get('/api/nodes/test-node/health')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 401 with expired token', async () => {
+      const token = createToken({
+        sub: 'admin-1',
+        role: 'admin',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now - 100,
+      });
+
+      const response = await request(app)
+        .get('/api/nodes/test-node/health')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 for role mismatch', async () => {
+      const token = createToken({
+        sub: 'viewer-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/nodes/test-node/health')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        error: 'Forbidden',
+        code: 'AUTH_FORBIDDEN',
+      });
     });
   });
 

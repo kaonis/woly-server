@@ -30,7 +30,7 @@ Acceptance criteria:
 - Enforce zero-warning lint gate for C&C.
 - Keep all local gates green after typing refactors.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #136)
 
 ### Phase 2: C&C auth integration coverage completion
 Issue: #134  
@@ -41,7 +41,7 @@ Acceptance criteria:
 - Cover missing token, malformed token, invalid signature, expired token, and role mismatch.
 - Update checklist status to reflect delivered coverage.
 
-Status: `Pending`
+Status: `In Progress` (2026-02-15)
 
 ### Phase 3: Protocol external publish readiness
 Issue: #135  
@@ -73,3 +73,5 @@ For each phase:
 - 2026-02-15: Started Phase 1 issue #133 on branch `feat/133-cnc-zero-warning-lint`.
 - 2026-02-15: Implemented #133 lint warning removals in C&C and enforced `--max-warnings=0` for `apps/cnc`.
 - 2026-02-15: Ran local gates for #133 (`npm run lint -w apps/cnc`, `npm run typecheck -w apps/cnc`, `npm run test:ci -w apps/cnc`) successfully.
+- 2026-02-15: Merged #133 via PR #136 and verified post-merge `master` checks green (CI + CodeQL).
+- 2026-02-15: Started Phase 2 issue #134 on branch `feat/134-cnc-auth-integration-coverage`.

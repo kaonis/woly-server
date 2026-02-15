@@ -8,6 +8,7 @@ Owner: Platform Team
 - [x] Phase 1 implemented (JWT auth + RBAC).
 - [x] Phase 2 implemented baseline (WebSocket auth hardening).
 - [x] Shared protocol adoption started on branch `feat/phase3-shared-protocol-adoption` to align with `woly-backend` Phase 3 rollout.
+- [x] Auth-path integration coverage now explicitly includes missing token, malformed token, invalid signature, expired token, and role-mismatch scenarios.
 
 ## Phase 0 - Baseline and Safety Rails
 
@@ -25,7 +26,7 @@ Definition of done:
 - [x] Add JWT auth middleware for `/api/hosts/*` and `/api/admin/*`.
 - [x] Add role-based authorization (`operator`, `admin`).
 - [x] Enforce issuer/audience/expiry checks.
-- [ ] Add integration tests for 401 and 403 paths.
+- [x] Add integration tests for 401 and 403 paths.
 
 Definition of done:
 - [x] Protected routes reject unauthorized requests.
