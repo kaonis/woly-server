@@ -64,3 +64,8 @@ V22 is complete when all four items (`#246`, `#245`, `#150`, `#4`) are resolved 
 - 2026-02-15: Completed `#246` by adding `npm run ci:closeout:comment` for standardized rolling CI closeout comment generation with optional direct issue posting.
 - 2026-02-15: Added helper tests for closeout comment parser/template behavior and delegated comment posting.
 - 2026-02-15: Validated closeout helper dry-run output with explicit cycle/roadmap/checkpoint arguments.
+- 2026-02-15: Completed scoped rolling policy audit for `#245`:
+  - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+- 2026-02-15: Used follow-up issue helper to create issue `#247` via:
+  - `npm run ci:followup:create -- --after 245`.
+- 2026-02-15: Posted ESLint10 checkpoint updates to both `#150` and `#4` via `npm run deps:checkpoint:eslint10:post` (`2026-02-15T22:14:39Z` payload; still blocked).
