@@ -6,8 +6,8 @@ Scope: Continue autonomous delivery on `kaonis/woly-server` after V1 completion.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `woly-server` synced with `origin/master` at merge commit `c2df1cf` (PR #123).
-- Active execution branch for next phase: `feat/57-node-agent-cors-tightening`.
+- `woly-server` synced with `origin/master` at merge commit `1b00d6c` (PR #124).
+- Active execution branch for next phase: `feat/47-node-agent-observability-rollout`.
 
 ### GitHub issues snapshot (`kaonis/woly-server`)
 - Open issues reviewed on 2026-02-15.
@@ -21,8 +21,8 @@ Scope: Continue autonomous delivery on `kaonis/woly-server` after V1 completion.
   - #51 `[C&C] Phase 6: Observability and operations`
 
 ### CI snapshot
-- Recent merged PRs on 2026-02-15: #118, #119, #120, #121, #122, #123.
-- Post-merge checks on `master` for #123 are green (CI + CodeQL).
+- Recent merged PRs on 2026-02-15: #118, #119, #120, #121, #122, #123, #124.
+- Post-merge checks on `master` for #124 are green (CI + CodeQL).
 
 ### Local gate health (`woly-server`)
 - `npm run typecheck`: pass.
@@ -78,7 +78,7 @@ Acceptance criteria:
 - Implement remaining hardening deltas only (or close as superseded if fully covered).
 - Preserve legitimate mobile/web production use cases.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #124)
 
 ### Phase 5: Observability and rollout ops
 Issues:
@@ -90,7 +90,7 @@ Acceptance criteria:
 - Add startup diagnostics and incident runbook scaffolding.
 - Define staged rollout/canary and rollback procedure.
 
-Status: `Planned`
+Status: `In Progress` (2026-02-15)
 
 ## 3. Execution Loop Rules for V2
 
@@ -121,4 +121,7 @@ For each issue phase:
 - 2026-02-15: Merged #56 via PR #123.
 - 2026-02-15: Verified post-merge `master` checks green for #123.
 - 2026-02-15: Started Phase 4 issue #57 on branch `feat/57-node-agent-cors-tightening`.
-- Next: Open PR for #57, merge after CI, then start Phase 5 (#47/#51).
+- 2026-02-15: Merged #57 via PR #124; verified post-merge `master` checks green.
+- 2026-02-15: Started Phase 5 issue #47 on branch `feat/47-node-agent-observability-rollout`.
+- 2026-02-15: Implemented #47 observability + rollout docs on `feat/47-node-agent-observability-rollout` with local gate green (`npx tsc --noEmit`, `npx jest --ci --coverage --passWithNoTests` in `apps/node-agent`).
+- Next: Open/merge #47 PR, verify post-merge CI, then continue with #51.

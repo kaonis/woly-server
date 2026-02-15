@@ -82,22 +82,22 @@ Definition of done:
 
 ## Phase 5 - Host Data and Backpressure
 
-- [ ] Add event sampling/debounce strategy.
-- [ ] Add payload size caps/chunking strategy.
-- [ ] Define queue-and-flush policy during C&C outage.
-- [ ] Add stale-host data detection.
+- [x] Add event sampling/debounce strategy.
+- [x] Add payload size caps/chunking strategy.
+- [x] Define queue-and-flush policy during C&C outage.
+- [x] Add stale-host data detection.
 
 Definition of done:
 
-- [ ] Node remains stable under event spikes and reconnect storms.
+- [x] Node remains stable under event spikes and reconnect storms.
 
 ## Phase 6 - Observability and Rollout
 
-- [ ] Emit reconnect/auth/schema/latency metrics.
-- [ ] Add startup diagnostics with build and protocol version.
-- [ ] Publish incident runbooks.
-- [ ] Execute canary to staged rollout policy.
+- [x] Emit reconnect/auth/schema/latency metrics.
+- [x] Add startup diagnostics with build and protocol version.
+- [x] Publish incident runbooks.
+- [x] Execute canary to staged rollout policy.
 
 Definition of done:
 
-- [ ] On-call can isolate auth, protocol, command, or network failures quickly.
+- [x] On-call can isolate auth, protocol, command, or network failures quickly.

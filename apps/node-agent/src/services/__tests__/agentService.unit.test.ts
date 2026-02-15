@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { AgentService } from '../agentService';
 import { cncClient } from '../cncClient';
+import { runtimeTelemetry } from '../runtimeTelemetry';
 import { Host } from '../../types';
 import { validateAgentConfig } from '../../config/agent';
 import * as wakeOnLan from 'wake_on_lan';
@@ -69,6 +70,7 @@ describe('AgentService command handlers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
+    runtimeTelemetry.reset(0);
     mockCncClient = (cncClient as unknown) as MockCncClient;
     mockCncClient.removeAllListeners();
     service = new AgentService();
@@ -144,6 +146,10 @@ describe('AgentService command handlers', () => {
         }),
       })
     );
+    const snapshot = runtimeTelemetry.snapshot();
+    expect(snapshot.commands.byType.wake.total).toBe(1);
+    expect(snapshot.commands.byType.wake.success).toBe(1);
+    expect(snapshot.commands.byType.wake.failed).toBe(0);
   });
 
   it('sends failure result for wake when wake-on-lan fails', async () => {
@@ -304,6 +310,11 @@ describe('AgentService command handlers', () => {
         }),
       })
     );
+    const snapshot = runtimeTelemetry.snapshot();
+    expect(snapshot.commands.byType.wake.failed).toBe(1);
+    expect(snapshot.commands.byType.scan.failed).toBe(1);
+    expect(snapshot.commands.byType['update-host'].failed).toBe(1);
+    expect(snapshot.commands.byType['delete-host'].failed).toBe(1);
   });
 
   it('runs scan immediately when immediate=true', async () => {
