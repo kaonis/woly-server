@@ -66,7 +66,7 @@ export const apiKeyAuth = (req: Request, _res: Response, next: NextFunction) => 
     if (!isValid) {
       throw new Error('Invalid API key');
     }
-  } catch (error) {
+  } catch (_error) {
     logger.warn('API authentication failed: Invalid API key', {
       path: req.path,
       method: req.method,

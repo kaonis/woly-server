@@ -8,7 +8,7 @@ Source: Dependency Dashboard (`#4`)
 
 This plan covers the currently deferred or high-risk major dependency updates:
 
-- ESLint v10
+- ESLint v9 and v10
 - typescript-eslint v8
 - eslint-config-prettier v10
 - Zod v4
@@ -18,7 +18,7 @@ This plan covers the currently deferred or high-risk major dependency updates:
 
 ### Tooling-only risk (medium)
 
-- ESLint v10
+- ESLint v9/v10
 - typescript-eslint v8
 - eslint-config-prettier v10
 
@@ -55,8 +55,9 @@ Primary impact:
 
 | Dependency | Decision | Rationale | Tracking |
 |---|---|---|---|
-| ESLint v10 | Merge candidate | Toolchain-only major; manageable with focused lint migration | #146 |
-| typescript-eslint v8 | Merge candidate | Coupled with ESLint upgrade; should be migrated together | #146 |
+| ESLint v9 | Merge candidate | Compatible major with typescript-eslint v8 peer requirements | #146 |
+| ESLint v10 | Deferred pending upstream compatibility | Blocked by current typescript-eslint peer dependency range | #150 |
+| typescript-eslint v8 | Merge candidate | Coupled with ESLint v9 upgrade under current compatibility constraints | #146 |
 | eslint-config-prettier v10 | Merge candidate | Companion lint stack upgrade with low runtime risk | #146 |
 | Zod v4 | Deferred pending validation | Runtime schema behavior can affect protocol/API contract guarantees | #147 |
 | npm v11 | Deferred pending compatibility evaluation | Potential workspace/CI/lockfile behavior changes require explicit validation | #148 |
@@ -66,5 +67,5 @@ Primary impact:
 Issue #144 is complete when:
 
 1. Decision table is documented and linked in roadmap progress.
-2. Execution/defer follow-up issues are in place (#146, #147, #148).
+2. Execution/defer follow-up issues are in place (#146, #147, #148, #150).
 3. Dependency dashboard comment history references these decisions for auditability.

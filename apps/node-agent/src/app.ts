@@ -184,7 +184,7 @@ async function startServer() {
       try {
         await hostDb.getAllHosts();
         health.checks.database = 'healthy';
-      } catch (error) {
+      } catch (_error) {
         health.checks.database = 'unhealthy';
         health.status = 'degraded';
       }

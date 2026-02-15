@@ -15,7 +15,7 @@
     "test:ci": "npm run test:preflight && jest --ci --coverage --maxWorkers=2",
     "test:schema-gate": "npm run test:preflight && jest --ci --runInBand src/services/__tests__/nodeManager.test.ts",
     "test:coverage": "npm run test:preflight && jest --coverage",
-    "lint": "eslint src --ext .ts --max-warnings=0",
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --max-warnings=0",
     "format": "prettier --write \"src/**/*.ts\"",
     "pm2:start": "pm2 start ecosystem.config.js",
     "pm2:stop": "pm2 stop woly-cnc",
