@@ -22,7 +22,9 @@ app.use(helmet());
 app.use(
   cors({
     origin: (origin, callback) => {
-      const decision = evaluateCorsOrigin(origin, config.cors.origins);
+      const decision = evaluateCorsOrigin(origin, config.cors.origins, {
+        allowHostedDevOrigins: config.server.env !== 'production',
+      });
 
       if (decision !== 'rejected') {
         if (decision === 'no-origin') {
