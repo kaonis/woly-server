@@ -8,6 +8,7 @@ jobs:
   protocol-compatibility:
     name: Protocol Compatibility Check
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     permissions:
       contents: read
 
@@ -49,6 +50,7 @@ jobs:
   validate:
     name: Build, Lint, Typecheck, Test
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     needs: protocol-compatibility
     permissions:
       contents: read
