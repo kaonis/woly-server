@@ -6,17 +6,16 @@ Scope: Continue autonomous delivery after V2 Phase 5 completion (#47 + #51).
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `71f7e03` (PR #126).
-- Active execution branch: `feat/129-node-agent-command-reliability`.
+- `master` synced at merge commit `8fd58b9` (PR #130).
+- Active execution branch: `feat/128-protocol-schema-ci-gates`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
-- #129 `[Node Agent] Phase 4: Command reliability hardening`
 - #128 `[CI/Protocol] Close remaining protocol compatibility and schema gates`
 - #127 `[Security] Node-agent dependency vulnerability remediation plan`
 - #4 `Dependency Dashboard`
 
 ### CI snapshot
-- Post-merge checks for `71f7e03` are green (CI + CodeQL).
+- Post-merge checks for `8fd58b9` are green (CI + CodeQL).
 
 ## 2. Iterative Phases
 
@@ -30,7 +29,7 @@ Acceptance criteria:
 - Add timeout and bounded retry policies per command type.
 - Keep command-result semantics safe under reconnect and retry conditions.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #130)
 
 ### Phase 2: Protocol/schema CI gates closure
 Issue: #128  
@@ -41,7 +40,7 @@ Acceptance criteria:
 - Add cross-repo contract tests for node-agent and C&C in CI.
 - Publish/update compatibility upgrade guide.
 
-Status: `Pending`
+Status: `In Progress` (2026-02-15)
 
 ### Phase 3: Security dependency remediation plan
 Issue: #127  
@@ -71,3 +70,6 @@ For each phase:
 
 - 2026-02-15: Created ROADMAP_V3 after V2 Phase 5 completion.
 - 2026-02-15: Started Phase 1 issue #129 on branch `feat/129-node-agent-command-reliability`.
+- 2026-02-15: Merged #129 via PR #130.
+- 2026-02-15: Verified post-merge `master` checks green for #130 (CI + CodeQL).
+- 2026-02-15: Started Phase 2 issue #128 on branch `feat/128-protocol-schema-ci-gates`.

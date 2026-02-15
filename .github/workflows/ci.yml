@@ -29,8 +29,11 @@ jobs:
       - name: Build protocol package
         run: npm run build -w packages/protocol
 
-      - name: Run protocol contract tests
-        run: npm run test -w packages/protocol
+      - name: Run protocol schema tests
+        run: npm run test -w packages/protocol -- schemas.test
+
+      - name: Run protocol cross-repo contract tests
+        run: npm run test -w packages/protocol -- contract.cross-repo
 
       - name: Verify protocol compatibility in apps
         run: |
@@ -41,6 +44,9 @@ jobs:
           echo "Verifying cnc can consume protocol package..."
           # Pattern matches files containing 'protocol.contract' in path
           npm run test -w apps/cnc -- protocol.contract
+
+      - name: Run C&C schema-validation gate
+        run: npm run test:schema-gate -w apps/cnc
 
   validate:
     name: Build, Lint, Typecheck, Test
