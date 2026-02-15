@@ -73,7 +73,7 @@ Primary impact:
 | npm v11 | Merged | Workspace tooling and CI remained stable; adopted via PR #17 | #148 |
 | ESLint flat config mode | Merged | Migrated to root `eslint.config.js` and removed legacy `.eslintrc` mode via PR #155 | #154 |
 | Turbo v2.8.9 | Merged | Adopted and validated with local + CI gates via PR #157 (issue #156) | #156 |
-| ESLint 10 watchdog automation | In progress | Adds scheduled/manual compatibility checks and sticky issue updates for blocker visibility | #159 |
+| ESLint 10 watchdog automation | Merged | Added scheduled/manual watchdog workflow with sticky issue updates via PR #160 | #159 |
 
 ## 5. Exit Criteria for #144
 
