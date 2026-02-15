@@ -104,7 +104,7 @@ describe('Capabilities Route', () => {
           protocol: PROTOCOL_VERSION,
         },
         capabilities: {
-          scan: { supported: false },
+          scan: { supported: true },
           notesTags: { supported: true, persistence: 'backend' },
           schedules: { supported: false },
           commandStatusStreaming: { supported: false, transport: null },

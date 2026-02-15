@@ -90,9 +90,25 @@ describe('Mobile API compatibility smoke checks', () => {
       ]),
       getHostsByNode: jest.fn().mockResolvedValue([]),
       getStats: jest.fn().mockResolvedValue({ total: 1, awake: 1, asleep: 0 }),
+      getHostByFQN: jest.fn().mockResolvedValue({
+        name: 'Office-Mac',
+        ip: '192.168.1.10',
+        mac: '00:11:22:33:44:55',
+        status: 'awake',
+        lastSeen: '2026-02-15T00:00:00.000Z',
+        nodeId: 'node-1',
+        location: 'Home',
+        fullyQualifiedName: 'Office-Mac@Home',
+      }),
     } as unknown as HostAggregator;
 
-    const commandRouter = {} as unknown as CommandRouter;
+    const commandRouter = {
+      routeScanCommand: jest.fn().mockResolvedValue({
+        commandId: 'scan-command-1',
+        success: true,
+        timestamp: new Date('2026-02-15T00:00:00.000Z'),
+      }),
+    } as unknown as CommandRouter;
 
     app = express();
     app.use(express.json());
@@ -203,6 +219,70 @@ describe('Mobile API compatibility smoke checks', () => {
     });
   });
 
+  describe('GET /api/hosts/ports/:fqn', () => {
+    const operatorJwt = createToken({
+      sub: 'mobile-client',
+      role: 'operator',
+      iss: 'test-issuer',
+      aud: 'test-audience',
+      exp: now + 3600,
+      nbf: now - 10,
+    });
+
+    it('returns mobile-compatible port payload shape', async () => {
+      const response = await request(app)
+        .get('/api/hosts/ports/Office-Mac%40Home')
+        .set('Authorization', `Bearer ${operatorJwt}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        target: 'Office-Mac@Home',
+        openPorts: [],
+      });
+      expect(typeof response.body.scannedAt).toBe('string');
+      expect(new Date(response.body.scannedAt).toString()).not.toBe('Invalid Date');
+    });
+  });
+
+  describe('GET /api/hosts/scan-ports/:fqn', () => {
+    const operatorJwt = createToken({
+      sub: 'mobile-client',
+      role: 'operator',
+      iss: 'test-issuer',
+      aud: 'test-audience',
+      exp: now + 3600,
+      nbf: now - 10,
+    });
+
+    it('returns scan payload with compatibility port shape', async () => {
+      const response = await request(app)
+        .get('/api/hosts/scan-ports/Office-Mac%40Home')
+        .set('Authorization', `Bearer ${operatorJwt}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        target: 'Office-Mac@Home',
+        openPorts: [],
+        scan: {
+          commandId: 'scan-command-1',
+          state: 'acknowledged',
+        },
+      });
+      expect(typeof response.body.scannedAt).toBe('string');
+      expect(new Date(response.body.scannedAt).toString()).not.toBe('Invalid Date');
+    });
+
+    it('returns auth error envelope when JWT is missing', async () => {
+      const response = await request(app).get('/api/hosts/scan-ports/Office-Mac%40Home');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+  });
+
   describe('GET /api/capabilities', () => {
     const operatorJwt = createToken({
       sub: 'mobile-client',
@@ -226,7 +306,7 @@ describe('Mobile API compatibility smoke checks', () => {
           protocol: PROTOCOL_VERSION,
         },
         capabilities: {
-          scan: { supported: false },
+          scan: { supported: true },
           notesTags: { supported: true, persistence: 'backend' },
           schedules: { supported: false },
           commandStatusStreaming: { supported: false, transport: null },

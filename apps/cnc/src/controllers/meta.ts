@@ -15,9 +15,9 @@ const cncCapabilities: CncCapabilitiesResponse = {
   },
   capabilities: {
     scan: {
-      supported: false,
-      routes: [],
-      note: 'Planned in kaonis/woly-server#253.',
+      supported: true,
+      routes: ['/api/hosts/ports/:fqn', '/api/hosts/scan-ports/:fqn'],
+      note: 'Compatibility endpoints are available; per-host open-port telemetry remains protocol-limited.',
     },
     notesTags: {
       supported: true,
