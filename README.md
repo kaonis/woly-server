@@ -191,6 +191,7 @@ Required local gate before PR merge:
 
 Manual operations and rollback criteria are documented in:
 - [docs/CI_MANUAL_OPERATIONS.md](docs/CI_MANUAL_OPERATIONS.md)
+- [docs/CI_MANUAL_REVIEW_LOG.md](docs/CI_MANUAL_REVIEW_LOG.md)
 
 Main workflow definition:
 - [.github/workflows/ci.yml](.github/workflows/ci.yml)

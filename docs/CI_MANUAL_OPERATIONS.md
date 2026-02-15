@@ -52,6 +52,35 @@ Re-enable automatic CI only when all of the following are true:
 2. Maintainers agree to restore mandatory remote PR checks.
 3. No active incident requires temporary CI spend controls.
 
+## Weekly Review Cadence
+
+- Cadence: once per week (recommended every Monday).
+- Owner: repository maintainer on weekly rotation.
+- Decision log location: `docs/CI_MANUAL_REVIEW_LOG.md`.
+
+Weekly checklist:
+
+1. Confirm no unexpected automatic workflow runs since previous review:
+   - `gh run list --limit 50`
+2. Verify manual-only policy still matches budget and throughput needs:
+   - count merges since last review
+   - count manually dispatched runs since last review
+3. Confirm local validation gate remains standard before merge:
+   - `npm run lint`
+   - `npm run typecheck`
+   - `npm run test:ci`
+   - `npm run build`
+4. Record decision in the review log:
+   - `Continue manual-only` or `Start rollback`
+
+## Objective Exit Criteria
+
+Start rollback to automatic CI only when all criteria are met:
+
+1. At least two consecutive weekly reviews indicate Actions spend is within planned budget.
+2. Manual-only mode is causing measurable delivery friction (for example delayed validation or merge bottlenecks).
+3. Maintainers explicitly approve re-enabling automatic `push` and `pull_request` triggers.
+
 ## Rollback Steps
 
 1. Restore automatic triggers in workflow files:
