@@ -27,6 +27,7 @@
     "format": "prettier --write .",
     "deps:check-eslint10": "node scripts/eslint10-compat-watchdog.cjs",
     "deps:checkpoint:eslint10": "node scripts/eslint10-dashboard-checkpoint.cjs",
+    "deps:checkpoint:eslint10:post": "node scripts/eslint10-dashboard-checkpoint-post.cjs",
     "ci:audit:manual": "node scripts/manual-ci-run-audit.cjs",
     "ci:audit:latest": "node scripts/manual-ci-run-audit-latest.cjs",
     "ci:review:template": "node scripts/manual-ci-review-template.cjs",

@@ -16,6 +16,11 @@ const {
   buildDashboardCheckpoint,
   parseArgs: parseDashboardArgs,
 } = require('../eslint10-dashboard-checkpoint.cjs');
+const {
+  parseArgs: parseCheckpointPostArgs,
+  postCheckpointToIssues,
+  resolveIssues,
+} = require('../eslint10-dashboard-checkpoint-post.cjs');
 
 test('findLatestSinceCheckpoint returns the latest valid checkpoint', () => {
   const markdown = [
@@ -100,4 +105,57 @@ test('buildDashboardCheckpoint includes expected dependency fields', () => {
   assert.match(markdown, /peer range: `\^8.57.0 \|\| \^9.0.0`/);
   assert.match(markdown, /Status: \*\*BLOCKED/);
   assert.match(markdown, /Dependency dashboard: #4/);
+});
+
+test('parseCheckpointPostArgs supports repeated issue flags and dry-run', () => {
+  const parsed = parseCheckpointPostArgs([
+    '--issue',
+    '150',
+    '--issue',
+    '4',
+    '--dry-run',
+  ]);
+
+  assert.deepEqual(parsed, {
+    issues: [150, 4],
+    dryRun: true,
+    help: false,
+  });
+});
+
+test('parseCheckpointPostArgs validates issue inputs', () => {
+  assert.throws(
+    () => parseCheckpointPostArgs(['--issue']),
+    /Missing or invalid value for --issue/
+  );
+  assert.throws(
+    () => parseCheckpointPostArgs(['--issue', 'abc']),
+    /Missing or invalid value for --issue/
+  );
+});
+
+test('resolveIssues defaults and deduplicates while preserving order', () => {
+  assert.deepEqual(resolveIssues([]), [150, 4]);
+  assert.deepEqual(resolveIssues([150, 4, 150]), [150, 4]);
+});
+
+test('postCheckpointToIssues calls commenter for each issue', () => {
+  const calls = [];
+  const results = postCheckpointToIssues(
+    [150, 4],
+    'checkpoint-body',
+    (issueNumber, body) => {
+      calls.push([issueNumber, body]);
+      return `ok-${issueNumber}`;
+    }
+  );
+
+  assert.deepEqual(calls, [
+    [150, 'checkpoint-body'],
+    [4, 'checkpoint-body'],
+  ]);
+  assert.deepEqual(results, [
+    { issueNumber: 150, output: 'ok-150' },
+    { issueNumber: 4, output: 'ok-4' },
+  ]);
 });
