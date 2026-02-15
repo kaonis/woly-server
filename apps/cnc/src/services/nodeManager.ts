@@ -20,6 +20,7 @@ import type {
 } from '@kaonis/woly-protocol';
 import { NodeModel } from '../models/Node';
 import { HostAggregator } from './hostAggregator';
+import { runtimeMetrics } from './runtimeMetrics';
 import config from '../config';
 import logger from '../utils/logger';
 import { type WsUpgradeAuthContext, matchesStaticToken } from '../websocket/upgradeAuth';
@@ -45,12 +46,11 @@ export class NodeManager extends EventEmitter {
   private pendingUpgradeAuth: WeakMap<WebSocket, WsUpgradeAuthContext> = new WeakMap();
   private messageRateWindows: WeakMap<WebSocket, MessageRateWindow> = new WeakMap();
   private readonly wsMessageRateLimitPerSecond = Math.max(config.wsMessageRateLimitPerSecond, 1);
-  private protocolValidationFailureCounts: Map<string, number> = new Map();
-  private protocolValidationFailureTotal = 0;
 
   constructor(hostAggregator: HostAggregator) {
     super();
     this.hostAggregator = hostAggregator;
+    runtimeMetrics.setConnectedNodeCount(this.connections.size);
     this.startHeartbeatCheck();
   }
 
@@ -125,6 +125,7 @@ export class NodeManager extends EventEmitter {
       if (connection) {
         logger.info('Node disconnected', { nodeId: connection.nodeId });
         this.connections.delete(connection.nodeId);
+        runtimeMetrics.setConnectedNodeCount(this.connections.size);
         
         // Mark node's hosts as unreachable
         try {
@@ -279,6 +280,7 @@ export class NodeManager extends EventEmitter {
         registeredAt: new Date(),
         location: node.location,
       });
+      runtimeMetrics.setConnectedNodeCount(this.connections.size);
 
       const minted = mintWsSessionToken(node.id, {
         issuer: config.wsSessionTokenIssuer,
@@ -319,9 +321,10 @@ export class NodeManager extends EventEmitter {
     total: number;
     byKey: Record<string, number>;
   } {
+    const snapshot = runtimeMetrics.snapshot();
     return {
-      total: this.protocolValidationFailureTotal,
-      byKey: Object.fromEntries(this.protocolValidationFailureCounts.entries()),
+      total: snapshot.protocol.invalidPayloadTotal,
+      byKey: snapshot.protocol.invalidPayloadByKey,
     };
   }
 
@@ -557,9 +560,7 @@ export class NodeManager extends EventEmitter {
     payload: unknown;
     error: unknown;
   }): void {
-    const key = `${params.direction}:${params.messageType}`;
-    this.protocolValidationFailureTotal += 1;
-    this.protocolValidationFailureCounts.set(key, (this.protocolValidationFailureCounts.get(key) || 0) + 1);
+    runtimeMetrics.recordInvalidPayload(params.direction, params.messageType);
 
     const validationIssues =
       params.error instanceof ZodError
@@ -660,6 +661,7 @@ export class NodeManager extends EventEmitter {
     }
 
     this.connections.clear();
+    runtimeMetrics.setConnectedNodeCount(0);
     logger.info('NodeManager shut down');
   }
 }

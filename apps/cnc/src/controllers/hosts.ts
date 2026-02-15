@@ -184,6 +184,7 @@ export class HostsController {
   async wakeupHost(req: Request, res: Response): Promise<void> {
     try {
       const fqn = req.params.fqn as string;
+      const correlationId = req.correlationId ?? null;
       logger.info('Wake-up request received', { fqn });
 
       const idempotencyKeyHeader = req.header('Idempotency-Key');
@@ -192,9 +193,21 @@ export class HostsController {
           ? idempotencyKeyHeader.trim()
           : null;
 
-      const result = await this.commandRouter.routeWakeCommand(fqn, { idempotencyKey });
+      const routeOptions: { idempotencyKey: string | null; correlationId?: string } = {
+        idempotencyKey,
+      };
+      if (correlationId) {
+        routeOptions.correlationId = correlationId;
+      }
 
-      res.json(result);
+      const result = await this.commandRouter.routeWakeCommand(fqn, routeOptions);
+      const responseBody = { ...result } as typeof result & { correlationId?: string };
+      const responseCorrelationId = result.correlationId ?? correlationId ?? undefined;
+      if (responseCorrelationId) {
+        responseBody.correlationId = responseCorrelationId;
+      }
+
+      res.json(responseBody);
     } catch (error: unknown) {
       logger.error('Failed to wake host', { fqn: req.params.fqn, error });
 
@@ -231,10 +244,15 @@ export class HostsController {
           break;
       }
 
-      res.status(statusCode).json({
+      const errorBody: { error: string; message: string; correlationId?: string } = {
         error: errorTitle,
         message: errorMessage,
-      });
+      };
+      if (req.correlationId) {
+        errorBody.correlationId = req.correlationId;
+      }
+
+      res.status(statusCode).json(errorBody);
     }
   }
 
@@ -296,6 +314,7 @@ export class HostsController {
   async updateHost(req: Request, res: Response): Promise<void> {
     try {
       const fqn = req.params.fqn as string;
+      const correlationId = req.correlationId ?? null;
       
       // Validate request body
       const parseResult = updateHostBodySchema.safeParse(req.body);
@@ -317,9 +336,14 @@ export class HostsController {
           ? idempotencyKeyHeader.trim()
           : null;
 
-      const result = await this.commandRouter.routeUpdateHostCommand(fqn, hostData, {
+      const routeOptions: { idempotencyKey: string | null; correlationId?: string } = {
         idempotencyKey,
-      });
+      };
+      if (correlationId) {
+        routeOptions.correlationId = correlationId;
+      }
+
+      const result = await this.commandRouter.routeUpdateHostCommand(fqn, hostData, routeOptions);
 
       if (!result.success) {
         res.status(500).json({
@@ -329,10 +353,16 @@ export class HostsController {
         return;
       }
 
-      res.json({
+      const responseBody: { success: boolean; message: string; correlationId?: string } = {
         success: true,
         message: 'Host updated successfully',
-      });
+      };
+      const responseCorrelationId = result.correlationId ?? correlationId ?? undefined;
+      if (responseCorrelationId) {
+        responseBody.correlationId = responseCorrelationId;
+      }
+
+      res.json(responseBody);
     } catch (error: unknown) {
       logger.error('Failed to update host', { fqn: req.params.fqn, error });
 
@@ -369,10 +399,15 @@ export class HostsController {
           break;
       }
 
-      res.status(statusCode).json({
+      const errorBody: { error: string; message: string; correlationId?: string } = {
         error: errorTitle,
         message: errorMessage,
-      });
+      };
+      if (req.correlationId) {
+        errorBody.correlationId = req.correlationId;
+      }
+
+      res.status(statusCode).json(errorBody);
     }
   }
 
@@ -427,6 +462,7 @@ export class HostsController {
   async deleteHost(req: Request, res: Response): Promise<void> {
     try {
       const fqn = req.params.fqn as string;
+      const correlationId = req.correlationId ?? null;
       logger.info('Delete host request received', { fqn });
 
       const idempotencyKeyHeader = req.header('Idempotency-Key');
@@ -435,7 +471,14 @@ export class HostsController {
           ? idempotencyKeyHeader.trim()
           : null;
 
-      const result = await this.commandRouter.routeDeleteHostCommand(fqn, { idempotencyKey });
+      const routeOptions: { idempotencyKey: string | null; correlationId?: string } = {
+        idempotencyKey,
+      };
+      if (correlationId) {
+        routeOptions.correlationId = correlationId;
+      }
+
+      const result = await this.commandRouter.routeDeleteHostCommand(fqn, routeOptions);
 
       if (!result.success) {
         res.status(500).json({
@@ -445,10 +488,16 @@ export class HostsController {
         return;
       }
 
-      res.json({
+      const responseBody: { success: boolean; message: string; correlationId?: string } = {
         success: true,
         message: 'Host deleted successfully',
-      });
+      };
+      const responseCorrelationId = result.correlationId ?? correlationId ?? undefined;
+      if (responseCorrelationId) {
+        responseBody.correlationId = responseCorrelationId;
+      }
+
+      res.json(responseBody);
     } catch (error: unknown) {
       logger.error('Failed to delete host', { fqn: req.params.fqn, error });
 
@@ -485,10 +534,15 @@ export class HostsController {
           break;
       }
 
-      res.status(statusCode).json({
+      const errorBody: { error: string; message: string; correlationId?: string } = {
         error: errorTitle,
         message: errorMessage,
-      });
+      };
+      if (req.correlationId) {
+        errorBody.correlationId = req.correlationId;
+      }
+
+      res.status(statusCode).json(errorBody);
     }
   }
 

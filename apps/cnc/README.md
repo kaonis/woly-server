@@ -9,6 +9,7 @@
 - **[Architecture Plan](ARCHITECTURE_PLAN.md)** — Phased implementation roadmap
 - **[Implementation Checklist](IMPLEMENTATION_CHECKLIST.md)** — Progress tracking
 - **[Runbooks](docs/runbooks/)** — Operational procedures
+- **[Observability Dashboard/Alerts](docs/observability-dashboard-alerts.md)** — SLO metrics and alert thresholds
 
 ## Architecture
 

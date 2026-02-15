@@ -10,6 +10,7 @@ import db from '../../database/connection';
 import { PROTOCOL_VERSION } from '@kaonis/woly-protocol';
 import config from '../../config';
 import { mintWsSessionToken } from '../../websocket/sessionTokens';
+import { runtimeMetrics } from '../runtimeMetrics';
 
 // Mock WebSocket
 jest.mock('ws');
@@ -26,6 +27,7 @@ describe('NodeManager', () => {
 
   beforeEach(async () => {
     (config as any).wsMessageRateLimitPerSecond = defaultWsMessageRateLimitPerSecond;
+    runtimeMetrics.reset(0);
     hostAggregator = new HostAggregator();
     nodeManager = new NodeManager(hostAggregator);
 
@@ -418,6 +420,7 @@ describe('NodeManager', () => {
       // Verify hosts were marked unreachable
       const hosts = await hostAggregator.getHostsByNode('test-ws-node-3');
       expect(hosts.every(h => h.status === 'asleep')).toBe(true);
+      expect(runtimeMetrics.snapshot().nodes.connected).toBe(0);
     });
   });
 
@@ -501,6 +504,7 @@ describe('NodeManager', () => {
 
       const connectedNodes = nodeManager.getConnectedNodes();
       expect(connectedNodes).toContain('test-ws-node-5');
+      expect(runtimeMetrics.snapshot().nodes.connected).toBe(1);
     });
   });
 

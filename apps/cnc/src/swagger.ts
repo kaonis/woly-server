@@ -186,6 +186,10 @@ const options: swaggerJsdoc.Options = {
               description: 'API version',
               example: '1.0.0',
             },
+            metrics: {
+              type: 'object',
+              description: 'Runtime observability snapshot (nodes, commands, protocol validation)',
+            },
           },
         },
         TokenRequest: {
@@ -258,6 +262,11 @@ const options: swaggerJsdoc.Options = {
               description: 'Unique command identifier',
               example: '123e4567-e89b-12d3-a456-426614174000',
             },
+            correlationId: {
+              type: 'string',
+              description: 'Request correlation identifier for end-to-end tracing',
+              example: 'corr_2a8f6842-6f8f-4e8f-b6dc-f7dbd9a18e68',
+            },
           },
         },
         SystemStats: {
@@ -297,6 +306,10 @@ const options: swaggerJsdoc.Options = {
                   },
                 },
               },
+            },
+            observability: {
+              type: 'object',
+              description: 'Runtime observability snapshot used by dashboards and alerts',
             },
             timestamp: {
               type: 'string',

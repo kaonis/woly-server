@@ -48,6 +48,7 @@ export interface CommandResult {
   success: boolean;
   error?: string;
   timestamp: Date;
+  correlationId?: string;
 }
 
 // API Response Types
@@ -70,6 +71,7 @@ export interface WakeupResponse {
   message: string;
   nodeId: string;
   location: string;
+  correlationId?: string;
 }
 
 export interface CommandRecord {

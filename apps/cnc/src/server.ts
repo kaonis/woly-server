@@ -18,6 +18,7 @@ import { createWebSocketServer } from './websocket/server';
 import { errorHandler } from './middleware/errorHandler';
 import { reconcileCommandsOnStartup, startCommandPruning, stopCommandPruning } from './services/commandReconciler';
 import { specs } from './swagger';
+import { runtimeMetrics } from './services/runtimeMetrics';
 
 function isAllowedCorsOrigin(origin: string, allowedOrigins: string[]): boolean {
   if (allowedOrigins.includes('*')) return true;
@@ -69,6 +70,7 @@ class Server {
     // Request logging
     this.app.use((req, _res, next) => {
       logger.debug('Incoming request', {
+        correlationId: req.correlationId,
         method: req.method,
         path: req.path,
         query: req.query,
@@ -108,6 +110,7 @@ class Server {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         version: '1.0.0',
+        metrics: runtimeMetrics.snapshot(),
       });
     });
 
@@ -166,6 +169,8 @@ class Server {
 
   async start(): Promise<void> {
     try {
+      runtimeMetrics.reset();
+
       // Connect to database
       await db.connect();
       logger.info('Database connected');

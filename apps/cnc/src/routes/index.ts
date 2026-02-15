@@ -10,8 +10,10 @@ import { AuthController } from '../controllers/auth';
 import { NodeManager } from '../services/nodeManager';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
+import { runtimeMetrics } from '../services/runtimeMetrics';
 import { authenticateJwt, authorizeRoles } from '../middleware/auth';
 import { apiLimiter, strictAuthLimiter } from '../middleware/rateLimiter';
+import { assignCorrelationId } from '../middleware/correlationId';
 
 export function createRoutes(
   nodeManager: NodeManager,
@@ -19,10 +21,11 @@ export function createRoutes(
   commandRouter: CommandRouter,
 ): Router {
   const router = Router();
+  router.use(assignCorrelationId);
 
   // Controllers
   const nodesController = new NodesController(nodeManager);
-  const adminController = new AdminController(hostAggregator, nodeManager);
+  const adminController = new AdminController(hostAggregator, nodeManager, commandRouter);
   const hostsController = new HostsController(hostAggregator, commandRouter);
   const authController = new AuthController();
 
@@ -61,6 +64,7 @@ export function createRoutes(
       status: 'healthy',
       timestamp: new Date().toISOString(),
       version: '1.0.0',
+      metrics: runtimeMetrics.snapshot(),
     });
   });
 

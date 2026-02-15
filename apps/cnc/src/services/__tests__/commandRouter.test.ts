@@ -8,6 +8,7 @@ import { HostAggregator } from '../hostAggregator';
 import { NodeModel } from '../../models/Node';
 import db from '../../database/connection';
 import { PROTOCOL_VERSION } from '@kaonis/woly-protocol';
+import { runtimeMetrics } from '../runtimeMetrics';
 
 describe('CommandRouter', () => {
   let commandRouter: CommandRouter;
@@ -19,6 +20,7 @@ describe('CommandRouter', () => {
   });
 
   beforeEach(async () => {
+    runtimeMetrics.reset(0);
     hostAggregator = new HostAggregator();
     nodeManager = new NodeManager(hostAggregator);
     commandRouter = new CommandRouter(nodeManager, hostAggregator);
@@ -197,6 +199,49 @@ describe('CommandRouter', () => {
         success: true,
         timestamp: new Date(),
       });
+    });
+
+    it('attaches correlationId when resolving pending command result', () => {
+      const router = commandRouter as unknown as {
+        pendingCommands: Map<
+          string,
+          {
+            resolvers: Array<{
+              resolve: (value: unknown) => void;
+              reject: (error: Error) => void;
+            }>;
+            timeout: NodeJS.Timeout;
+            correlationId: string | null;
+          }
+        >;
+        handleCommandResult: (result: {
+          commandId: string;
+          success: boolean;
+          timestamp: Date;
+        }) => void;
+      };
+
+      const resolve = jest.fn();
+      const reject = jest.fn();
+      router.pendingCommands.set('cmd-correlation', {
+        resolvers: [{ resolve, reject }],
+        timeout: setTimeout(() => undefined, 10_000),
+        correlationId: 'corr-test-1',
+      });
+
+      router.handleCommandResult({
+        commandId: 'cmd-correlation',
+        success: true,
+        timestamp: new Date(),
+      });
+
+      expect(resolve).toHaveBeenCalledWith(
+        expect.objectContaining({
+          commandId: 'cmd-correlation',
+          correlationId: 'corr-test-1',
+        })
+      );
+      expect(reject).not.toHaveBeenCalled();
     });
   });
 
