@@ -82,3 +82,11 @@ Issue #144 is complete when:
 1. Decision table is documented and linked in roadmap progress.
 2. Execution/defer follow-up issues are in place (#146, #147, #148, #150).
 3. Dependency dashboard comment history references these decisions for auditability.
+
+## 6. Checkpoint Updates
+
+- 2026-02-15 (V15 / issue #210 checkpoint):
+  - Re-checked latest `@typescript-eslint/eslint-plugin` metadata:
+    - version: `8.55.0`
+    - peer `eslint`: `^8.57.0 || ^9.0.0`
+  - Status for ESLint 10 adoption (`#150`): still blocked pending upstream peer compatibility.
