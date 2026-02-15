@@ -32,6 +32,7 @@
     "ci:audit:latest": "node scripts/manual-ci-run-audit-latest.cjs",
     "ci:review:template": "node scripts/manual-ci-review-template.cjs",
     "ci:followup:create": "node scripts/manual-ci-followup-issue.cjs",
+    "ci:closeout:comment": "node scripts/manual-ci-closeout-comment.cjs",
     "ci:policy:check": "node scripts/manual-ci-workflow-policy-check.cjs",
     "protocol:build": "npm run build --workspace=@kaonis/woly-protocol",
     "protocol:publish": "npm run protocol:build && npm publish --workspace=@kaonis/woly-protocol",
