@@ -6,14 +6,14 @@ Scope: New autonomous cycle after V8 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `9ef6dd2` (PR #199).
-- Active execution branch: `docs/198-manual-review-cycle-next`.
+- `master` synced at merge commit `2aea105` (PR #201).
+- Active execution branch: `feat/202-node-agent-coverage-hardening`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #198 `[CI] Schedule weekly manual-only operations review (next cycle)`
 - #200 `[CI] Schedule weekly manual-only operations review (following cycle)`
+- #202 `[Testing][Node-Agent] Coverage hardening for hostDatabase/service edge paths`
 
 ### CI snapshot
 - Repository workflows are in temporary manual-only mode (`workflow_dispatch` only).
@@ -21,7 +21,7 @@ Scope: New autonomous cycle after V8 closeout.
 - Manual workflow jobs are capped to `timeout-minutes: 8`.
 - Local manual-only run audit command is available: `npm run ci:audit:manual`.
 - Local workflow policy guard command is available: `npm run ci:policy:check` (PR #193).
-- Latest manual CI run succeeded: `22039380055` (PR #199, 2026-02-15).
+- Latest manual CI run succeeded: `22039426360` (PR #201, 2026-02-15).
 - Latest manual ESLint10 watchdog run succeeded: `22037969724` (2026-02-15).
 - Latest manual-only audit passed: `npm run ci:audit:manual -- --since 2026-02-15T16:46:26Z --fail-on-unexpected` (`2026-02-15T16:50:29Z`).
 - Latest ESLint10 compatibility checkpoint remains blocked (`npm run deps:check-eslint10`, 2026-02-15).
@@ -118,6 +118,21 @@ Acceptance criteria:
 
 Status: `Completed` (2026-02-15, queued follow-up issue #200)
 
+### Phase 9: Node-agent coverage hardening tranche
+Issue: #202
+Labels: `priority:medium`, `testing`, `node-agent`
+
+Acceptance criteria:
+- Add focused unit coverage for low-covered node-agent service/database edge paths (prioritizing `hostDatabase.ts`).
+- Keep local monorepo quality gates green:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test:ci`
+  - `npm run build`
+- Maintain node-agent coverage above threshold and record latest snapshot.
+
+Status: `In Progress` (2026-02-15)
+
 ## 3. Execution Loop Rules
 
 For each phase:
@@ -155,3 +170,6 @@ For each phase:
 - 2026-02-15: Merged issue #194 via PR #199 after manual CI run `22039380055` passed.
 - 2026-02-15: Ran scoped manual-only workflow audit for issue #198: `npm run ci:audit:manual -- --since 2026-02-15T16:46:26Z --fail-on-unexpected` (PASS).
 - 2026-02-15: Created follow-up issue #200 to queue the next weekly manual-only review cycle.
+- 2026-02-15: Merged issue #198 via PR #201 after manual CI run `22039426360` passed.
+- 2026-02-15: Created issue #202 and started branch `feat/202-node-agent-coverage-hardening`.
+- 2026-02-15: Expanded `hostDatabase` unit coverage for node-agent edge/error branches; latest node-agent snapshot `86.93%` statements (`hostDatabase.ts` `91.26%` statements).

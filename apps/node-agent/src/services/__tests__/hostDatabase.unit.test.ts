@@ -672,5 +672,133 @@ describe('HostDatabase', () => {
 
       await expect(testDb.close()).resolves.not.toThrow();
     });
+
+    it('should warn when pingResponsive migration fails for a non-duplicate-column reason', () => {
+      const execSpy = jest.spyOn((db as any).db, 'exec').mockImplementation((...args: unknown[]) => {
+        const sql = args[0] as string;
+        if (sql.includes('ALTER TABLE hosts ADD COLUMN pingResponsive integer')) {
+          throw new Error('permission denied');
+        }
+      });
+
+      db.createTable();
+
+      expect(logger.warn).toHaveBeenCalledWith('Could not add pingResponsive column:', {
+        error: 'permission denied',
+      });
+      execSpy.mockRestore();
+    });
+
+    it('should log and rethrow getAllHosts failures', async () => {
+      const prepareSpy = jest
+        .spyOn((db as any).db, 'prepare')
+        .mockImplementation(() => {
+          throw new Error('select failed');
+        });
+
+      await expect(db.getAllHosts()).rejects.toThrow('select failed');
+      expect(logger.error).toHaveBeenCalledWith('Failed to get all hosts:', { error: 'select failed' });
+      prepareSpy.mockRestore();
+    });
+
+    it('should log and rethrow getHost failures', async () => {
+      const prepareSpy = jest
+        .spyOn((db as any).db, 'prepare')
+        .mockImplementation(() => {
+          throw new Error('get failed');
+        });
+
+      await expect(db.getHost('BrokenHost')).rejects.toThrow('get failed');
+      expect(logger.error).toHaveBeenCalledWith('Failed to get host BrokenHost:', {
+        error: 'get failed',
+      });
+      prepareSpy.mockRestore();
+    });
+
+    it('should log and rethrow getHostByMAC failures', async () => {
+      const prepareSpy = jest
+        .spyOn((db as any).db, 'prepare')
+        .mockImplementation(() => {
+          throw new Error('get by mac failed');
+        });
+
+      await expect(db.getHostByMAC('aa-bb-cc-dd-ee-ff')).rejects.toThrow('get by mac failed');
+      expect(logger.error).toHaveBeenCalledWith('Failed to get host by MAC aa-bb-cc-dd-ee-ff:', {
+        error: 'get by mac failed',
+      });
+      prepareSpy.mockRestore();
+    });
+
+    it('should reject when updateHostSeen query execution throws', async () => {
+      const prepareSpy = jest
+        .spyOn((db as any).db, 'prepare')
+        .mockImplementation(() => {
+          throw new Error('update seen failed');
+        });
+
+      await expect(db.updateHostSeen('AA:BB:CC:DD:EE:FE', 'awake')).rejects.toThrow('update seen failed');
+      prepareSpy.mockRestore();
+    });
+
+    it('should short-circuit updateHost when no fields are provided', async () => {
+      const prepareSpy = jest.spyOn((db as any).db, 'prepare');
+
+      await expect(db.updateHost('AnyHost', {})).resolves.toBeUndefined();
+      expect(prepareSpy).not.toHaveBeenCalled();
+      prepareSpy.mockRestore();
+    });
+
+    it('should normalize MAC in updateHost payloads', async () => {
+      await db.addHost('MacUpdateHost', 'AA:BB:CC:DD:EE:99', '192.168.1.99');
+
+      await expect(
+        db.updateHost('MacUpdateHost', {
+          mac: 'aa-bb-cc-dd-ee-aa',
+        })
+      ).resolves.toBeUndefined();
+
+      const updated = await db.getHost('MacUpdateHost');
+      expect(updated?.mac).toBe('AA:BB:CC:DD:EE:AA');
+    });
+
+    it('should reject when deleting a missing host', async () => {
+      await expect(db.deleteHost('MissingDeleteHost')).rejects.toThrow('Host MissingDeleteHost not found');
+    });
+
+    it('should reject when delete query throws', async () => {
+      const prepareSpy = jest
+        .spyOn((db as any).db, 'prepare')
+        .mockImplementation(() => {
+          throw new Error('delete failed');
+        });
+
+      await expect(db.deleteHost('AnyHost')).rejects.toThrow('delete failed');
+      prepareSpy.mockRestore();
+    });
+
+    it('should reject when status update query throws', async () => {
+      const prepareSpy = jest
+        .spyOn((db as any).db, 'prepare')
+        .mockImplementation(() => {
+          throw new Error('status failed');
+        });
+
+      await expect(db.updateHostStatus('AnyHost', 'awake')).rejects.toThrow('status failed');
+      prepareSpy.mockRestore();
+    });
+
+    it('should log and rethrow close failures', async () => {
+      const closeSpy = jest
+        .spyOn((db as any).db, 'close')
+        .mockImplementation(() => {
+          throw new Error('close failed');
+        });
+
+      await expect(db.close()).rejects.toThrow('close failed');
+      expect(logger.error).toHaveBeenCalledWith('Failed to close database connection:', {
+        error: 'close failed',
+      });
+      closeSpy.mockRestore();
+    });
   });
 });
