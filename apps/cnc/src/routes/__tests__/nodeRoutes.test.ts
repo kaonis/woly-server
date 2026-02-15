@@ -353,5 +353,13 @@ describe('Node Routes Authentication', () => {
       expect(response.body).toHaveProperty('status', 'healthy');
       expect(response.body).toHaveProperty('version', CNC_VERSION);
     });
+
+    it('allows access to /api/metrics without authentication', async () => {
+      const response = await request(app).get('/api/metrics');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toContain('text/plain');
+      expect(response.text).toContain('woly_cnc_nodes_connected');
+    });
   });
 });

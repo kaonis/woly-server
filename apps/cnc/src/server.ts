@@ -20,6 +20,7 @@ import { reconcileCommandsOnStartup, startCommandPruning, stopCommandPruning } f
 import { specs } from './swagger';
 import { runtimeMetrics } from './services/runtimeMetrics';
 import { CNC_VERSION } from './utils/cncVersion';
+import { prometheusContentType, renderPrometheusMetrics } from './services/promMetrics';
 
 function isAllowedCorsOrigin(origin: string, allowedOrigins: string[]): boolean {
   if (allowedOrigins.includes('*')) return true;
@@ -113,6 +114,12 @@ class Server {
         version: CNC_VERSION,
         metrics: runtimeMetrics.snapshot(),
       });
+    });
+
+    this.app.get('/metrics', async (_req, res) => {
+      const metrics = await renderPrometheusMetrics(runtimeMetrics.snapshot());
+      res.setHeader('Content-Type', prometheusContentType());
+      res.status(200).send(metrics);
     });
 
     /**

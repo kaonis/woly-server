@@ -15,6 +15,7 @@ import { authenticateJwt, authorizeRoles } from '../middleware/auth';
 import { apiLimiter, strictAuthLimiter } from '../middleware/rateLimiter';
 import { assignCorrelationId } from '../middleware/correlationId';
 import { CNC_VERSION } from '../utils/cncVersion';
+import { prometheusContentType, renderPrometheusMetrics } from '../services/promMetrics';
 
 export function createRoutes(
   nodeManager: NodeManager,
@@ -67,6 +68,12 @@ export function createRoutes(
       version: CNC_VERSION,
       metrics: runtimeMetrics.snapshot(),
     });
+  });
+
+  router.get('/metrics', async (_req, res) => {
+    const metrics = await renderPrometheusMetrics(runtimeMetrics.snapshot());
+    res.setHeader('Content-Type', prometheusContentType());
+    res.status(200).send(metrics);
   });
 
   return router;
