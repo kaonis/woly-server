@@ -95,6 +95,16 @@ npm run ci:closeout:comment -- --issue <current-review-issue-number> --followup 
 npm run ci:closeout:comment -- --issue <current-review-issue-number> --followup <next-review-issue-number> --cycle "post-merge cycle (#x to #y)" --roadmap docs/ROADMAP_VXX_AUTONOMOUS_CYCLE.md --deps-payload <checkpoint-iso> --post
 ```
 
+Run the common rolling-cycle sequence with one command:
+
+```bash
+# Preview planned commands only
+npm run ci:cycle:run -- --after <current-review-issue-number> --dry-run
+
+# Execute audit + follow-up issue creation + dependency checkpoint posting
+npm run ci:cycle:run -- --after <current-review-issue-number>
+```
+
 ## Rollback Criteria (Re-enable Automatic Runs)
 
 Re-enable automatic CI only when all of the following are true:
