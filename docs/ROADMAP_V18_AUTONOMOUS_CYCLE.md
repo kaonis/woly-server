@@ -60,3 +60,5 @@ V18 is complete when all four issues (`#237`, `#236`, `#150`, `#4`) are resolved
   - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
 - 2026-02-15: Added CI review log entry for this cycle and created follow-up review issue `#238`.
 - 2026-02-15: Dependency checkpoint status unchanged for `#150` (blocked pending upstream ESLint 10 peer support in `@typescript-eslint`).
+- 2026-02-15: Updated dependency dashboard issue `#4` with latest blocker/audit checkpoint summary.
+- 2026-02-15: Refreshed `#150` watchdog checkpoint (`npm run deps:check-eslint10` at `2026-02-15T21:49:51Z`), still blocked with unchanged peer range.
