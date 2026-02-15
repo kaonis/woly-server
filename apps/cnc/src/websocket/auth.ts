@@ -1,5 +1,4 @@
 import { IncomingMessage } from 'http';
-import { parse } from 'url';
 
 export interface WebSocketAuthOptions {
   allowQueryTokenAuth: boolean;
@@ -52,9 +51,17 @@ export function extractAuthTokenFromSubprotocol(request: IncomingMessage): strin
 }
 
 export function extractAuthTokenFromQuery(request: IncomingMessage): string | null {
-  const { query } = parse(request.url || '', true);
-  const token = query.token;
-  return typeof token === 'string' && token.length > 0 ? token : null;
+  if (!request.url) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(request.url, 'http://localhost');
+    const token = parsed.searchParams.get('token');
+    return typeof token === 'string' && token.length > 0 ? token : null;
+  } catch {
+    return null;
+  }
 }
 
 export function extractNodeAuthToken(

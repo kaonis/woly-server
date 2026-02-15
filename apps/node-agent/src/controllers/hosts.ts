@@ -295,7 +295,16 @@ const scanNetwork = async (_req: Request, res: Response): Promise<void> => {
     return;
   }
   logger.info('Manual network scan requested');
-  await scanOrchestrator.syncWithNetwork();
+  const scanResult = await scanOrchestrator.syncWithNetwork();
+  if (!scanResult.success) {
+    const statusCode = scanResult.code === 'SCAN_IN_PROGRESS' ? 409 : 500;
+    const error = scanResult.code === 'SCAN_IN_PROGRESS' ? 'Conflict' : 'Internal Server Error';
+    res.status(statusCode).json({
+      error,
+      message: scanResult.error,
+    });
+    return;
+  }
 
   const hosts = await hostDb.getAllHosts();
   res.status(200).json({

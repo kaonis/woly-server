@@ -222,7 +222,9 @@ export class HostsController {
       
       if (error instanceof Error) {
         errorMessage = error.message;
-        if (error.message.includes('not found')) {
+        if (error.message.includes('Invalid FQN')) {
+          statusCode = 400;
+        } else if (error.message.includes('not found')) {
           statusCode = 404;
         } else if (error.message.includes('offline')) {
           statusCode = 503;
@@ -234,6 +236,9 @@ export class HostsController {
       // Map status code to appropriate error title
       let errorTitle: string;
       switch (statusCode) {
+        case 400:
+          errorTitle = 'Bad Request';
+          break;
         case 404:
           errorTitle = 'Not Found';
           break;
@@ -377,7 +382,9 @@ export class HostsController {
       
       if (error instanceof Error) {
         errorMessage = error.message;
-        if (error.message.includes('not found')) {
+        if (error.message.includes('Invalid FQN')) {
+          statusCode = 400;
+        } else if (error.message.includes('not found')) {
           statusCode = 404;
         } else if (error.message.includes('offline')) {
           statusCode = 503;
@@ -389,6 +396,9 @@ export class HostsController {
       // Map status code to appropriate error title
       let errorTitle: string;
       switch (statusCode) {
+        case 400:
+          errorTitle = 'Bad Request';
+          break;
         case 404:
           errorTitle = 'Not Found';
           break;
@@ -512,7 +522,9 @@ export class HostsController {
       
       if (error instanceof Error) {
         errorMessage = error.message;
-        if (error.message.includes('not found')) {
+        if (error.message.includes('Invalid FQN')) {
+          statusCode = 400;
+        } else if (error.message.includes('not found')) {
           statusCode = 404;
         } else if (error.message.includes('offline')) {
           statusCode = 503;
@@ -524,6 +536,9 @@ export class HostsController {
       // Map status code to appropriate error title
       let errorTitle: string;
       switch (statusCode) {
+        case 400:
+          errorTitle = 'Bad Request';
+          break;
         case 404:
           errorTitle = 'Not Found';
           break;

@@ -34,7 +34,7 @@ export function createRoutes(
 
   // Route group protection
   router.use('/nodes', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
-  router.use('/hosts', authenticateJwt, authorizeRoles('operator', 'admin'));
+  router.use('/hosts', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/admin', apiLimiter, authenticateJwt, authorizeRoles('admin'));
 
   // Node API routes (protected)
@@ -44,7 +44,7 @@ export function createRoutes(
 
   // Host API routes
   // IMPORTANT: mac-vendor must be registered before the :fqn catch-all
-  router.get('/hosts/mac-vendor/:mac', apiLimiter, (req, res) =>
+  router.get('/hosts/mac-vendor/:mac', (req, res) =>
     hostsController.getMacVendor(req, res),
   );
   router.get('/hosts', (req, res) => hostsController.getHosts(req, res));

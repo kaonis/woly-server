@@ -245,6 +245,19 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     expect(runtimeTelemetryMock.recordReconnectFailed).toHaveBeenCalledTimes(1);
   });
 
+  it('does not schedule reconnect after intentional disconnect', async () => {
+    await client.connect();
+
+    const onReconnectDisabled = jest.fn();
+    client.on('reconnect-disabled', onReconnectDisabled);
+
+    client.disconnect();
+
+    expect(onReconnectDisabled).toHaveBeenCalledTimes(1);
+    expect(runtimeTelemetryMock.recordReconnectScheduled).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
   it('rejects malformed inbound command payloads with structured validation logs', async () => {
     await client.connect();
 

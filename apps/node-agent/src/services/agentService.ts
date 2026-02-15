@@ -867,7 +867,10 @@ export class AgentService extends EventEmitter {
       }
 
       if (immediate) {
-        await this.scanOrchestrator.syncWithNetwork();
+        const scanResult = await this.scanOrchestrator.syncWithNetwork();
+        if (!scanResult.success) {
+          throw new Error(scanResult.error);
+        }
         const hosts = await this.hostDb.getAllHosts();
 
         logger.info('Scan command completed', { commandId, hostCount: hosts.length });
@@ -880,10 +883,13 @@ export class AgentService extends EventEmitter {
 
       const scanOrchestrator = this.scanOrchestrator;
       setTimeout(() => {
-        scanOrchestrator.syncWithNetwork().catch((backgroundError: unknown) => {
-          const message =
-            backgroundError instanceof Error ? backgroundError.message : 'Unknown error';
-          logger.error('Background scan command failed', { commandId, error: message });
+        void scanOrchestrator.syncWithNetwork().then((scanResult) => {
+          if (!scanResult.success && scanResult.code !== 'SCAN_IN_PROGRESS') {
+            logger.error('Background scan command failed', {
+              commandId,
+              error: scanResult.error,
+            });
+          }
         });
       }, 0);
 

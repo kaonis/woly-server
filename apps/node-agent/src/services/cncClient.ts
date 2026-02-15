@@ -84,6 +84,9 @@ export class CncClient extends EventEmitter {
    */
   public disconnect(): void {
     logger.info('Disconnecting from C&C backend');
+    // Explicit disconnect is operator intent, so do not auto-reconnect on ensuing close event.
+    this.shouldReconnect = false;
+    this.isConnecting = false;
 
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);

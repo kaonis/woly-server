@@ -255,7 +255,14 @@ describe('hosts controller', () => {
           discovered: 1,
         },
       ];
-      mockScanOrchestrator.syncWithNetwork.mockResolvedValue(undefined);
+      mockScanOrchestrator.syncWithNetwork.mockResolvedValue({
+        success: true,
+        discoveredHosts: 1,
+        updatedHosts: 1,
+        newHosts: 0,
+        awakeHosts: 1,
+        hostCount: 1,
+      });
       mockDb.getAllHosts.mockResolvedValue(mockHosts as any);
 
       await hostsController.scanNetwork(mockReq as Request, mockRes as Response);
@@ -270,13 +277,36 @@ describe('hosts controller', () => {
       });
     });
 
-    it('should handle network scan errors', async () => {
-      mockScanOrchestrator.syncWithNetwork.mockRejectedValue(new Error('Network error'));
+    it('should return 500 when network scan fails', async () => {
+      mockScanOrchestrator.syncWithNetwork.mockResolvedValue({
+        success: false,
+        code: 'SCAN_FAILED',
+        error: 'Network error',
+      });
 
-      // Controller now throws errors for Express error handler to catch
-      await expect(
-        hostsController.scanNetwork(mockReq as Request, mockRes as Response)
-      ).rejects.toThrow('Network error');
+      await hostsController.scanNetwork(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(500);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Internal Server Error',
+        message: 'Network error',
+      });
+    });
+
+    it('should return 409 when network scan is already in progress', async () => {
+      mockScanOrchestrator.syncWithNetwork.mockResolvedValue({
+        success: false,
+        code: 'SCAN_IN_PROGRESS',
+        error: 'Scan already in progress',
+      });
+
+      await hostsController.scanNetwork(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(409);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: 'Conflict',
+        message: 'Scan already in progress',
+      });
     });
   });
 

@@ -55,10 +55,14 @@ describe('ScanOrchestrator', () => {
     expect(scanOrchestrator.isScanInProgress()).toBe(true);
 
     resolveScan?.([]);
-    await scanPromise;
+    const result = await scanPromise;
 
     expect(scanOrchestrator.isScanInProgress()).toBe(false);
     expect(scanOrchestrator.getLastScanTime()).not.toBeNull();
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.discoveredHosts).toBe(0);
+    }
   });
 
   it('skips concurrent scans', async () => {
@@ -71,12 +75,16 @@ describe('ScanOrchestrator', () => {
     );
 
     const firstScan = scanOrchestrator.syncWithNetwork();
-    await scanOrchestrator.syncWithNetwork();
+    const secondResult = await scanOrchestrator.syncWithNetwork();
     resolveScan?.([]);
     await firstScan;
 
     expect(networkDiscovery.scanNetworkARP).toHaveBeenCalledTimes(1);
     expect(logger.info).toHaveBeenCalledWith('Scan already in progress, skipping...');
+    expect(secondResult.success).toBe(false);
+    if (!secondResult.success) {
+      expect(secondResult.code).toBe('SCAN_IN_PROGRESS');
+    }
   });
 
   it('runs and cancels periodic scans', () => {
@@ -91,5 +99,17 @@ describe('ScanOrchestrator', () => {
     jest.advanceTimersByTime(20000);
     expect(networkDiscovery.scanNetworkARP).toHaveBeenCalledTimes(1);
     jest.useRealTimers();
+  });
+
+  it('returns failed scan result when discovery throws', async () => {
+    (networkDiscovery.scanNetworkARP as jest.Mock).mockRejectedValue(new Error('arp failed'));
+
+    const result = await scanOrchestrator.syncWithNetwork();
+
+    expect(result).toEqual({
+      success: false,
+      error: 'arp failed',
+      code: 'SCAN_FAILED',
+    });
   });
 });
