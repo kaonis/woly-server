@@ -41,7 +41,7 @@ Assessment:
 
 ## Phase B: Observability
 
-- [ ] **B1** Add Prometheus metrics endpoint(s) and wire runtime metrics to counters/gauges/histograms.  
+- [x] **B1** Add Prometheus metrics endpoint(s) and wire runtime metrics to counters/gauges/histograms.  
   Issue: `#215` https://github.com/kaonis/woly-server/issues/215
 
 ## Phase C: Product Capability
@@ -77,3 +77,4 @@ V11 is complete when all A/B/C/D items are merged and validated by green gates (
 - 2026-02-15: Created V11 roadmap and linked issues `#213` to `#219`.
 - 2026-02-15: Completed and merged **A1** (`#213`) after full gate pass (`lint`, `typecheck`, `test:ci`, `build`).
 - 2026-02-15: Completed **A2** (`#214`) by reconciling `IMPROVEMENTS.md` and `.github/IMPROVEMENT_TRACKING.md` with actual issue/code status.
+- 2026-02-15: Completed **B1** (`#215`) by adding Prometheus metrics endpoints (`/metrics`, `/api/metrics`) and runtime metric export mapping in C&C.
