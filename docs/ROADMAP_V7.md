@@ -6,13 +6,13 @@ Scope: New autonomous cycle after V6 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `fab2643` (PR #169).
-- Active execution branch: `docs/170-roadmap-v7-sync`.
+- `master` synced at merge commit `91f3624` (PR #171).
+- Active execution branch: `feat/172-eslint10-watchdog-script`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #170 `[Roadmap] Sync ROADMAP_V7 after #167 merge`
+- #172 `[Dependencies] Extract ESLint 10 watchdog check into reusable repo script`
 
 ### CI snapshot
 - Repository workflows are in temporary manual-only mode (`workflow_dispatch` only).
@@ -58,6 +58,17 @@ Acceptance criteria:
 
 Status: `Completed` (2026-02-15, PR #169)
 
+### Phase 4: ESLint 10 watchdog script extraction
+Issue: #172  
+Labels: `priority:low`, `technical-debt`, `developer-experience`, `testing`
+
+Acceptance criteria:
+- Extract compatibility check logic into a reusable repository script.
+- Add local command for manual compatibility checks.
+- Update watchdog workflow to use the reusable script while keeping sticky comment behavior.
+
+Status: `In Progress` (2026-02-15)
+
 ## 3. Execution Loop Rules
 
 For each phase:
@@ -82,3 +93,5 @@ For each phase:
 - 2026-02-15: Started issue #167 on branch `docs/167-ci-review-cadence` to add weekly manual-only CI review process and decision log.
 - 2026-02-15: Merged issue #167 via PR #169, adding weekly review cadence, ownership, objective exit criteria, and `docs/CI_MANUAL_REVIEW_LOG.md`.
 - 2026-02-15: Started issue #170 to sync ROADMAP_V7 after #167 merge and refresh open-issue snapshot.
+- 2026-02-15: Merged issue #170 via PR #171, syncing ROADMAP_V7 to completed Phase 3 state and current open issue set.
+- 2026-02-15: Added issue #172 and started Phase 4 on branch `feat/172-eslint10-watchdog-script`.

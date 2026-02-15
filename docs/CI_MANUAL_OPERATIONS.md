@@ -37,6 +37,12 @@ gh workflow run eslint10-compat-watchdog.yml --ref master
 gh workflow run publish-protocol.yml --ref master -f dry-run=true
 ```
 
+Run watchdog check locally without dispatching workflow:
+
+```bash
+npm run deps:check-eslint10
+```
+
 Monitor manual runs:
 
 ```bash
