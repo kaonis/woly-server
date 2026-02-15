@@ -442,7 +442,7 @@ New features to improve functionality.
 
 | Priority | MEDIUM |
 |----------|--------|
-| **Status** | Not Implemented |
+| **Status** | Partial (`#215`) |
 
 **Problem:** No metrics export for monitoring systems.
 
@@ -466,6 +466,9 @@ New features to improve functionality.
 
 **Tracking Issue:**
 - https://github.com/kaonis/woly-server/issues/215
+
+**Notes:**
+- C&C now exposes Prometheus metrics endpoints (`/metrics`, `/api/metrics`) with runtime command/node/protocol gauges.
 
 ---
 
