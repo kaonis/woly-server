@@ -52,3 +52,12 @@ For each issue:
 ## 6. Exit Criteria
 
 V16 is complete when all four issues (`#231`, `#232`, `#230`, `#150`) are resolved (merged or explicitly updated/closed with documented blocker state) and related docs/scripts are updated.
+
+## 7. Progress Updates
+
+- 2026-02-15: Completed `#231` by disabling Watchman integration for non-watch Jest scripts across workspaces.
+- 2026-02-15: Completed `#232` by enabling quiet dotenv loading in test mode for C&C and node-agent config modules.
+- 2026-02-15: Completed scoped manual-only policy audit for `#230`:
+  - `npm run ci:audit:manual -- --since 2026-02-15T21:31:02Z --fail-on-unexpected` (PASS; 0 runs).
+- 2026-02-15: Added CI review log entry for this cycle and created follow-up review issue `#233`.
+- 2026-02-15: Dependency checkpoint status remains unchanged for `#150` (blocked pending `@typescript-eslint` peer support for ESLint 10).
