@@ -89,6 +89,7 @@ npm run build -w packages/protocol
 | `npm run test` | Run all tests |
 | `npm run test:ci` | CI mode with coverage |
 | `npm run test:e2e:smoke` | Run cross-service C&C <-> node-agent E2E smoke suite |
+| `npm run validate:standard` | Run standard repo validation gate (`lint`, `typecheck`, `test:ci`, `build`, smoke) |
 | `npm run typecheck` | Type-check all workspaces |
 | `npm run lint` | Lint all workspaces |
 | `npm run dev:node-agent` | Start node agent in dev mode |
@@ -187,11 +188,11 @@ Automatic runs on `push`/`pull_request` are disabled.
 Current validation flow:
 
 1. Protocol compatibility gate (schema tests, cross-repo contracts, app protocol contracts, C&C schema gate)
-2. Build, lint, typecheck, and test all workspaces via Turborepo (via local gate and optional manual workflow dispatch)
+2. Standard validation gate via `npm run validate:standard` (`lint`, `typecheck`, `test:ci`, `build`, cross-service smoke)
 3. Upload coverage reports as artifacts when `ci.yml` is manually dispatched
 
 Required local gate before PR merge:
-- `npx turbo run lint typecheck test:ci build`
+- `npm run validate:standard`
 
 Manual operations and rollback criteria are documented in:
 - [docs/CI_MANUAL_OPERATIONS.md](docs/CI_MANUAL_OPERATIONS.md)

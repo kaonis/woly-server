@@ -14,14 +14,18 @@ Actions workflows are manual-only.
 
 ## Required Local Gate Before PR
 
-Run all commands from repo root and require exit code 0 for each:
+Run the standard validation gate from repo root and require exit code 0:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run test:ci
-npm run build
+npm run validate:standard
 ```
+
+The gate includes:
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test:ci`
+- `npm run build`
+- `npm run test:e2e:smoke`
 
 ## Manual Workflow Dispatch
 
@@ -91,10 +95,7 @@ Weekly checklist:
    - count manually dispatched runs since last review
    - `npm run ci:policy:check`
 3. Confirm local validation gate remains standard before merge:
-   - `npm run lint`
-   - `npm run typecheck`
-   - `npm run test:ci`
-   - `npm run build`
+   - `npm run validate:standard`
 4. Record decision in the review log:
    - `Continue manual-only` or `Start rollback`
 
