@@ -6,13 +6,13 @@ Scope: New autonomous cycle after V6 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `037a24c` (PR #173).
-- Active execution branch: `feat/174-watchdog-validation`.
+- `master` synced at merge commit `164659f` (PR #175).
+- Active execution branch: `feat/176-renovate-eslint-suppress`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #174 `[Dependencies] Validate ESLint10 watchdog workflow after script extraction`
+- #176 `[Dependencies] Temporarily suppress Renovate ESLint 10 major updates while blocked`
 
 ### CI snapshot
 - Repository workflows are in temporary manual-only mode (`workflow_dispatch` only).
@@ -79,6 +79,17 @@ Acceptance criteria:
 - Confirm workflow success and sticky comment update on issue #150.
 - Record validation evidence in roadmap/dependency tracking.
 
+Status: `Completed` (2026-02-15, PR #175)
+
+### Phase 6: Renovate ESLint major suppression while blocked
+Issue: #176  
+Labels: `priority:low`, `technical-debt`, `developer-experience`, `testing`
+
+Acceptance criteria:
+- Suppress Renovate major updates for `eslint` and `@eslint/js` while #150 is blocked.
+- Keep all non-ESLint-major dependency updates unaffected.
+- Document temporary rationale and traceability in config + roadmap.
+
 Status: `In Progress` (2026-02-15)
 
 ## 3. Execution Loop Rules
@@ -109,3 +120,5 @@ For each phase:
 - 2026-02-15: Added issue #172 and started Phase 4 on branch `feat/172-eslint10-watchdog-script`.
 - 2026-02-15: Merged issue #172 via PR #173, extracting watchdog logic into `scripts/eslint10-compat-watchdog.cjs`, adding `npm run deps:check-eslint10`, and wiring workflow reuse.
 - 2026-02-15: Added issue #174, manually dispatched watchdog workflow run `22037969724`, and validated success with sticky issue #150 comment refresh at `2026-02-15T15:11:45Z`.
+- 2026-02-15: Merged issue #174 via PR #175 and logged successful post-extraction watchdog validation evidence on master.
+- 2026-02-15: Added issue #176 and started Phase 6 on branch `feat/176-renovate-eslint-suppress`.
