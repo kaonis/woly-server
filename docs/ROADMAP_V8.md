@@ -6,13 +6,12 @@ Scope: New autonomous cycle after V7 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `38daddf` (PR #186).
-- Active execution branch: `docs/187-roadmap-v9-bootstrap`.
+- `master` synced at merge commit `70ccae6` (PR #189).
+- Active execution branch: `docs/188-manual-ci-review-cycle`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #187 `[Roadmap] Close V8 and bootstrap ROADMAP_V9`
 - #188 `[CI] Run next weekly manual-only operations review log update`
 
 ### CI snapshot
@@ -94,7 +93,7 @@ Acceptance criteria:
 - Refresh V8 status audit and open issue snapshot.
 - Create `docs/ROADMAP_V9.md` with carry-forward phases and issue links.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #189)
 
 ## 3. Execution Loop Rules
 
@@ -127,3 +126,4 @@ For each phase:
 - 2026-02-15: Merged issue #185 via PR #186 and published `ci:audit:manual` for weekly manual-only run audits.
 - 2026-02-15: Created issue #187 and started branch `docs/187-roadmap-v9-bootstrap` to close V8 and bootstrap V9.
 - 2026-02-15: Created issue #188 for the next weekly manual-only operations review cycle.
+- 2026-02-15: Merged issue #187 via PR #189 and completed V8 closeout with ROADMAP_V9 bootstrap.
