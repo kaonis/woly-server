@@ -9,6 +9,7 @@ import { NodeManager } from '../../services/nodeManager';
 import { HostAggregator } from '../../services/hostAggregator';
 import { CommandRouter } from '../../services/commandRouter';
 import { createToken } from './testUtils';
+import { CNC_VERSION } from '../../utils/cncVersion';
 
 // Mock config before importing middleware
 jest.mock('../../config', () => ({
@@ -350,6 +351,7 @@ describe('Node Routes Authentication', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('status', 'healthy');
+      expect(response.body).toHaveProperty('version', CNC_VERSION);
     });
   });
 });

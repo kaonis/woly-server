@@ -19,6 +19,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { reconcileCommandsOnStartup, startCommandPruning, stopCommandPruning } from './services/commandReconciler';
 import { specs } from './swagger';
 import { runtimeMetrics } from './services/runtimeMetrics';
+import { CNC_VERSION } from './utils/cncVersion';
 
 function isAllowedCorsOrigin(origin: string, allowedOrigins: string[]): boolean {
   if (allowedOrigins.includes('*')) return true;
@@ -109,7 +110,7 @@ class Server {
       res.json({
         status: 'healthy',
         timestamp: new Date().toISOString(),
-        version: '1.0.0',
+        version: CNC_VERSION,
         metrics: runtimeMetrics.snapshot(),
       });
     });
@@ -142,7 +143,7 @@ class Server {
     this.app.get('/', (_req, res) => {
       res.json({
         name: 'WoLy C&C Backend',
-        version: '1.0.0',
+        version: CNC_VERSION,
         status: 'running',
       });
     });
