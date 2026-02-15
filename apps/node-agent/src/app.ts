@@ -11,6 +11,7 @@ import HostDatabase from './services/hostDatabase';
 import * as hostsController from './controllers/hosts';
 import hosts from './routes/hosts';
 import { agentService } from './services/agentService';
+import { evaluateCorsOrigin } from './utils/corsOrigin';
 
 const app = express();
 
@@ -19,40 +20,27 @@ app.use(helmet());
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl)
-      if (!origin) return callback(null, true);
+      const decision = evaluateCorsOrigin(origin, config.cors.origins);
 
-      // Check if origin is in allowed list
-      if (config.cors.origins.includes(origin)) {
-        logger.debug(`CORS: Allowed origin from config: ${origin}`);
-        return callback(null, true);
-      }
-
-      // Allow all ngrok URLs
-      if (origin.match(/^https:\/\/[a-z0-9-]+\.ngrok-free\.app$/i)) {
-        logger.debug(`CORS: Allowed ngrok origin: ${origin}`);
-        return callback(null, true);
-      }
-
-      // Allow all Netlify URLs
-      if (origin.match(/^https:\/\/[a-z0-9-]+\.netlify\.app$/i)) {
-        logger.debug(`CORS: Allowed Netlify origin: ${origin}`);
-        return callback(null, true);
-      }
-
-      // Allow helios.kaonis.com with any protocol
-      if (origin.match(/^https?:\/\/(.*\.)?helios\.kaonis\.com$/i)) {
-        logger.debug(`CORS: Allowed helios.kaonis.com origin: ${origin}`);
+      if (decision !== 'rejected') {
+        if (decision === 'no-origin') {
+          logger.debug('CORS: Allowed request with no origin header');
+        } else if (decision === 'config') {
+          logger.debug(`CORS: Allowed origin from config: ${origin}`);
+        } else if (decision === 'ngrok') {
+          logger.debug(`CORS: Allowed ngrok origin: ${origin}`);
+        } else if (decision === 'netlify') {
+          logger.debug(`CORS: Allowed Netlify origin: ${origin}`);
+        } else if (decision === 'helios') {
+          logger.debug(`CORS: Allowed helios.kaonis.com origin: ${origin}`);
+        }
         return callback(null, true);
       }
 
       logger.warn(`CORS: Rejected origin: ${origin}`);
-      const error = new AppError(
-        `Origin ${origin} is not allowed by CORS policy`,
-        403,
-        'FORBIDDEN'
+      return callback(
+        new AppError(`Origin ${origin} is not allowed by CORS policy`, 403, 'FORBIDDEN')
       );
-      callback(error);
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
