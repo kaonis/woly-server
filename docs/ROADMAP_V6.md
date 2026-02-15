@@ -6,15 +6,16 @@ Scope: New autonomous cycle after V5 completion.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `8b3fbd5` (PR #157).
+- `master` synced at merge commit `2b23575` (PR #158).
 - Active execution branch: `master`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
+- #159 `[Dependencies] Automate ESLint 10 compatibility watchdog for #150`
 
 ### CI snapshot
-- Post-merge checks for `8b3fbd5` are green (CI + CodeQL).
+- Post-merge checks for `2b23575` are green (CI + CodeQL).
 - Dependency triage workflow and audit/security gates are documented and active.
 
 ## 2. Iterative Phases
@@ -96,6 +97,17 @@ Acceptance criteria:
 
 Status: `Completed` (2026-02-15, PR #157)
 
+### Phase 8: ESLint 10 compatibility watchdog automation
+Issue: #159  
+Labels: `priority:low`, `technical-debt`, `testing`
+
+Acceptance criteria:
+- Add a scheduled + manual GitHub workflow that checks latest `@typescript-eslint` peer support for ESLint 10.
+- Upsert a sticky status comment on issue #150 with blocker/unblock evidence.
+- Keep workflow informational (no fail-on-blocked behavior).
+
+Status: `In Progress` (2026-02-15)
+
 ## 3. Execution Loop Rules
 
 For each phase:
@@ -145,3 +157,7 @@ For each phase:
 - 2026-02-15: Merged #156 via PR #157 and verified post-merge `master` checks green (CI + CodeQL, commit `8b3fbd5`).
 - 2026-02-15: Confirmed dependency dashboard Turbo Renovate PR #75 is closed as superseded by merged PR #157.
 - 2026-02-15: Re-checked ESLint 10 blocker for #150: latest `@typescript-eslint/eslint-plugin@8.55.0` still peers `eslint ^8.57.0 || ^9.0.0`; Renovate ESLint 10 PR #11 remains open and unstable (Protocol Compatibility Check failing).
+- 2026-02-15: Merged blocker-checkpoint docs via PR #158 and verified post-merge `master` checks green (CI + CodeQL, commit `2b23575`).
+- 2026-02-15: Added follow-up issue #159 and started Phase 8 on branch `feat/159-eslint10-watchdog-workflow`.
+- 2026-02-15: Implemented `.github/workflows/eslint10-compat-watchdog.yml` to run scheduled/manual ESLint 10 compatibility checks and upsert a sticky watchdog comment on issue #150.
+- 2026-02-15: Ran local gates for #159 (`npm run lint`, `npm run typecheck`, `npm run test:ci`, `npm run build`) successfully.

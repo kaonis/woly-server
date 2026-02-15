@@ -1,0 +1,102 @@
+name: ESLint 10 Compatibility Watchdog
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * 1'
+
+jobs:
+  eslint10-watchdog:
+    name: ESLint 10 Compatibility Watchdog
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+
+      - name: Check compatibility state
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          plugin_json="$(npm view @typescript-eslint/eslint-plugin@latest version peerDependencies --json)"
+          parser_json="$(npm view @typescript-eslint/parser@latest version peerDependencies --json)"
+          eslint_version="$(npm view eslint@latest version)"
+
+          plugin_version="$(node -e "const d=JSON.parse(process.argv[1]); process.stdout.write(d.version);" "$plugin_json")"
+          parser_version="$(node -e "const d=JSON.parse(process.argv[1]); process.stdout.write(d.version);" "$parser_json")"
+          peer_range="$(node -e "const d=JSON.parse(process.argv[1]); process.stdout.write(d.peerDependencies.eslint || 'unknown');" "$plugin_json")"
+          supports_eslint_10="$(node -e "const range=process.argv[1] || ''; process.stdout.write(/\\b10\\./.test(range) ? 'true' : 'false');" "$peer_range")"
+          checked_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+          if [ "$supports_eslint_10" = "true" ]; then
+            status_line="UNBLOCKED: latest @typescript-eslint peer range includes ESLint 10."
+          else
+            status_line="BLOCKED: latest @typescript-eslint peer range does not include ESLint 10 yet."
+          fi
+
+          cat > watchdog-comment.md <<EOF
+          <!-- eslint10-compat-watchdog -->
+          ## ESLint 10 Compatibility Watchdog
+
+          Checked at: \`${checked_at}\`
+
+          - Latest \`eslint\`: \`${eslint_version}\`
+          - Latest \`@typescript-eslint/eslint-plugin\`: \`${plugin_version}\`
+          - Latest \`@typescript-eslint/parser\`: \`${parser_version}\`
+          - Reported \`eslint\` peer range: \`${peer_range}\`
+          - Status: **${status_line}**
+
+          Tracking issue: #150
+          EOF
+
+          echo "supports_eslint_10=${supports_eslint_10}" >> "$GITHUB_OUTPUT"
+          {
+            echo 'comment_body<<EOF'
+            cat watchdog-comment.md
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upsert issue #150 watchdog comment
+        uses: actions/github-script@v8
+        env:
+          COMMENT_BODY: ${{ steps.check.outputs.comment_body }}
+        with:
+          script: |
+            const issue_number = 150;
+            const marker = '<!-- eslint10-compat-watchdog -->';
+            const body = process.env.COMMENT_BODY;
+
+            const { owner, repo } = context.repo;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find((comment) =>
+              comment.body && comment.body.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }

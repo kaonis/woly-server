@@ -14,6 +14,7 @@ This plan covers the currently deferred or high-risk major dependency updates:
 - Zod v4
 - npm v11
 - Turbo v2.8.9
+- ESLint 10 compatibility watchdog automation
 
 ## 2. Risk Profile
 
@@ -57,6 +58,8 @@ Primary impact:
    Tracking issue: #154
 6. Wave F: Turbo workspace runner update  
    Tracking issue: #156
+7. Wave G: ESLint 10 compatibility watchdog automation  
+   Tracking issue: #159
 
 ## 4. Decision Table (2026-02-15)
 
@@ -70,6 +73,7 @@ Primary impact:
 | npm v11 | Merged | Workspace tooling and CI remained stable; adopted via PR #17 | #148 |
 | ESLint flat config mode | Merged | Migrated to root `eslint.config.js` and removed legacy `.eslintrc` mode via PR #155 | #154 |
 | Turbo v2.8.9 | Merged | Adopted and validated with local + CI gates via PR #157 (issue #156) | #156 |
+| ESLint 10 watchdog automation | In progress | Adds scheduled/manual compatibility checks and sticky issue updates for blocker visibility | #159 |
 
 ## 5. Exit Criteria for #144
 
