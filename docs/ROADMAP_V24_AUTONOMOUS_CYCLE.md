@@ -62,3 +62,7 @@ V24 is complete when all four items (`#250`, `#249`, `#150`, `#4`) are resolved 
 - 2026-02-15: Created issue `#250` to harden cycle summary checkpoint parsing fallback behavior.
 - 2026-02-15: Completed `#250` by adding fallback checkpoint resolution from review log in `ci:cycle:run` summaries.
 - 2026-02-15: Added parser test coverage for missing `--since` output line fallback behavior.
+- 2026-02-15: Completed `#249` using cycle orchestration:
+  - `npm run ci:cycle:run -- --after 249`
+  - Result: audit PASS with resolved checkpoint, follow-up issue `#251` created, checkpoint comments posted to `#150` and `#4`.
+- 2026-02-15: Recorded V24 CI/dependency checkpoint entries with unchanged ESLint 10 blocker status (`^8.57.0 || ^9.0.0` peer range).
