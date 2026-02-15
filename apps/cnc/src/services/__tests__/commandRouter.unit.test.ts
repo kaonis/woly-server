@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { CommandRouter } from '../commandRouter';
 import { CommandModel } from '../../models/Command';
 import type { CommandResult } from '../../types';
+import { runtimeMetrics } from '../runtimeMetrics';
 import logger from '../../utils/logger';
 
 interface CommandResolver {
@@ -90,6 +91,11 @@ function createQueuedRecord(commandId: string, payload: unknown) {
 }
 
 describe('CommandRouter unit behavior', () => {
+  beforeEach(() => {
+    runtimeMetrics.reset(0);
+    jest.spyOn(CommandModel, 'findById').mockResolvedValue(null);
+  });
+
   afterEach(() => {
     jest.restoreAllMocks();
     jest.useRealTimers();
@@ -785,6 +791,38 @@ describe('CommandRouter unit behavior', () => {
       'Failed to mark command as failed',
       expect.objectContaining({ commandId: 'cmd-fail-persist-fail' })
     );
+    router.cleanup();
+  });
+
+  it('attributes metrics to persisted command type when pending state is missing', async () => {
+    const { internals, router } = createRouter();
+    jest.spyOn(CommandModel, 'findById').mockResolvedValue({
+      id: 'cmd-late-result',
+      nodeId: 'node-1',
+      type: 'wake',
+      payload: { type: 'wake', commandId: 'cmd-late-result', data: { hostName: 'desk', mac: 'AA' } },
+      idempotencyKey: null,
+      state: 'sent',
+      error: null,
+      retryCount: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      sentAt: new Date(),
+      completedAt: null,
+    });
+    jest.spyOn(CommandModel, 'markFailed').mockResolvedValue(undefined);
+
+    internals.handleCommandResult({
+      commandId: 'cmd-late-result',
+      success: false,
+      error: 'late result failure',
+      timestamp: new Date(),
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(runtimeMetrics.snapshot().commands.outcomesByType.wake.failed).toBe(1);
+    expect(runtimeMetrics.snapshot().commands.outcomesByType.unknown).toBeUndefined();
     router.cleanup();
   });
 
