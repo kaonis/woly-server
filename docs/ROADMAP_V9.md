@@ -6,14 +6,14 @@ Scope: New autonomous cycle after V8 closeout.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `22951e9` (PR #197).
-- Active execution branch: `docs/194-manual-review-cycle`.
+- `master` synced at merge commit `9ef6dd2` (PR #199).
+- Active execution branch: `docs/198-manual-review-cycle-next`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #194 `[CI] Schedule next weekly manual-only operations review`
 - #198 `[CI] Schedule weekly manual-only operations review (next cycle)`
+- #200 `[CI] Schedule weekly manual-only operations review (following cycle)`
 
 ### CI snapshot
 - Repository workflows are in temporary manual-only mode (`workflow_dispatch` only).
@@ -21,9 +21,9 @@ Scope: New autonomous cycle after V8 closeout.
 - Manual workflow jobs are capped to `timeout-minutes: 8`.
 - Local manual-only run audit command is available: `npm run ci:audit:manual`.
 - Local workflow policy guard command is available: `npm run ci:policy:check` (PR #193).
-- Latest manual CI run succeeded: `22039325902` (PR #197, 2026-02-15).
+- Latest manual CI run succeeded: `22039380055` (PR #199, 2026-02-15).
 - Latest manual ESLint10 watchdog run succeeded: `22037969724` (2026-02-15).
-- Latest manual-only audit passed: `npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --fail-on-unexpected` (`2026-02-15T16:46:26Z`).
+- Latest manual-only audit passed: `npm run ci:audit:manual -- --since 2026-02-15T16:46:26Z --fail-on-unexpected` (`2026-02-15T16:50:29Z`).
 - Latest ESLint10 compatibility checkpoint remains blocked (`npm run deps:check-eslint10`, 2026-02-15).
 
 ## 2. Iterative Phases
@@ -107,6 +107,17 @@ Acceptance criteria:
 
 Status: `Completed` (2026-02-15, PR #197)
 
+### Phase 8: Weekly manual-only review cycle (next)
+Issue: #198
+Labels: `priority:low`, `developer-experience`, `technical-debt`
+
+Acceptance criteria:
+- Run `npm run ci:audit:manual -- --since <previous-review-iso> --fail-on-unexpected`.
+- Append decision entry to `docs/CI_MANUAL_REVIEW_LOG.md`.
+- Update active roadmap progress and dependency checkpoint notes.
+
+Status: `Completed` (2026-02-15, queued follow-up issue #200)
+
 ## 3. Execution Loop Rules
 
 For each phase:
@@ -141,3 +152,6 @@ For each phase:
 - 2026-02-15: Merged issue #196 via PR #197 after manual CI run `22039325902` passed.
 - 2026-02-15: Ran scoped manual-only workflow audit for issue #194: `npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --fail-on-unexpected` (PASS).
 - 2026-02-15: Created follow-up issue #198 to queue the next weekly manual-only review cycle.
+- 2026-02-15: Merged issue #194 via PR #199 after manual CI run `22039380055` passed.
+- 2026-02-15: Ran scoped manual-only workflow audit for issue #198: `npm run ci:audit:manual -- --since 2026-02-15T16:46:26Z --fail-on-unexpected` (PASS).
+- 2026-02-15: Created follow-up issue #200 to queue the next weekly manual-only review cycle.
