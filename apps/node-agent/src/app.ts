@@ -12,6 +12,7 @@ import * as hostsController from './controllers/hosts';
 import hosts from './routes/hosts';
 import { agentService } from './services/agentService';
 import { evaluateCorsOrigin } from './utils/corsOrigin';
+import { healthLimiter } from './middleware/rateLimiter';
 
 const app = express();
 
@@ -79,6 +80,10 @@ async function startServer() {
       logger.info('Starting in STANDALONE mode');
     }
 
+    if (config.server.env === 'production' && config.cors.origins.length === 0) {
+      logger.warn('CORS_ORIGINS is not configured in production; browser origins are denied by default');
+    }
+
     // Start periodic network scanning
     // Initial scan runs in background after configured delay for faster API availability
     hostDb.startPeriodicSync(config.network.scanInterval, false);
@@ -118,7 +123,7 @@ async function startServer() {
      *               $ref: '#/components/schemas/HealthCheck'
      */
     // Enhanced health check endpoint
-    app.get('/health', async (_req: Request, res: Response) => {
+    app.get('/health', healthLimiter, async (_req: Request, res: Response) => {
       const health = {
         uptime: process.uptime(),
         timestamp: Date.now(),
