@@ -19,8 +19,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "jest",
-    "test:ci": "jest",
+    "test": "jest --watchman=false",
+    "test:ci": "jest --watchman=false",
     "typecheck": "tsc --noEmit"
   },
   "repository": {
