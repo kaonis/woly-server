@@ -6,16 +6,15 @@ Scope: New autonomous cycle after V5 completion.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `e8e7aa8` (PR #155).
+- `master` synced at merge commit `8b3fbd5` (PR #157).
 - Active execution branch: `master`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #156 `[Dependencies] Adopt Turbo 2.8.9 workspace runner update`
 
 ### CI snapshot
-- Post-merge checks for `e8e7aa8` are green (CI + CodeQL).
+- Post-merge checks for `8b3fbd5` are green (CI + CodeQL).
 - Dependency triage workflow and audit/security gates are documented and active.
 
 ## 2. Iterative Phases
@@ -73,7 +72,7 @@ Acceptance criteria:
 - Upgrade ESLint to 10 when compatibility is available.
 - Validate lint behavior and CI stability after upgrade.
 
-Status: `Blocked` (2026-02-15; latest `@typescript-eslint/*@8.55.0` peers `eslint ^8.57 || ^9`)
+Status: `Blocked` (2026-02-15; `eslint@10.0.0` available, but latest `@typescript-eslint/*@8.55.0` peers `eslint ^8.57 || ^9`; Renovate PR #11 remains unstable)
 
 ### Phase 6: ESLint flat config migration precondition
 Issue: #154  
@@ -95,7 +94,7 @@ Acceptance criteria:
 - Keep lint/typecheck/test/build gates green after the update.
 - Verify PR and post-merge `master` CI + CodeQL are green.
 
-Status: `In Progress` (2026-02-15)
+Status: `Completed` (2026-02-15, PR #157)
 
 ## 3. Execution Loop Rules
 
@@ -143,3 +142,6 @@ For each phase:
 - 2026-02-15: Applied Turbo `2.8.9` lockfile update on #156 (`npm update turbo --save-dev --package-lock-only`) matching dependency dashboard PR #75 scope.
 - 2026-02-15: Ran local gates for #156 (`npm run lint`, `npm run typecheck`, `npm run test:ci`, `npm run build`) successfully.
 - 2026-02-15: Re-installed workspace dependencies with `npm ci`, confirmed `npx turbo --version` = `2.8.9`, and re-ran `npm run lint` successfully under Turbo `2.8.9`.
+- 2026-02-15: Merged #156 via PR #157 and verified post-merge `master` checks green (CI + CodeQL, commit `8b3fbd5`).
+- 2026-02-15: Confirmed dependency dashboard Turbo Renovate PR #75 is closed as superseded by merged PR #157.
+- 2026-02-15: Re-checked ESLint 10 blocker for #150: latest `@typescript-eslint/eslint-plugin@8.55.0` still peers `eslint ^8.57.0 || ^9.0.0`; Renovate ESLint 10 PR #11 remains open and unstable (Protocol Compatibility Check failing).
