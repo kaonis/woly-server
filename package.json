@@ -17,6 +17,7 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "test:ci": "turbo run test:ci",
+    "test:e2e:smoke": "npm run test:e2e:smoke --workspace=@woly-server/cnc",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "dev:node-agent": "turbo run dev --filter=@woly-server/node-agent",
