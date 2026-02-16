@@ -14,14 +14,14 @@
  */
 
 import {
-  createWakeScheduleRequestSchema,
+  createHostWakeScheduleRequestSchema,
+  hostSchedulesResponseSchema,
+  hostWakeScheduleSchema,
   inboundCncCommandSchema,
   outboundNodeMessageSchema,
   PROTOCOL_VERSION,
   SUPPORTED_PROTOCOL_VERSIONS,
-  updateWakeScheduleRequestSchema,
-  wakeScheduleListResponseSchema,
-  wakeScheduleSchema,
+  updateHostWakeScheduleRequestSchema,
 } from '../index';
 
 describe('Cross-repo protocol contract', () => {
@@ -530,19 +530,15 @@ describe('Cross-repo protocol contract', () => {
   describe('Wake schedule API contracts', () => {
     it('validates create payloads and applies defaults', () => {
       const createPayload = {
-        hostName: 'office-pc',
-        hostMac: 'AA:BB:CC:DD:EE:FF',
-        hostFqn: 'office-pc@home-node',
         scheduledTime: '2026-02-16T08:00:00.000Z',
         frequency: 'daily',
       };
 
-      const result = createWakeScheduleRequestSchema.safeParse(createPayload);
+      const result = createHostWakeScheduleRequestSchema.safeParse(createPayload);
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.timezone).toBe('UTC');
-        expect(result.data.enabled).toBe(true);
-        expect(result.data.notifyOnWake).toBe(true);
+        expect(result.data.scheduledTime).toBe('2026-02-16T08:00:00.000Z');
+        expect(result.data.frequency).toBe('daily');
       }
     });
 
@@ -563,18 +559,18 @@ describe('Cross-repo protocol contract', () => {
         nextTrigger: null,
       };
 
-      expect(wakeScheduleSchema.safeParse(schedule).success).toBe(true);
-      expect(wakeScheduleListResponseSchema.safeParse({ schedules: [schedule] }).success).toBe(
+      expect(hostWakeScheduleSchema.safeParse(schedule).success).toBe(true);
+      expect(hostSchedulesResponseSchema.safeParse({ schedules: [schedule] }).success).toBe(
         true,
       );
     });
 
     it('rejects empty updates and accepts partial updates', () => {
-      expect(updateWakeScheduleRequestSchema.safeParse({}).success).toBe(false);
+      expect(updateHostWakeScheduleRequestSchema.safeParse({}).success).toBe(false);
       expect(
-        updateWakeScheduleRequestSchema.safeParse({
+        updateHostWakeScheduleRequestSchema.safeParse({
           enabled: false,
-          nextTrigger: '2026-02-17T08:00:00.000Z',
+          timezone: 'UTC',
         }).success,
       ).toBe(true);
     });
