@@ -364,6 +364,19 @@ describe('HostDatabase', () => {
       expect(hostAfter?.lastSeen).toBeTruthy();
     });
 
+    it('should normalize legacy sqlite UTC timestamps to ISO UTC on read', async () => {
+      await db.addHost('LegacyTimestampHost', 'AA:BB:CC:DD:EE:14', '192.168.1.214');
+
+      const rawDb = (db as any).db;
+      rawDb
+        .prepare('UPDATE hosts SET lastSeen = ? WHERE name = ?')
+        .run('2026-02-16 21:24:14', 'LegacyTimestampHost');
+
+      const host = await db.getHost('LegacyTimestampHost');
+      expect(host).toBeDefined();
+      expect(host?.lastSeen).toBe('2026-02-16T21:24:14.000Z');
+    });
+
     it('should mark host as discovered when updating', async () => {
       // Add test host first
       await db.addHost('DiscoveredTestHost', 'AA:BB:CC:DD:EE:05', '192.168.1.205');

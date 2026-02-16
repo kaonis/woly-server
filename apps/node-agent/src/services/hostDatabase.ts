@@ -68,9 +68,38 @@ class HostDatabase extends EventEmitter {
     return JSON.stringify(tags);
   }
 
+  private normalizeLastSeen(value: string | null): string | null {
+    if (!value) {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      return null;
+    }
+
+    let normalized = trimmed;
+
+    // SQLite datetime('now') / CURRENT_TIMESTAMP is UTC without timezone.
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(trimmed)) {
+      normalized = `${trimmed.replace(' ', 'T')}Z`;
+    } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(trimmed)) {
+      // Timestamp without explicit timezone: treat as UTC.
+      normalized = `${trimmed}Z`;
+    }
+
+    const parsed = new Date(normalized);
+    if (Number.isNaN(parsed.getTime())) {
+      return trimmed;
+    }
+
+    return parsed.toISOString();
+  }
+
   private normalizeHostRow(row: Host & { tags?: unknown }): Host {
     return {
       ...row,
+      lastSeen: this.normalizeLastSeen(row.lastSeen),
       notes: row.notes ?? null,
       tags: this.parseTags(row.tags, row.name),
     };
@@ -231,7 +260,7 @@ class HostDatabase extends EventEmitter {
   ): Promise<Host> {
     return new Promise((resolve, reject) => {
       const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags)
-                   VALUES(?, ?, ?, ?, datetime('now'), 0, NULL, ?, ?)`;
+                   VALUES(?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 0, NULL, ?, ?)`;
       try {
         const db = this.assertReady();
         const formattedMac = networkDiscovery.formatMAC(mac);
@@ -274,7 +303,7 @@ class HostDatabase extends EventEmitter {
     pingResponsive: number | null = null
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      const sql = `UPDATE hosts SET lastSeen = datetime('now'), discovered = 1, status = ?, pingResponsive = ? WHERE mac = ?`;
+      const sql = `UPDATE hosts SET lastSeen = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), discovered = 1, status = ?, pingResponsive = ? WHERE mac = ?`;
       try {
         const db = this.assertReady();
         const formattedMac = networkDiscovery.formatMAC(mac);
