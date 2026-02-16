@@ -6,13 +6,13 @@ Scope: Post-V10 operational cadence with manual-first CI checkpoint automation.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `4698b37` (PR #278).
-- Active execution branch: `codex/issue-150-eslint10-checkpoint`.
+- `master` synced at merge commit `cf86b75` (PR #279).
+- Active execution branch: `codex/issue-277-weekly-manual-review`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
-- #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
 - #277 `[CI] Schedule weekly manual-only operations review (rolling follow-up after #275)`
+- #280 `[CI] Schedule weekly manual-only operations review (rolling follow-up after #277)`
 
 ### CI snapshot
 - Policy is manual-first:
@@ -21,10 +21,10 @@ Scope: Post-V10 operational cadence with manual-first CI checkpoint automation.
 - Local guard commands remain active:
   - `npm run ci:audit:manual`
   - `npm run ci:policy:check`
-- Latest scoped audit (`2026-02-16T18:35:12Z`) since `2026-02-16T18:33:09Z`:
+- Latest scoped audit (`2026-02-16T18:41:48Z`) since `2026-02-16T18:35:12Z`:
   - runs in scope: 0
   - unexpected non-manual runs: 0
-- Latest policy check (`2026-02-16T18:35:10Z`): PASS across all workflow files.
+- Latest policy check (`2026-02-16T18:41:47Z`): PASS across all workflow files.
 
 ## 2. Iterative Phases
 
@@ -73,7 +73,7 @@ Labels: `technical-debt`
 
 Acceptance criteria:
 - Keep dependency dashboard comment trail aligned with phase outcomes.
-- Link relevant blocker/next-step issues (#150, #277).
+- Link relevant blocker/next-step issues (#277, #280).
 
 Status: `Planned`
 
@@ -99,6 +99,16 @@ Status: `Completed` (2026-02-16, follow-up queued in #277)
 
 ### Phase 7: Next weekly operations review cycle
 Issue: #277  
+Labels: `priority:low`, `technical-debt`, `developer-experience`
+
+Acceptance criteria:
+- Re-run scoped audit and policy checks for the next review window.
+- Append review log and roadmap/dependency checkpoint updates.
+
+Status: `Completed` (2026-02-16, follow-up queued in #280)
+
+### Phase 8: Next weekly operations review cycle
+Issue: #280  
 Labels: `priority:low`, `technical-debt`, `developer-experience`
 
 Acceptance criteria:
@@ -131,3 +141,8 @@ Status: `Planned`
 - 2026-02-16: Started issue #150 on branch `codex/issue-150-eslint10-checkpoint`.
 - 2026-02-16: Re-ran compatibility checkpoint (`npm run deps:check-eslint10`) and confirmed ESLint 10 support is unblocked (`@typescript-eslint/*@8.56.0`, peer range includes `^10`).
 - 2026-02-16: Adopted ESLint 10 toolchain (`eslint@10.0.0`, `@eslint/js@10.0.1`) and revalidated local gates (`lint`, `typecheck`, `test:ci`, `build`) successfully.
+- 2026-02-16: Merged issue #150 via PR #279.
+- 2026-02-16: Started issue #277 on branch `codex/issue-277-weekly-manual-review`.
+- 2026-02-16: Ran scoped audit for #277 (`npm run ci:audit:manual -- --since 2026-02-16T18:35:12Z --fail-on-unexpected`) and observed 0 runs in scope.
+- 2026-02-16: Ran workflow policy guard for #277 (`npm run ci:policy:check`) and observed full PASS compliance.
+- 2026-02-16: Appended review/dependency checkpoints and created follow-up issue #280.

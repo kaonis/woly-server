@@ -92,3 +92,5 @@ Issue #144 is complete when:
 - 2026-02-16: Manual-CI operations checkpoint (issue #275) confirmed no unexpected workflow events since `2026-02-16T18:33:09Z`; scoped window contained 0 runs.
 - 2026-02-16: Manual-first policy baseline remains unchanged; next weekly review is queued in #277.
 - 2026-02-16: ESLint 10 compatibility checkpoint (issue #150) is unblocked (`eslint@10.0.0`, `@typescript-eslint/*@8.56.0`) and adopted with local gate validation.
+- 2026-02-16: Manual-CI operations checkpoint (issue #277) confirmed no unexpected workflow events since `2026-02-16T18:35:12Z`; scoped window contained 0 runs.
+- 2026-02-16: Manual-first policy baseline remains unchanged; next weekly review is queued in #280.
