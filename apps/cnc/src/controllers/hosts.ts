@@ -25,6 +25,23 @@ const updateHostBodySchema = z.object({
   tags: z.array(z.string().min(1).max(64)).max(32).optional(),
 }).strict();
 
+type RouteUpdateHostData = Parameters<CommandRouter['routeUpdateHostCommand']>[1];
+
+function toRouteUpdateHostData(payload: z.infer<typeof updateHostBodySchema>): RouteUpdateHostData {
+  const hostData: RouteUpdateHostData = {};
+
+  if (payload.name !== undefined) hostData.name = payload.name;
+  if (payload.mac !== undefined) hostData.mac = payload.mac;
+  if (payload.ip !== undefined) hostData.ip = payload.ip;
+  if (payload.notes !== undefined) hostData.notes = payload.notes;
+  if (payload.tags !== undefined) hostData.tags = payload.tags;
+  if (payload.status === 'awake' || payload.status === 'asleep') {
+    hostData.status = payload.status;
+  }
+
+  return hostData;
+}
+
 type PortScanEndpointResponse = {
   target: string;
   scannedAt: string;
@@ -578,7 +595,7 @@ export class HostsController {
         return;
       }
 
-      const hostData = parseResult.data;
+      const hostData = toRouteUpdateHostData(parseResult.data);
       logger.info('Update host request received', { fqn });
 
       const idempotencyKeyHeader = req.header('Idempotency-Key');
