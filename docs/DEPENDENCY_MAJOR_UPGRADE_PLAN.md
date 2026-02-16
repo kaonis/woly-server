@@ -89,3 +89,5 @@ Issue #144 is complete when:
 - 2026-02-16: Policy baseline remains manual-first with one approved automation exception (path-scoped `CNC Mobile Contract Gate`), and next weekly review is queued in #273.
 - 2026-02-16: Manual-CI operations checkpoint (issue #273) confirmed no unexpected workflow events since `2026-02-16T18:31:42Z`; scoped window contained 0 runs.
 - 2026-02-16: Manual-first policy baseline remains unchanged; next weekly review is queued in #275.
+- 2026-02-16: Manual-CI operations checkpoint (issue #275) confirmed no unexpected workflow events since `2026-02-16T18:33:09Z`; scoped window contained 0 runs.
+- 2026-02-16: Manual-first policy baseline remains unchanged; next weekly review is queued in #277.
