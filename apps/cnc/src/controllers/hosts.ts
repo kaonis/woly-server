@@ -6,7 +6,6 @@ import { Request, Response } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
 import { hostStatusSchema } from '@kaonis/woly-protocol';
-import type { HostPortScanResponse } from '@kaonis/woly-protocol';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
 import { lookupMacVendor, MAC_ADDRESS_PATTERN } from '../services/macVendorService';
@@ -22,9 +21,40 @@ const updateHostBodySchema = z.object({
   mac: z.string().regex(MAC_ADDRESS_PATTERN).optional(),
   ip: ipAddressSchema.optional(),
   status: hostStatusSchema.optional(),
-  notes: z.string().max(2000).nullable().optional(),
-  tags: z.array(z.string().min(1).max(64)).max(32).nullable().optional(),
+  notes: z.string().max(2_000).nullable().optional(),
+  tags: z.array(z.string().min(1).max(64)).max(32).optional(),
 }).strict();
+
+type RouteUpdateHostData = Parameters<CommandRouter['routeUpdateHostCommand']>[1];
+
+function toRouteUpdateHostData(payload: z.infer<typeof updateHostBodySchema>): RouteUpdateHostData {
+  const hostData: RouteUpdateHostData = {};
+
+  if (payload.name !== undefined) hostData.name = payload.name;
+  if (payload.mac !== undefined) hostData.mac = payload.mac;
+  if (payload.ip !== undefined) hostData.ip = payload.ip;
+  if (payload.notes !== undefined) hostData.notes = payload.notes;
+  if (payload.tags !== undefined) hostData.tags = payload.tags;
+  if (payload.status === 'awake' || payload.status === 'asleep') {
+    hostData.status = payload.status;
+  }
+
+  return hostData;
+}
+
+type PortScanEndpointResponse = {
+  target: string;
+  scannedAt: string;
+  openPorts: Array<{ port: number; protocol: 'tcp'; service: string }>;
+  scan?: {
+    commandId?: string;
+    state?: 'acknowledged' | 'failed';
+    nodeId?: string;
+    message?: string;
+  };
+  message?: string;
+  correlationId?: string;
+};
 
 function mapCommandError(error: unknown, fallbackMessage: string): {
   statusCode: number;
@@ -356,7 +386,7 @@ export class HostsController {
         return;
       }
 
-      const response: HostPortScanResponse = {
+      const response: PortScanEndpointResponse = {
         target: fqn,
         scannedAt: new Date().toISOString(),
         openPorts: [],
@@ -429,7 +459,7 @@ export class HostsController {
 
       const result = await this.commandRouter.routeScanCommand(host.nodeId, true, routeOptions);
 
-      const response: HostPortScanResponse = {
+      const response: PortScanEndpointResponse = {
         target: fqn,
         scannedAt: new Date().toISOString(),
         openPorts: [],
@@ -503,10 +533,27 @@ export class HostsController {
    *     requestBody:
    *       required: true
    *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             description: Host properties to update
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             description: Host properties to update
+ *             properties:
+ *               name:
+ *                 type: string
+ *               mac:
+ *                 type: string
+ *               ip:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *                 enum: [awake, asleep]
+ *               notes:
+ *                 type: string
+ *                 nullable: true
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
    *     responses:
    *       200:
    *         description: Host updated successfully
@@ -548,7 +595,7 @@ export class HostsController {
         return;
       }
 
-      const hostData = parseResult.data;
+      const hostData = toRouteUpdateHostData(parseResult.data);
       logger.info('Update host request received', { fqn });
 
       const idempotencyKeyHeader = req.header('Idempotency-Key');
