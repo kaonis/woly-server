@@ -106,42 +106,112 @@ Period reviewed: post-merge cycle (#207 to #209)
 - Decision: Continue manual-only
 - Follow-up actions: Execute the next weekly review cycle under issue #210.
 
-Date: 2026-02-16
+Date: 2026-02-15
 Reviewer: Codex autonomous loop
-Period reviewed: post-merge cycle (#210 to #251)
-
-- Unexpected automatic workflow runs observed: Yes (allowlisted `CNC Mobile Contract Gate` PR runs only)
-- Local gate policy followed: Yes
-- Budget and throughput assessment: Scoped audit (`npm run ci:audit:manual -- --since 2026-02-15T17:07:43Z --fail-on-unexpected`) analyzed 6 runs (4 allowlisted `pull_request`, 2 `workflow_dispatch`) with 0 unexpected events.
-- Decision: Continue manual-first policy
-- Follow-up actions: Execute the next weekly review cycle under issue #273.
-
-Date: 2026-02-16
-Reviewer: Codex autonomous loop
-Period reviewed: post-merge cycle (#251 to #273)
+Period reviewed: post-merge cycle (#209 to #227)
 
 - Unexpected automatic workflow runs observed: No
 - Local gate policy followed: Yes
-- Budget and throughput assessment: Scoped audit (`npm run ci:audit:manual -- --since 2026-02-16T18:31:42Z --fail-on-unexpected`) analyzed 0 runs in scope with 0 unexpected events.
-- Decision: Continue manual-first policy
-- Follow-up actions: Execute the next weekly review cycle under issue #275.
+- Budget and throughput assessment: Scoped audit (`ci:audit:manual --since 2026-02-15T17:07:43Z --fail-on-unexpected`) analyzed 2 runs and observed only `workflow_dispatch` events.
+- Decision: Continue manual-only
+- Follow-up actions: Execute the next weekly review cycle under issue #230.
 
-Date: 2026-02-16
+Date: 2026-02-15
 Reviewer: Codex autonomous loop
-Period reviewed: post-merge cycle (#273 to #275)
+Period reviewed: post-merge cycle (#227 to #232)
 
 - Unexpected automatic workflow runs observed: No
 - Local gate policy followed: Yes
-- Budget and throughput assessment: Scoped audit (`npm run ci:audit:manual -- --since 2026-02-16T18:33:09Z --fail-on-unexpected`) analyzed 0 runs in scope with 0 unexpected events.
-- Decision: Continue manual-first policy
-- Follow-up actions: Execute the next weekly review cycle under issue #277.
+- Budget and throughput assessment: Scoped audit (`ci:audit:manual --since 2026-02-15T21:31:02Z --fail-on-unexpected`) analyzed 0 runs and observed no unexpected events.
+- Decision: Continue manual-only
+- Follow-up actions: Execute the next weekly review cycle under issue #233.
 
-Date: 2026-02-16
+Date: 2026-02-15
 Reviewer: Codex autonomous loop
-Period reviewed: post-merge cycle (#275 to #277)
+Period reviewed: post-merge cycle (#232 to #235)
 
 - Unexpected automatic workflow runs observed: No
 - Local gate policy followed: Yes
-- Budget and throughput assessment: Scoped audit (`npm run ci:audit:manual -- --since 2026-02-16T18:35:12Z --fail-on-unexpected`) analyzed 0 runs in scope with 0 unexpected events.
-- Decision: Continue manual-first policy
-- Follow-up actions: Execute the next weekly review cycle under issue #280.
+- Budget and throughput assessment: Scoped audit (`ci:audit:latest -- --fail-on-unexpected`) using checkpoint `2026-02-15T21:31:02Z` analyzed 0 runs and observed no unexpected events.
+- Decision: Continue manual-only
+- Follow-up actions: Execute the next weekly review cycle under issue #236.
+
+Date: 2026-02-15
+Reviewer: Codex autonomous loop
+Period reviewed: post-merge cycle (#235 to #237)
+
+- Unexpected automatic workflow runs observed: No
+- Local gate policy followed: Yes
+- Budget and throughput assessment: Scoped audit (`ci:audit:latest -- --fail-on-unexpected`) using checkpoint `2026-02-15T21:31:02Z` analyzed 0 runs and observed no unexpected events.
+- Decision: Continue manual-only
+- Follow-up actions: Execute the next weekly review cycle under issue #238.
+
+Date: 2026-02-15
+Reviewer: Codex autonomous loop
+Period reviewed: post-merge cycle (#237 to #239)
+
+- Unexpected automatic workflow runs observed: No
+- Local gate policy followed: Yes
+- Budget and throughput assessment: Scoped audit (`ci:audit:latest -- --fail-on-unexpected`) using checkpoint `2026-02-15T21:31:02Z` analyzed 0 runs and observed no unexpected events.
+- Decision: Continue manual-only
+- Follow-up actions: Execute the next weekly review cycle under issue #240.
+
+Date: 2026-02-15
+Reviewer: Codex autonomous loop
+Period reviewed: post-merge cycle (#239 to #240)
+
+- Unexpected automatic workflow runs observed: No
+- Local gate policy followed: Yes
+- Budget and throughput assessment: Scoped audit (`ci:audit:latest -- --fail-on-unexpected`) using checkpoint `2026-02-15T21:31:02Z` analyzed 0 runs and observed no unexpected events.
+- Decision: Continue manual-only
+- Follow-up actions: Execute the next weekly review cycle under issue #241.
+
+Date: 2026-02-15
+Reviewer: Codex autonomous loop
+Period reviewed: post-merge cycle (#240 to #242)
+
+- Unexpected automatic workflow runs observed: No
+- Local gate policy followed: Yes
+- Budget and throughput assessment: Scoped audit (`ci:audit:latest -- --fail-on-unexpected`) using checkpoint `2026-02-15T21:31:02Z` analyzed 0 runs and observed no unexpected events.
+- Decision: Continue manual-only
+- Follow-up actions: Execute the next weekly review cycle under issue #243.
+
+Date: 2026-02-15
+Reviewer: Codex autonomous loop
+Period reviewed: post-merge cycle (#242 to #244)
+
+- Unexpected automatic workflow runs observed: No
+- Local gate policy followed: Yes
+- Budget and throughput assessment: Scoped audit (`ci:audit:latest -- --fail-on-unexpected`) using checkpoint `2026-02-15T21:31:02Z` analyzed 0 runs and observed no unexpected events.
+- Decision: Continue manual-only
+- Follow-up actions: Execute the next weekly review cycle under issue #245.
+
+Date: 2026-02-15
+Reviewer: Codex autonomous loop
+Period reviewed: post-merge cycle (#244 to #246)
+
+- Unexpected automatic workflow runs observed: No
+- Local gate policy followed: Yes
+- Budget and throughput assessment: Scoped audit (`ci:audit:latest -- --fail-on-unexpected`) using checkpoint `2026-02-15T21:31:02Z` analyzed 0 runs and observed no unexpected events.
+- Decision: Continue manual-only
+- Follow-up actions: Execute the next weekly review cycle under issue #247.
+
+Date: 2026-02-15
+Reviewer: Codex autonomous loop
+Period reviewed: post-merge cycle (#246 to #248)
+
+- Unexpected automatic workflow runs observed: No
+- Local gate policy followed: Yes
+- Budget and throughput assessment: Scoped audit (`ci:audit:latest -- --fail-on-unexpected`) using checkpoint `2026-02-15T21:31:02Z` analyzed 0 runs and observed no unexpected events.
+- Decision: Continue manual-only
+- Follow-up actions: Execute the next weekly review cycle under issue #249.
+
+Date: 2026-02-15
+Reviewer: Codex autonomous loop
+Period reviewed: post-merge cycle (#248 to #250)
+
+- Unexpected automatic workflow runs observed: No
+- Local gate policy followed: Yes
+- Budget and throughput assessment: Scoped audit (`ci:audit:latest -- --fail-on-unexpected`) using checkpoint `2026-02-15T21:31:02Z` analyzed 0 runs and observed no unexpected events.
+- Decision: Continue manual-only
+- Follow-up actions: Execute the next weekly review cycle under issue #251.

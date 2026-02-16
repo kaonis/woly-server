@@ -1,5 +1,16 @@
 type ProtocolDirection = 'inbound' | 'outbound';
 type CommandOutcome = 'acknowledged' | 'failed' | 'timed_out';
+const TRACKED_COMMAND_TYPES = ['wake', 'scan', 'update-host', 'delete-host'] as const;
+
+type CommandOutcomeSnapshot = {
+  acknowledged: number;
+  failed: number;
+  timedOut: number;
+};
+
+type UnknownOutcomeAttributionSnapshot = CommandOutcomeSnapshot & {
+  total: number;
+};
 
 type CommandMetricBucket = {
   dispatched: number;
@@ -54,6 +65,8 @@ export type RuntimeMetricsSnapshot = {
     timeoutRate: number;
     avgLatencyMs: number;
     lastLatencyMs: number | null;
+    unknownAttribution: UnknownOutcomeAttributionSnapshot;
+    outcomesByType: Record<string, CommandOutcomeSnapshot>;
     byType: Record<string, CommandMetricBucketSnapshot>;
   };
   correlations: {
@@ -85,6 +98,10 @@ export class RuntimeMetrics {
   private readonly resolvedCorrelationTrail: ResolvedCorrelation[] = [];
   private readonly resolvedCorrelationByCommandId = new Map<string, string>();
 
+  constructor() {
+    this.bootstrapTrackedCommandTypeBuckets();
+  }
+
   public reset(nowMs = Date.now()): void {
     this.startedAtMs = nowMs;
     this.connectedNodes = 0;
@@ -99,6 +116,7 @@ export class RuntimeMetrics {
     this.commandTotals.cumulativeLatencyMs = 0;
     this.commandTotals.lastLatencyMs = null;
     this.commandByType.clear();
+    this.bootstrapTrackedCommandTypeBuckets();
     this.activeCommands.clear();
     this.resolvedCorrelationTrail.length = 0;
     this.resolvedCorrelationByCommandId.clear();
@@ -144,16 +162,26 @@ export class RuntimeMetrics {
     });
   }
 
-  public recordCommandResult(commandId: string, success: boolean, nowMs = Date.now()): void {
+  public recordCommandResult(
+    commandId: string,
+    success: boolean,
+    nowMs = Date.now(),
+    commandTypeHint?: string | null
+  ): void {
     this.resolveCommand(
       this.normalizeCommandId(commandId),
       success ? 'acknowledged' : 'failed',
-      nowMs
+      nowMs,
+      commandTypeHint
     );
   }
 
-  public recordCommandTimeout(commandId: string, nowMs = Date.now()): void {
-    this.resolveCommand(this.normalizeCommandId(commandId), 'timed_out', nowMs);
+  public recordCommandTimeout(
+    commandId: string,
+    nowMs = Date.now(),
+    commandTypeHint?: string | null
+  ): void {
+    this.resolveCommand(this.normalizeCommandId(commandId), 'timed_out', nowMs, commandTypeHint);
   }
 
   public lookupCorrelationId(commandId: string): string | null {
@@ -178,6 +206,15 @@ export class RuntimeMetrics {
         commandType,
         this.toBucketSnapshot(bucket),
       ])
+    );
+    const outcomesByType = Object.fromEntries(
+      Array.from(this.commandByType.entries()).map(([commandType, bucket]) => [
+        commandType,
+        this.toOutcomeSnapshot(bucket),
+      ])
+    );
+    const unknownOutcomeAttribution = this.toUnknownOutcomeSnapshot(
+      this.commandByType.get('unknown') ?? null
     );
 
     return {
@@ -206,6 +243,8 @@ export class RuntimeMetrics {
             ? Math.round(this.commandTotals.cumulativeLatencyMs / this.commandTotals.completed)
             : 0,
         lastLatencyMs: this.commandTotals.lastLatencyMs,
+        unknownAttribution: unknownOutcomeAttribution,
+        outcomesByType,
         byType,
       },
       correlations: {
@@ -215,9 +254,15 @@ export class RuntimeMetrics {
     };
   }
 
-  private resolveCommand(commandId: string, outcome: CommandOutcome, nowMs: number): void {
+  private resolveCommand(
+    commandId: string,
+    outcome: CommandOutcome,
+    nowMs: number,
+    commandTypeHint?: string | null
+  ): void {
     const active = this.activeCommands.get(commandId);
-    const commandType = active?.commandType ?? 'unknown';
+    const commandType =
+      active?.commandType ?? this.normalizeCommandType(commandTypeHint ?? 'unknown');
     const startedAtMs = active?.startedAtMs ?? nowMs;
     const latencyMs = Math.max(0, Math.round(nowMs - startedAtMs));
 
@@ -299,6 +344,33 @@ export class RuntimeMetrics {
     };
   }
 
+  private toOutcomeSnapshot(bucket: CommandMetricBucket): CommandOutcomeSnapshot {
+    return {
+      acknowledged: bucket.acknowledged,
+      failed: bucket.failed,
+      timedOut: bucket.timedOut,
+    };
+  }
+
+  private toUnknownOutcomeSnapshot(
+    bucket: CommandMetricBucket | null
+  ): UnknownOutcomeAttributionSnapshot {
+    if (!bucket) {
+      return {
+        acknowledged: 0,
+        failed: 0,
+        timedOut: 0,
+        total: 0,
+      };
+    }
+
+    const outcomes = this.toOutcomeSnapshot(bucket);
+    return {
+      ...outcomes,
+      total: outcomes.acknowledged + outcomes.failed + outcomes.timedOut,
+    };
+  }
+
   private normalizeCommandId(commandId: string): string {
     if (typeof commandId !== 'string' || commandId.trim().length === 0) {
       return 'unknown-command-id';
@@ -319,6 +391,12 @@ export class RuntimeMetrics {
     }
     const trimmed = correlationId.trim();
     return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private bootstrapTrackedCommandTypeBuckets(): void {
+    for (const commandType of TRACKED_COMMAND_TYPES) {
+      this.getOrCreateCommandBucket(commandType);
+    }
   }
 }
 

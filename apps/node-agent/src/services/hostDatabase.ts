@@ -36,6 +36,60 @@ class HostDatabase extends EventEmitter {
     return this.db;
   }
 
+  private parseTags(value: unknown, hostName: string): string[] {
+    if (Array.isArray(value)) {
+      return value.filter((tag): tag is string => typeof tag === 'string');
+    }
+
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((tag): tag is string => typeof tag === 'string');
+      }
+    } catch (error) {
+      logger.warn('Failed to parse host tag metadata; falling back to empty tags', {
+        hostName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return [];
+  }
+
+  private serializeTags(tags: string[] | undefined): string {
+    if (!tags || tags.length === 0) {
+      return '[]';
+    }
+
+    return JSON.stringify(tags);
+  }
+
+  private normalizeHostRow(row: Host & { tags?: unknown }): Host {
+    return {
+      ...row,
+      notes: row.notes ?? null,
+      tags: this.parseTags(row.tags, row.name),
+    };
+  }
+
+  private addColumnIfMissing(columnDefinition: string): void {
+    const db = this.assertReady();
+    try {
+      db.exec(`ALTER TABLE hosts ADD COLUMN ${columnDefinition}`);
+    } catch (err) {
+      const error = err as Error;
+      if (!error.message.includes('duplicate column')) {
+        logger.warn(`Could not add ${columnDefinition.split(' ')[0]} column:`, {
+          error: error.message,
+        });
+      }
+    }
+  }
+
   /**
    * Connect to database with retry logic
    */
@@ -93,18 +147,15 @@ class HostDatabase extends EventEmitter {
       status text NOT NULL,
       lastSeen datetime,
       discovered integer DEFAULT 0,
-      pingResponsive integer
+      pingResponsive integer,
+      notes text,
+      tags text NOT NULL DEFAULT '[]'
     )`);
 
-    // Try to add pingResponsive column if it doesn't exist
-    try {
-      db.exec(`ALTER TABLE hosts ADD COLUMN pingResponsive integer`);
-    } catch (err) {
-      const error = err as Error;
-      if (!error.message.includes('duplicate column')) {
-        logger.warn('Could not add pingResponsive column:', { error: error.message });
-      }
-    }
+    // Keep runtime schema compatible with older databases.
+    this.addColumnIfMissing('pingResponsive integer');
+    this.addColumnIfMissing('notes text');
+    this.addColumnIfMissing("tags text NOT NULL DEFAULT '[]'");
   }
 
   /**
@@ -113,11 +164,13 @@ class HostDatabase extends EventEmitter {
   async getAllHosts(): Promise<Host[]> {
     try {
       const db = this.assertReady();
-      return db
+      const rows = db
         .prepare(
-          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts ORDER BY name'
+          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags FROM hosts ORDER BY name'
         )
-        .all() as Host[];
+        .all() as Array<Host & { tags?: unknown }>;
+
+      return rows.map((row) => this.normalizeHostRow(row));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Failed to get all hosts:', { error: message });
@@ -131,11 +184,13 @@ class HostDatabase extends EventEmitter {
   async getHost(name: string): Promise<Host | undefined> {
     try {
       const db = this.assertReady();
-      return db
+      const row = db
         .prepare(
-          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts WHERE name = ?'
+          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE name = ?'
         )
-        .get(name) as Host | undefined;
+        .get(name) as (Host & { tags?: unknown }) | undefined;
+
+      return row ? this.normalizeHostRow(row) : undefined;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error(`Failed to get host ${name}:`, { error: message });
@@ -150,11 +205,13 @@ class HostDatabase extends EventEmitter {
     try {
       const db = this.assertReady();
       const formattedMac = networkDiscovery.formatMAC(mac);
-      return db
+      const row = db
         .prepare(
-          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive FROM hosts WHERE mac = ?'
+          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE mac = ?'
         )
-        .get(formattedMac) as Host | undefined;
+        .get(formattedMac) as (Host & { tags?: unknown }) | undefined;
+
+      return row ? this.normalizeHostRow(row) : undefined;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error(`Failed to get host by MAC ${mac}:`, { error: message });
@@ -165,16 +222,24 @@ class HostDatabase extends EventEmitter {
   /**
    * Add a new host to database
    */
-  addHost(name: string, mac: string, ip: string): Promise<Host> {
+  addHost(
+    name: string,
+    mac: string,
+    ip: string,
+    metadata?: { notes?: string | null; tags?: string[] },
+    options?: { emitLifecycleEvent?: boolean }
+  ): Promise<Host> {
     return new Promise((resolve, reject) => {
-      const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered, pingResponsive)
-                   VALUES(?, ?, ?, ?, datetime('now'), 0, NULL)`;
+      const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags)
+                   VALUES(?, ?, ?, ?, datetime('now'), 0, NULL, ?, ?)`;
       try {
         const db = this.assertReady();
         const formattedMac = networkDiscovery.formatMAC(mac);
-        db.prepare(sql).run(name, formattedMac, ip, 'asleep');
+        const notes = metadata?.notes ?? null;
+        const tags = this.serializeTags(metadata?.tags);
+        db.prepare(sql).run(name, formattedMac, ip, 'asleep', notes, tags);
         logger.info(`Added host: ${name}`);
-        resolve({
+        const createdHost: Host = {
           name,
           mac: formattedMac,
           ip,
@@ -182,7 +247,13 @@ class HostDatabase extends EventEmitter {
           lastSeen: new Date().toISOString(),
           discovered: 0,
           pingResponsive: null,
-        });
+          notes,
+          tags: this.parseTags(tags, name),
+        };
+        if (options?.emitLifecycleEvent ?? true) {
+          this.emit('host-discovered', createdHost);
+        }
+        resolve(createdHost);
       } catch (err) {
         const error = err as Error;
         if (error.message.includes('UNIQUE constraint failed')) {
@@ -225,7 +296,8 @@ class HostDatabase extends EventEmitter {
    */
   updateHost(
     name: string,
-    updates: Partial<Pick<Host, 'name' | 'mac' | 'ip' | 'status'>>
+    updates: Partial<Pick<Host, 'name' | 'mac' | 'ip' | 'status' | 'notes' | 'tags'>>,
+    options?: { emitLifecycleEvent?: boolean }
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       let db: Database.Database;
@@ -236,7 +308,7 @@ class HostDatabase extends EventEmitter {
         return;
       }
       const fields: string[] = [];
-      const values: Array<string> = [];
+      const values: unknown[] = [];
 
       if (updates.name !== undefined) {
         fields.push('name = ?');
@@ -254,8 +326,42 @@ class HostDatabase extends EventEmitter {
         fields.push('status = ?');
         values.push(updates.status);
       }
+      if (updates.notes !== undefined) {
+        fields.push('notes = ?');
+        values.push(updates.notes);
+      }
+      if (updates.tags !== undefined) {
+        fields.push('tags = ?');
+        values.push(this.serializeTags(updates.tags));
+      }
 
       if (fields.length === 0) {
+        resolve();
+        return;
+      }
+
+      const existingRow = db
+        .prepare(
+          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE name = ?'
+        )
+        .get(name) as (Host & { tags?: unknown }) | undefined;
+      if (!existingRow) {
+        reject(new Error(`Host ${name} not found`));
+        return;
+      }
+
+      const existing = this.normalizeHostRow(existingRow);
+      const normalizedMac = updates.mac !== undefined ? networkDiscovery.formatMAC(updates.mac) : undefined;
+      const hasMeaningfulChange =
+        (updates.name !== undefined && updates.name !== existing.name) ||
+        (normalizedMac !== undefined && normalizedMac !== existing.mac) ||
+        (updates.ip !== undefined && updates.ip !== existing.ip) ||
+        (updates.status !== undefined && updates.status !== existing.status) ||
+        (updates.notes !== undefined && updates.notes !== (existing.notes ?? null)) ||
+        (updates.tags !== undefined &&
+          JSON.stringify(updates.tags ?? []) !== JSON.stringify(existing.tags ?? []));
+
+      if (!hasMeaningfulChange) {
         resolve();
         return;
       }
@@ -266,14 +372,17 @@ class HostDatabase extends EventEmitter {
       try {
         const info = db.prepare(sql).run(values);
         if (info.changes === 0) {
-          // Check if host exists
-          const exists = db.prepare('SELECT 1 FROM hosts WHERE name = ?').get(name);
-          if (exists) {
-            resolve(); // Host exists but no changes needed
-          } else {
-            reject(new Error(`Host ${name} not found`));
-          }
+          reject(new Error(`Host ${name} not found`));
         } else {
+          const resolvedName = updates.name ?? name;
+          const updatedRow = db
+            .prepare(
+              'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE name = ?'
+            )
+            .get(resolvedName) as (Host & { tags?: unknown }) | undefined;
+          if (updatedRow && (options?.emitLifecycleEvent ?? true)) {
+            this.emit('host-updated', this.normalizeHostRow(updatedRow));
+          }
           resolve();
         }
       } catch (err) {
@@ -285,7 +394,7 @@ class HostDatabase extends EventEmitter {
   /**
    * Delete host by name
    */
-  deleteHost(name: string): Promise<void> {
+  deleteHost(name: string, options?: { emitLifecycleEvent?: boolean }): Promise<void> {
     return new Promise((resolve, reject) => {
       const sql = 'DELETE FROM hosts WHERE name = ?';
       try {
@@ -294,6 +403,9 @@ class HostDatabase extends EventEmitter {
         if (info.changes === 0) {
           reject(new Error(`Host ${name} not found`));
         } else {
+          if (options?.emitLifecycleEvent ?? true) {
+            this.emit('host-removed', name);
+          }
           resolve();
         }
       } catch (err) {

@@ -77,7 +77,14 @@ class SqliteDatabase {
     const start = Date.now();
     try {
       // Convert PostgreSQL-style placeholders ($1, $2) to SQLite-style (?, ?)
-      const sqliteQuery = text.replace(/\$(\d+)/g, '?');
+      const placeholderOrder: number[] = [];
+      const sqliteQuery = text.replace(/\$(\d+)/g, (_match, rawIndex: string) => {
+        placeholderOrder.push(Number.parseInt(rawIndex, 10));
+        return '?';
+      });
+      const sqliteParams = params && placeholderOrder.length > 0
+        ? placeholderOrder.map((position) => params[position - 1])
+        : (params ?? []);
 
       // Detect query type
       const trimmedQuery = sqliteQuery.trim().toUpperCase();
@@ -91,7 +98,7 @@ class SqliteDatabase {
       if (isSelect) {
         // SELECT queries return rows
         const stmt = this.db.prepare(sqliteQuery);
-        const rows = params ? stmt.all(...params) : stmt.all();
+        const rows = sqliteParams.length > 0 ? stmt.all(...sqliteParams) : stmt.all();
         result = {
           rows: rows as T[],
           rowCount: rows.length,
@@ -103,7 +110,7 @@ class SqliteDatabase {
           // better-sqlite3 v12.6.2 includes SQLite 3.47.2, so we can use RETURNING directly
           // Use .all() for RETURNING queries as .run() doesn't return rows
           const stmt = this.db.prepare(sqliteQuery);
-          const rows = params ? stmt.all(...params) : stmt.all();
+          const rows = sqliteParams.length > 0 ? stmt.all(...sqliteParams) : stmt.all();
 
           result = {
             rows: rows as T[],
@@ -111,7 +118,7 @@ class SqliteDatabase {
           };
         } else {
           const stmt = this.db.prepare(sqliteQuery);
-          const info = params ? stmt.run(...params) : stmt.run();
+          const info = sqliteParams.length > 0 ? stmt.run(...sqliteParams) : stmt.run();
           result = {
             rows: [] as T[],
             rowCount: info.changes,
@@ -122,13 +129,13 @@ class SqliteDatabase {
         const stmt = this.db.prepare(sqliteQuery);
         if (sqliteQuery.includes('RETURNING')) {
           // Use native RETURNING support
-          const rows = params ? stmt.all(...params) : stmt.all();
+          const rows = sqliteParams.length > 0 ? stmt.all(...sqliteParams) : stmt.all();
           result = {
             rows: rows as T[],
             rowCount: rows.length,
           };
         } else {
-          const info = params ? stmt.run(...params) : stmt.run();
+          const info = sqliteParams.length > 0 ? stmt.run(...sqliteParams) : stmt.run();
           result = {
             rows: [] as T[],
             rowCount: info.changes,

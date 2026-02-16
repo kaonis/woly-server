@@ -129,6 +129,29 @@ describe('HostAggregator', () => {
       expect(host!.status).toBe('asleep');
     });
 
+    it('should persist host notes/tags metadata', async () => {
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-1',
+        location: 'Test Location',
+        host: {
+          name: 'metadata-host',
+          mac: 'AA:BB:CC:DD:EE:42',
+          ip: '192.168.1.142',
+          status: 'awake' as const,
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: 1,
+          notes: 'Top-of-rack switch',
+          tags: ['network', 'critical'],
+        },
+      });
+
+      const host = await hostAggregator.getHostByFQN('metadata-host@Test%20Location-test-node-1');
+      expect(host).not.toBeNull();
+      expect(host!.notes).toBe('Top-of-rack switch');
+      expect(host!.tags).toEqual(['network', 'critical']);
+    });
+
     it('should handle errors gracefully', async () => {
       // Force a deterministic DB failure for this error-path test.
       const querySpy = jest.spyOn(db, 'query').mockRejectedValueOnce(new Error('forced-db-failure'));

@@ -152,6 +152,14 @@ POST   /api/auth/token         # Exchange operator token for JWT (mobile sign-in
 GET    /health                 # Server health check
 ```
 
+### Protected Metadata API
+
+Requires `Authorization: Bearer <jwt>` with role `operator` or `admin`.
+
+```
+GET    /api/capabilities       # Feature negotiation map for CNC clients
+```
+
 ### Protected Node API
 
 Requires `Authorization: Bearer <jwt>` with role `operator` or `admin`.
@@ -170,6 +178,10 @@ Requires `Authorization: Bearer <jwt>` with role `operator` or `admin`.
 GET    /api/hosts
 GET    /api/hosts/ports/:fqn
 GET    /api/hosts/scan-ports/:fqn
+GET    /api/hosts/:fqn/schedules
+POST   /api/hosts/:fqn/schedules
+PUT    /api/hosts/schedules/:id
+DELETE /api/hosts/schedules/:id
 GET    /api/hosts/:fqn
 POST   /api/hosts/wakeup/:fqn
 PUT    /api/hosts/:fqn
@@ -225,11 +237,11 @@ Environment variables (`.env`):
 | `NODE_HEARTBEAT_INTERVAL` | Expected heartbeat interval (ms) | `30000` |
 | `NODE_TIMEOUT` | Node offline threshold (ms) | `90000` |
 | `COMMAND_TIMEOUT` | Command acknowledgement timeout (ms) | `30000` |
-| `COMMAND_RETENTION_DAYS` | Retention window for command lifecycle rows | `30` |
-| `COMMAND_MAX_RETRIES` | Max command retry attempts before terminal failure | `3` |
+| `COMMAND_RETENTION_DAYS` | Retention window for historical command rows | `30` |
+| `COMMAND_MAX_RETRIES` | Maximum command retries before terminal failure | `3` |
 | `COMMAND_RETRY_BASE_DELAY_MS` | Base delay for retry backoff (ms) | `1000` |
-| `SCHEDULE_WORKER_ENABLED` | Enable persisted wake schedule execution worker | `true` |
-| `SCHEDULE_POLL_INTERVAL_MS` | Wake schedule worker polling interval (ms) | `60000` |
+| `SCHEDULE_WORKER_ENABLED` | Enable backend wake schedule execution worker | `true` |
+| `SCHEDULE_POLL_INTERVAL_MS` | Wake schedule polling interval (ms) | `60000` |
 | `SCHEDULE_BATCH_SIZE` | Max due schedules processed per worker tick | `25` |
 | `LOG_LEVEL` | Logging level | `info` |
 

@@ -21,6 +21,8 @@ export interface Host {
   lastSeen: string | null;
   discovered: number;
   pingResponsive?: number | null;
+  notes?: string | null;
+  tags?: string[];
 }
 
 /** @deprecated Use `Host` instead. */
@@ -101,41 +103,49 @@ export interface HostPortScanResponse {
   correlationId?: string;
 }
 
-// --- Wake schedule API ---
-
 export type ScheduleFrequency = 'once' | 'daily' | 'weekly' | 'weekdays' | 'weekends';
 
-export interface WakeSchedule {
+export interface HostWakeSchedule {
   id: string;
+  hostFqn: string;
   hostName: string;
   hostMac: string;
-  hostFqn: string;
   scheduledTime: string;
-  timezone: string;
   frequency: ScheduleFrequency;
   enabled: boolean;
   notifyOnWake: boolean;
+  timezone: string;
   createdAt: string;
   updatedAt: string;
-  lastTriggered: string | null;
-  nextTrigger: string | null;
+  lastTriggered?: string;
+  nextTrigger?: string;
 }
 
-export interface CreateWakeScheduleRequest {
-  hostName: string;
-  hostMac: string;
-  hostFqn: string;
+export interface HostSchedulesResponse {
+  schedules: HostWakeSchedule[];
+}
+
+export interface CreateHostWakeScheduleRequest {
   scheduledTime: string;
-  timezone?: string;
   frequency: ScheduleFrequency;
   enabled?: boolean;
   notifyOnWake?: boolean;
-  nextTrigger?: string | null;
+  timezone?: string;
 }
 
-export type UpdateWakeScheduleRequest = Partial<CreateWakeScheduleRequest> & {
-  lastTriggered?: string | null;
-};
+export interface UpdateHostWakeScheduleRequest {
+  scheduledTime?: string;
+  frequency?: ScheduleFrequency;
+  enabled?: boolean;
+  notifyOnWake?: boolean;
+  timezone?: string;
+}
+
+export interface DeleteHostWakeScheduleResponse {
+  success: boolean;
+  id: string;
+}
+
 // --- WebSocket message types ---
 
 export type NodeMessage =
@@ -179,7 +189,7 @@ export type CncCommand =
         ip?: string;
         status?: HostStatus;
         notes?: string | null;
-        tags?: string[] | null;
+        tags?: string[];
       };
     }
   | { type: 'delete-host'; commandId: string; data: { name: string } }
@@ -189,6 +199,8 @@ export type CncCommand =
 // --- Zod schemas ---
 
 export const hostStatusSchema = z.enum(['awake', 'asleep']);
+export const hostNotesSchema = z.string().max(2_000).nullable();
+export const hostTagsSchema = z.array(z.string().min(1).max(64)).max(32);
 
 export const hostSchema = z.object({
   name: z.string().min(1),
@@ -198,6 +210,8 @@ export const hostSchema = z.object({
   lastSeen: z.string().nullable(),
   discovered: z.number().int(),
   pingResponsive: z.number().int().nullable().optional(),
+  notes: hostNotesSchema.optional(),
+  tags: hostTagsSchema.optional(),
 });
 
 export const commandStateSchema = z.enum([
@@ -213,10 +227,6 @@ export const errorResponseSchema = z.object({
   message: z.string().min(1),
   code: z.string().optional(),
   details: z.unknown().optional(),
-});
-
-const isoTimestampSchema = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
-  message: 'Expected ISO-8601 timestamp',
 });
 
 export const cncCapabilityDescriptorSchema: z.ZodType<CncCapabilityDescriptor> = z.object({
@@ -249,7 +259,7 @@ export const hostPortSchema: z.ZodType<HostPort> = z.object({
 
 export const hostPortScanResponseSchema: z.ZodType<HostPortScanResponse> = z.object({
   target: z.string().min(1),
-  scannedAt: isoTimestampSchema,
+  scannedAt: z.string().min(1),
   openPorts: z.array(hostPortSchema),
   scan: z.object({
     commandId: z.string().min(1).optional(),
@@ -261,69 +271,58 @@ export const hostPortScanResponseSchema: z.ZodType<HostPortScanResponse> = z.obj
   correlationId: z.string().min(1).optional(),
 });
 
-export const scheduleFrequencySchema = z.enum([
-  'once',
-  'daily',
-  'weekly',
-  'weekdays',
-  'weekends',
-]);
+export const scheduleFrequencySchema = z.enum(['once', 'daily', 'weekly', 'weekdays', 'weekends']);
 
-export const wakeScheduleSchema = z
+export const hostWakeScheduleSchema: z.ZodType<HostWakeSchedule> = z.object({
+  id: z.string().min(1),
+  hostFqn: z.string().min(1),
+  hostName: z.string().min(1),
+  hostMac: z.string().min(1),
+  scheduledTime: z.string().datetime(),
+  frequency: scheduleFrequencySchema,
+  enabled: z.boolean(),
+  notifyOnWake: z.boolean(),
+  timezone: z.string().min(1).max(64),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  lastTriggered: z.string().datetime().optional(),
+  nextTrigger: z.string().datetime().optional(),
+});
+
+export const hostSchedulesResponseSchema: z.ZodType<HostSchedulesResponse> = z.object({
+  schedules: z.array(hostWakeScheduleSchema),
+});
+
+export const createHostWakeScheduleRequestSchema: z.ZodType<CreateHostWakeScheduleRequest> = z
   .object({
-    id: z.string().min(1),
-    hostName: z.string().min(1),
-    hostMac: z.string().min(1),
-    hostFqn: z.string().min(1),
-    scheduledTime: isoTimestampSchema,
-    timezone: z.string().min(1),
+    scheduledTime: z.string().datetime(),
     frequency: scheduleFrequencySchema,
-    enabled: z.boolean(),
-    notifyOnWake: z.boolean(),
-    createdAt: isoTimestampSchema,
-    updatedAt: isoTimestampSchema,
-    lastTriggered: isoTimestampSchema.nullable(),
-    nextTrigger: isoTimestampSchema.nullable(),
+    enabled: z.boolean().optional(),
+    notifyOnWake: z.boolean().optional(),
+    timezone: z.string().min(1).max(64).optional(),
   })
   .strict();
 
-export const wakeScheduleListResponseSchema = z
+export const updateHostWakeScheduleRequestSchema: z.ZodType<UpdateHostWakeScheduleRequest> = z
   .object({
-    schedules: z.array(wakeScheduleSchema),
-  })
-  .strict();
-
-export const createWakeScheduleRequestSchema = z
-  .object({
-    hostName: z.string().min(1),
-    hostMac: z.string().min(1),
-    hostFqn: z.string().min(1),
-    scheduledTime: isoTimestampSchema,
-    timezone: z.string().min(1).default('UTC'),
-    frequency: scheduleFrequencySchema,
-    enabled: z.boolean().default(true),
-    notifyOnWake: z.boolean().default(true),
-    nextTrigger: isoTimestampSchema.nullable().optional(),
-  })
-  .strict();
-
-export const updateWakeScheduleRequestSchema = z
-  .object({
-    hostName: z.string().min(1).optional(),
-    hostMac: z.string().min(1).optional(),
-    hostFqn: z.string().min(1).optional(),
-    scheduledTime: isoTimestampSchema.optional(),
-    timezone: z.string().min(1).optional(),
+    scheduledTime: z.string().datetime().optional(),
     frequency: scheduleFrequencySchema.optional(),
     enabled: z.boolean().optional(),
     notifyOnWake: z.boolean().optional(),
-    nextTrigger: isoTimestampSchema.nullable().optional(),
-    lastTriggered: isoTimestampSchema.nullable().optional(),
+    timezone: z.string().min(1).max(64).optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one field must be provided',
   });
+
+export const deleteHostWakeScheduleResponseSchema: z.ZodType<DeleteHostWakeScheduleResponse> = z
+  .object({
+    success: z.literal(true),
+    id: z.string().min(1),
+  })
+  .strict();
+
 const nodeMetadataSchema = z.object({
   version: z.string().min(1),
   platform: z.string().min(1),
@@ -431,8 +430,8 @@ export const inboundCncCommandSchema: z.ZodType<CncCommand> = z.discriminatedUni
       mac: z.string().min(1).optional(),
       ip: z.string().min(1).optional(),
       status: hostStatusSchema.optional(),
-      notes: z.string().max(2000).nullable().optional(),
-      tags: z.array(z.string().min(1)).max(32).nullable().optional(),
+      notes: hostNotesSchema.optional(),
+      tags: hostTagsSchema.optional(),
     }),
   }),
   z.object({

@@ -237,6 +237,25 @@ describe('HostsController.updateHost', () => {
       );
     });
 
+    it('should accept notes and tags metadata updates', async () => {
+      mockCommandRouter.routeUpdateHostCommand.mockResolvedValueOnce({ success: true });
+
+      const req = createMockRequest({ notes: 'Rack 2', tags: ['prod', 'db'] });
+      const res = createMockResponse();
+
+      await controller.updateHost(req, res);
+
+      expect(mockCommandRouter.routeUpdateHostCommand).toHaveBeenCalledWith(
+        'testhost@location',
+        { notes: 'Rack 2', tags: ['prod', 'db'] },
+        { idempotencyKey: null }
+      );
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Host updated successfully',
+      });
+    });
+
     it('should accept empty body (all fields optional)', async () => {
       mockCommandRouter.routeUpdateHostCommand.mockResolvedValueOnce({ success: true });
 
@@ -384,6 +403,16 @@ describe('HostsController.updateHost', () => {
       expect(mockCommandRouter.routeUpdateHostCommand).not.toHaveBeenCalled();
     });
 
+    it('should reject invalid tags payload', async () => {
+      const req = createMockRequest({ tags: [''] });
+      const res = createMockResponse();
+
+      await controller.updateHost(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(mockCommandRouter.routeUpdateHostCommand).not.toHaveBeenCalled();
+    });
+
     it('should reject extra/unexpected fields (strict mode)', async () => {
       const req = createMockRequest({
         name: 'validname',
@@ -495,4 +524,3 @@ describe('HostsController.updateHost', () => {
     });
   });
 });
-

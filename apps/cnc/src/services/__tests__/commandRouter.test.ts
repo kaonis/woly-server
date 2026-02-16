@@ -201,7 +201,7 @@ describe('CommandRouter', () => {
       });
     });
 
-    it('attaches correlationId when resolving pending command result', () => {
+    it('attaches correlationId when resolving pending command result', async () => {
       const router = commandRouter as unknown as {
         pendingCommands: Map<
           string,
@@ -212,6 +212,7 @@ describe('CommandRouter', () => {
             }>;
             timeout: NodeJS.Timeout;
             correlationId: string | null;
+            commandType: 'wake' | 'scan' | 'update-host' | 'delete-host';
           }
         >;
         handleCommandResult: (result: {
@@ -227,6 +228,7 @@ describe('CommandRouter', () => {
         resolvers: [{ resolve, reject }],
         timeout: setTimeout(() => undefined, 10_000),
         correlationId: 'corr-test-1',
+        commandType: 'scan',
       });
 
       router.handleCommandResult({
@@ -234,6 +236,7 @@ describe('CommandRouter', () => {
         success: true,
         timestamp: new Date(),
       });
+      await new Promise((resolvePromise) => setImmediate(resolvePromise));
 
       expect(resolve).toHaveBeenCalledWith(
         expect.objectContaining({

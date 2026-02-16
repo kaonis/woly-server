@@ -8,7 +8,9 @@ import { createRoutes } from '../index';
 import { NodeManager } from '../../services/nodeManager';
 import { HostAggregator } from '../../services/hostAggregator';
 import { CommandRouter } from '../../services/commandRouter';
+import { runtimeMetrics } from '../../services/runtimeMetrics';
 import { createToken } from './testUtils';
+import { CNC_VERSION } from '../../utils/cncVersion';
 
 // Mock config before importing middleware
 jest.mock('../../config', () => ({
@@ -52,6 +54,10 @@ describe('Node Routes Authentication', () => {
     app = express();
     app.use(express.json());
     app.use('/api', createRoutes(nodeManager, hostAggregator, commandRouter));
+  });
+
+  beforeEach(() => {
+    runtimeMetrics.reset(0);
   });
 
   describe('GET /api/nodes', () => {
@@ -350,6 +356,76 @@ describe('Node Routes Authentication', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('status', 'healthy');
+      expect(response.body).toHaveProperty('version', CNC_VERSION);
+      expect(response.body.metrics?.commands?.outcomesByType).toEqual(
+        expect.objectContaining({
+          wake: expect.objectContaining({ acknowledged: 0, failed: 0, timedOut: 0 }),
+          scan: expect.objectContaining({ acknowledged: 0, failed: 0, timedOut: 0 }),
+          'update-host': expect.objectContaining({ acknowledged: 0, failed: 0, timedOut: 0 }),
+          'delete-host': expect.objectContaining({ acknowledged: 0, failed: 0, timedOut: 0 }),
+        })
+      );
+    });
+
+    it('exposes non-zero command outcome metrics on /api/health', async () => {
+      runtimeMetrics.recordCommandDispatched('cmd-health-wake', 'wake', null, 10);
+      runtimeMetrics.recordCommandResult('cmd-health-wake', true, 25, 'wake');
+      runtimeMetrics.recordCommandDispatched('cmd-health-scan', 'scan', null, 20);
+      runtimeMetrics.recordCommandResult('cmd-health-scan', false, 45, 'scan');
+      runtimeMetrics.recordCommandDispatched('cmd-health-update', 'update-host', null, 30);
+      runtimeMetrics.recordCommandTimeout('cmd-health-update', 70, 'update-host');
+
+      const response = await request(app).get('/api/health');
+
+      expect(response.status).toBe(200);
+      expect(response.body.metrics?.commands?.outcomesByType).toEqual(
+        expect.objectContaining({
+          wake: expect.objectContaining({ acknowledged: 1 }),
+          scan: expect.objectContaining({ failed: 1 }),
+          'update-host': expect.objectContaining({ timedOut: 1 }),
+          'delete-host': expect.objectContaining({ acknowledged: 0, failed: 0, timedOut: 0 }),
+        })
+      );
+    });
+
+    it('allows access to /api/metrics without authentication', async () => {
+      const response = await request(app).get('/api/metrics');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toContain('text/plain');
+      expect(response.text).toContain('woly_cnc_nodes_connected');
+    });
+
+    it('exposes command outcome series for tracked command types and terminal states', async () => {
+      runtimeMetrics.recordCommandDispatched('cmd-wake-ack', 'wake', null, 10);
+      runtimeMetrics.recordCommandResult('cmd-wake-ack', true, 30, 'wake');
+
+      runtimeMetrics.recordCommandDispatched('cmd-scan-fail', 'scan', null, 20);
+      runtimeMetrics.recordCommandResult('cmd-scan-fail', false, 50, 'scan');
+
+      runtimeMetrics.recordCommandDispatched('cmd-update-timeout', 'update-host', null, 30);
+      runtimeMetrics.recordCommandTimeout('cmd-update-timeout', 70, 'update-host');
+
+      runtimeMetrics.recordCommandDispatched('cmd-delete-ack', 'delete-host', null, 40);
+      runtimeMetrics.recordCommandResult('cmd-delete-ack', true, 80, 'delete-host');
+
+      const response = await request(app).get('/api/metrics');
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toContain('text/plain');
+      expect(response.text).toContain('woly_cnc_command_outcomes_total');
+      expect(response.text).toMatch(
+        /woly_cnc_command_outcomes_total\{(?=[^}]*state=\"acknowledged\")(?=[^}]*type=\"wake\")[^}]*\} 1/
+      );
+      expect(response.text).toMatch(
+        /woly_cnc_command_outcomes_total\{(?=[^}]*state=\"failed\")(?=[^}]*type=\"scan\")[^}]*\} 1/
+      );
+      expect(response.text).toMatch(
+        /woly_cnc_command_outcomes_total\{(?=[^}]*state=\"timed_out\")(?=[^}]*type=\"update-host\")[^}]*\} 1/
+      );
+      expect(response.text).toMatch(
+        /woly_cnc_command_outcomes_total\{(?=[^}]*state=\"acknowledged\")(?=[^}]*type=\"delete-host\")[^}]*\} 1/
+      );
     });
   });
 });

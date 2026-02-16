@@ -1,7 +1,9 @@
 import dotenv from 'dotenv';
 
 // Load environment variables
-dotenv.config();
+dotenv.config({
+  quiet: process.env.NODE_ENV === 'test' || process.env.DOTENV_CONFIG_QUIET === 'true',
+});
 
 function getEnvNumber(key: string, defaultValue: number): number {
   const rawValue = process.env[key];

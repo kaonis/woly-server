@@ -1,7 +1,9 @@
 import dotenv from 'dotenv';
 
 // Load environment variables from .env file
-dotenv.config();
+dotenv.config({
+  quiet: process.env.NODE_ENV === 'test' || process.env.DOTENV_CONFIG_QUIET === 'true',
+});
 
 const parsedCorsOrigins = process.env.CORS_ORIGINS
   ?.split(',')
@@ -42,5 +44,10 @@ export const config = {
   },
   auth: {
     apiKey: process.env.NODE_API_KEY,
+  },
+  wakeVerification: {
+    enabled: process.env.WAKE_VERIFY_ENABLED === 'true',
+    timeoutMs: parseInt(process.env.WAKE_VERIFY_TIMEOUT_MS || '10000', 10),
+    pollIntervalMs: parseInt(process.env.WAKE_VERIFY_POLL_INTERVAL_MS || '1000', 10),
   },
 };

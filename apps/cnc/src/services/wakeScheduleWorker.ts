@@ -1,5 +1,5 @@
 import type { CommandRouter } from './commandRouter';
-import WakeScheduleModel from '../models/WakeSchedule';
+import HostScheduleModel from '../models/HostSchedule';
 import logger from '../utils/logger';
 
 interface ProcessDueWakeSchedulesParams {
@@ -14,30 +14,30 @@ interface StartWakeScheduleWorkerParams {
   batchSize: number;
 }
 
-let wakeScheduleInterval: NodeJS.Timeout | null = null;
-let tickInProgress = false;
+let workerInterval: NodeJS.Timeout | null = null;
+let isTickRunning = false;
 
 export async function processDueWakeSchedules(
   params: ProcessDueWakeSchedulesParams,
 ): Promise<number> {
-  const schedules = await WakeScheduleModel.listDue(params.batchSize ?? 25);
-  if (schedules.length === 0) {
+  const dueSchedules = await HostScheduleModel.listDue(params.batchSize ?? 25);
+  if (dueSchedules.length === 0) {
     return 0;
   }
 
-  for (const schedule of schedules) {
+  for (const schedule of dueSchedules) {
     const attemptedAt = new Date().toISOString();
-    const correlationId = `wake-schedule:${schedule.id}:${Date.now()}`;
+    const correlationId = `schedule:${schedule.id}:${Date.now()}`;
 
     try {
       await params.commandRouter.routeWakeCommand(schedule.hostFqn, { correlationId });
-      logger.info('Wake schedule command dispatched', {
+      logger.info('Wake schedule executed', {
         scheduleId: schedule.id,
         hostFqn: schedule.hostFqn,
         correlationId,
       });
     } catch (error) {
-      logger.warn('Wake schedule dispatch failed', {
+      logger.warn('Wake schedule execution failed', {
         scheduleId: schedule.id,
         hostFqn: schedule.hostFqn,
         correlationId,
@@ -46,9 +46,9 @@ export async function processDueWakeSchedules(
     }
 
     try {
-      await WakeScheduleModel.recordExecutionAttempt(schedule.id, attemptedAt);
+      await HostScheduleModel.recordExecutionAttempt(schedule.id, attemptedAt);
     } catch (error) {
-      logger.error('Failed to persist wake schedule execution attempt', {
+      logger.error('Failed to record wake schedule execution attempt', {
         scheduleId: schedule.id,
         hostFqn: schedule.hostFqn,
         attemptedAt,
@@ -57,13 +57,13 @@ export async function processDueWakeSchedules(
     }
   }
 
-  return schedules.length;
+  return dueSchedules.length;
 }
 
 export function startWakeScheduleWorker(params: StartWakeScheduleWorkerParams): void {
-  if (wakeScheduleInterval) {
-    clearInterval(wakeScheduleInterval);
-    wakeScheduleInterval = null;
+  if (workerInterval) {
+    clearInterval(workerInterval);
+    workerInterval = null;
   }
 
   if (!params.enabled) {
@@ -71,30 +71,31 @@ export function startWakeScheduleWorker(params: StartWakeScheduleWorkerParams): 
     return;
   }
 
-  const tick = async () => {
-    if (tickInProgress) {
+  const runTick = async () => {
+    if (isTickRunning) {
       return;
     }
 
-    tickInProgress = true;
+    isTickRunning = true;
     try {
-      const processed = await processDueWakeSchedules({
+      const count = await processDueWakeSchedules({
         commandRouter: params.commandRouter,
         batchSize: params.batchSize,
       });
-      if (processed > 0) {
-        logger.info('Processed due wake schedules', { processed });
+
+      if (count > 0) {
+        logger.info('Processed due wake schedules', { count });
       }
     } catch (error) {
       logger.error('Wake schedule worker tick failed', { error });
     } finally {
-      tickInProgress = false;
+      isTickRunning = false;
     }
   };
 
-  void tick();
-  wakeScheduleInterval = setInterval(() => {
-    void tick();
+  void runTick();
+  workerInterval = setInterval(() => {
+    void runTick();
   }, params.pollIntervalMs);
 
   logger.info('Wake schedule worker started', {
@@ -104,9 +105,9 @@ export function startWakeScheduleWorker(params: StartWakeScheduleWorkerParams): 
 }
 
 export function stopWakeScheduleWorker(): void {
-  if (wakeScheduleInterval) {
-    clearInterval(wakeScheduleInterval);
-    wakeScheduleInterval = null;
+  if (workerInterval) {
+    clearInterval(workerInterval);
+    workerInterval = null;
     logger.info('Wake schedule worker stopped');
   }
 }

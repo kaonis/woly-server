@@ -49,6 +49,10 @@ describe('RuntimeMetrics', () => {
     expect(snapshot.commands.acknowledged).toBe(1);
     expect(snapshot.commands.failed).toBe(1);
     expect(snapshot.commands.timedOut).toBe(1);
+    expect(snapshot.commands.outcomesByType.wake.acknowledged).toBe(1);
+    expect(snapshot.commands.outcomesByType.scan.failed).toBe(1);
+    expect(snapshot.commands.outcomesByType['delete-host'].timedOut).toBe(1);
+    expect(snapshot.commands.unknownAttribution.total).toBe(0);
     expect(snapshot.commands.timeoutRate).toBeCloseTo(0.3333, 4);
     expect(snapshot.commands.avgLatencyMs).toBe(177);
     expect(snapshot.commands.byType.wake.acknowledged).toBe(1);
@@ -57,5 +61,42 @@ describe('RuntimeMetrics', () => {
     expect(snapshot.correlations.recentResolved).toHaveLength(2);
     expect(metrics.lookupCorrelationId('cmd-1')).toBe('corr-1');
     expect(metrics.lookupCorrelationId('cmd-3')).toBeNull();
+  });
+
+  it('uses command type hints when resolving outcomes without an active dispatch record', () => {
+    const metrics = new RuntimeMetrics();
+    metrics.reset(1000);
+
+    metrics.recordCommandResult('cmd-orphan-fail', false, 1100, 'update-host');
+    metrics.recordCommandTimeout('cmd-orphan-timeout', 1300, 'wake');
+
+    const snapshot = metrics.snapshot(1400);
+    expect(snapshot.commands.outcomesByType['update-host'].failed).toBe(1);
+    expect(snapshot.commands.outcomesByType.wake.timedOut).toBe(1);
+    expect(snapshot.commands.outcomesByType.scan.acknowledged).toBe(0);
+    expect(snapshot.commands.outcomesByType['delete-host'].failed).toBe(0);
+    expect(snapshot.commands.unknownAttribution.total).toBe(0);
+  });
+
+  it('tracks explicit unknown-attribution outcome counters', () => {
+    const metrics = new RuntimeMetrics();
+    metrics.reset(1000);
+
+    metrics.recordCommandResult('cmd-unknown-ack', true, 1010);
+    metrics.recordCommandResult('cmd-unknown-fail', false, 1020);
+    metrics.recordCommandTimeout('cmd-unknown-timeout', 1030);
+
+    const snapshot = metrics.snapshot(1100);
+    expect(snapshot.commands.unknownAttribution).toEqual({
+      acknowledged: 1,
+      failed: 1,
+      timedOut: 1,
+      total: 3,
+    });
+    expect(snapshot.commands.outcomesByType.unknown).toEqual({
+      acknowledged: 1,
+      failed: 1,
+      timedOut: 1,
+    });
   });
 });

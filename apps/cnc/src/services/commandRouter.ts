@@ -18,7 +18,7 @@ interface HostUpdateData {
   ip?: string;
   status?: HostStatus;
   notes?: string | null;
-  tags?: string[] | null;
+  tags?: string[];
 }
 
 /**
@@ -45,6 +45,7 @@ export class CommandRouter extends EventEmitter {
     }>;
     timeout: NodeJS.Timeout;
     correlationId: string | null;
+    commandType: DispatchCommand['type'];
   }>;
   readonly commandTimeout: number;
   readonly maxRetries: number;
@@ -196,12 +197,12 @@ export class CommandRouter extends EventEmitter {
       commandId,
       data: {
         currentName: host.name,
-        name: hostData.name || host.name,
-        mac: hostData.mac || host.mac,
-        ip: hostData.ip || host.ip,
-        status: hostData.status || host.status,
-        ...(hostData.notes !== undefined ? { notes: hostData.notes } : {}),
-        ...(hostData.tags !== undefined ? { tags: hostData.tags } : {}),
+        name: hostData.name ?? host.name,
+        mac: hostData.mac ?? host.mac,
+        ip: hostData.ip ?? host.ip,
+        status: hostData.status ?? host.status,
+        notes: hostData.notes !== undefined ? hostData.notes : host.notes,
+        tags: hostData.tags !== undefined ? hostData.tags : host.tags,
       },
     };
 
@@ -331,7 +332,7 @@ export class CommandRouter extends EventEmitter {
       const timeout = setTimeout(() => {
         const pending = this.pendingCommands.get(effectiveCommandId);
         this.pendingCommands.delete(effectiveCommandId);
-        runtimeMetrics.recordCommandTimeout(effectiveCommandId);
+        runtimeMetrics.recordCommandTimeout(effectiveCommandId, Date.now(), command.type);
         
         const attemptNumber = record.retryCount + 1; // Current attempt number
         const error = new Error(`Command ${effectiveCommandId} timed out after ${this.commandTimeout}ms (attempt ${attemptNumber}/${this.maxRetries})`);
@@ -356,6 +357,7 @@ export class CommandRouter extends EventEmitter {
         resolvers: [{ resolve, reject }],
         timeout,
         correlationId: options.correlationId,
+        commandType: command.type,
       });
 
       void (async () => {
@@ -402,7 +404,7 @@ export class CommandRouter extends EventEmitter {
           const err = error instanceof Error ? error : new Error(message);
           
           await CommandModel.markFailed(effectiveCommandId, message);
-          runtimeMetrics.recordCommandResult(effectiveCommandId, false);
+          runtimeMetrics.recordCommandResult(effectiveCommandId, false, Date.now(), command.type);
           
           logger.error('Failed to send command', {
             commandId: effectiveCommandId,
@@ -428,15 +430,25 @@ export class CommandRouter extends EventEmitter {
    * @param result Command result
    */
   private handleCommandResult(result: CommandResult): void {
-    runtimeMetrics.recordCommandResult(result.commandId, result.success);
+    void this.applyCommandResult(result);
+  }
+
+  private async applyCommandResult(result: CommandResult): Promise<void> {
+    const pending = this.pendingCommands.get(result.commandId);
+    const metricCommandType =
+      pending?.commandType ?? (await this.resolvePersistedCommandType(result.commandId));
+    runtimeMetrics.recordCommandResult(
+      result.commandId,
+      result.success,
+      Date.now(),
+      metricCommandType
+    );
     logger.debug('Received command result', {
       commandId: result.commandId,
       success: result.success,
       error: result.error,
       correlationId: runtimeMetrics.lookupCorrelationId(result.commandId),
     });
-
-    const pending = this.pendingCommands.get(result.commandId);
     
     // Always persist the result state, even if no pending resolver exists
     // (e.g., after a process restart or if the HTTP caller disconnected)
@@ -487,6 +499,19 @@ export class CommandRouter extends EventEmitter {
 
     for (const resolver of pending.resolvers) {
       resolver.reject(new Error(result.error || 'Command failed'));
+    }
+  }
+
+  private async resolvePersistedCommandType(commandId: string): Promise<string | null> {
+    try {
+      const record = await CommandModel.findById(commandId);
+      return record?.type ?? null;
+    } catch (error) {
+      logger.warn('Failed to resolve persisted command type for result attribution', {
+        commandId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
     }
   }
 

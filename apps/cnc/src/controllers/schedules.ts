@@ -1,184 +1,136 @@
 import { Request, Response } from 'express';
 import {
-  createWakeScheduleRequestSchema,
-  updateWakeScheduleRequestSchema,
-  wakeScheduleListResponseSchema,
-  wakeScheduleSchema,
+  createHostWakeScheduleRequestSchema,
+  updateHostWakeScheduleRequestSchema,
 } from '@kaonis/woly-protocol';
-import { z } from 'zod';
-import { WakeScheduleModel } from '../models/WakeSchedule';
+import { HostAggregator } from '../services/hostAggregator';
+import HostScheduleModel from '../models/HostSchedule';
 import logger from '../utils/logger';
 
-const listSchedulesQuerySchema = z.object({
-  hostFqn: z.string().min(1).optional(),
-});
-
-function isValidTimezone(timezone: string): boolean {
-  try {
-    Intl.DateTimeFormat('en-US', { timeZone: timezone });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function badRequest(res: Response, message: string, details?: unknown): void {
-  res.status(400).json({
-    error: 'Bad Request',
-    message,
-    ...(details ? { details } : {}),
-  });
-}
-
-function ownerSub(req: Request): string | null {
-  return req.auth?.sub ?? null;
-}
-
 export class SchedulesController {
+  constructor(private readonly hostAggregator: HostAggregator) {}
+
   /**
    * @swagger
-   * /api/schedules:
+   * /api/hosts/{fqn}/schedules:
    *   get:
-   *     summary: List wake schedules for authenticated subject
-   *     description: Returns wake schedules scoped to the authenticated JWT subject with optional host FQN filter.
-   *     tags: [Schedules]
+   *     summary: List wake schedules for a host
+   *     tags: [Hosts]
    *     security:
    *       - bearerAuth: []
    *     parameters:
-   *       - in: query
-   *         name: hostFqn
+   *       - in: path
+   *         name: fqn
+   *         required: true
    *         schema:
    *           type: string
-   *         description: Optional fully-qualified host identity filter (hostname@location)
-   *         example: office-pc@home-node
    *     responses:
    *       200:
-   *         description: Wake schedules list
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 schedules:
-   *                   type: array
-   *                   items:
-   *                     $ref: '#/components/schemas/WakeSchedule'
+   *         description: Host schedules
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
-   *       500:
-   *         $ref: '#/components/responses/InternalError'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
    */
-  async listSchedules(req: Request, res: Response): Promise<void> {
+  async listHostSchedules(req: Request, res: Response): Promise<void> {
     try {
-      const authSub = ownerSub(req);
-      if (!authSub) {
-        res.status(401).json({
-          error: 'Unauthorized',
-          message: 'Authentication required',
-          code: 'AUTH_UNAUTHORIZED',
+      const fqn = req.params.fqn as string;
+      const host = await this.hostAggregator.getHostByFQN(fqn);
+
+      if (!host) {
+        res.status(404).json({
+          error: 'Not Found',
+          message: `Host ${fqn} not found`,
         });
         return;
       }
 
-      const queryParse = listSchedulesQuerySchema.safeParse(req.query);
-      if (!queryParse.success) {
-        badRequest(res, 'Invalid query parameters', queryParse.error.issues);
-        return;
-      }
-
-      const schedules = await WakeScheduleModel.list(authSub, queryParse.data.hostFqn);
-      const payload = wakeScheduleListResponseSchema.parse({ schedules });
-      res.status(200).json(payload);
+      const schedules = await HostScheduleModel.listByHostFqn(fqn);
+      res.json({ schedules });
     } catch (error) {
-      logger.error('Failed to list wake schedules', {
-        ownerSub: req.auth?.sub,
-        correlationId: req.correlationId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
+      logger.error('Failed to list host schedules', { fqn: req.params.fqn, error });
       res.status(500).json({
         error: 'Internal Server Error',
-        message: 'Failed to retrieve wake schedules',
+        message: 'Failed to list host schedules',
       });
     }
   }
 
   /**
    * @swagger
-   * /api/schedules:
+   * /api/hosts/{fqn}/schedules:
    *   post:
-   *     summary: Create wake schedule
-   *     description: Creates a wake schedule scoped to the authenticated JWT subject.
-   *     tags: [Schedules]
+   *     summary: Create a wake schedule for a host
+   *     tags: [Hosts]
    *     security:
    *       - bearerAuth: []
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             $ref: '#/components/schemas/CreateWakeScheduleRequest'
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
    *     responses:
    *       201:
-   *         description: Created wake schedule
-   *         content:
-   *           application/json:
-   *             schema:
-   *               $ref: '#/components/schemas/WakeSchedule'
+   *         description: Created schedule
    *       400:
    *         $ref: '#/components/responses/BadRequest'
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
-   *       500:
-   *         $ref: '#/components/responses/InternalError'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
    */
-  async createSchedule(req: Request, res: Response): Promise<void> {
+  async createHostSchedule(req: Request, res: Response): Promise<void> {
     try {
-      const authSub = ownerSub(req);
-      if (!authSub) {
-        res.status(401).json({
-          error: 'Unauthorized',
-          message: 'Authentication required',
-          code: 'AUTH_UNAUTHORIZED',
+      const fqn = req.params.fqn as string;
+      const host = await this.hostAggregator.getHostByFQN(fqn);
+
+      if (!host) {
+        res.status(404).json({
+          error: 'Not Found',
+          message: `Host ${fqn} not found`,
         });
         return;
       }
 
-      const parseResult = createWakeScheduleRequestSchema.safeParse(req.body);
+      const parseResult = createHostWakeScheduleRequestSchema.safeParse(req.body);
       if (!parseResult.success) {
-        badRequest(res, 'Invalid request body', parseResult.error.issues);
+        res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid request body',
+          details: parseResult.error.issues,
+        });
         return;
       }
 
-      if (!isValidTimezone(parseResult.data.timezone)) {
-        badRequest(res, 'timezone must be a valid IANA timezone name');
-        return;
-      }
-
-      const created = await WakeScheduleModel.create(authSub, parseResult.data);
-      const payload = wakeScheduleSchema.parse(created);
-      res.status(201).json(payload);
-    } catch (error) {
-      logger.error('Failed to create wake schedule', {
-        ownerSub: req.auth?.sub,
-        correlationId: req.correlationId,
-        error: error instanceof Error ? error.message : String(error),
+      const payload = parseResult.data;
+      const created = await HostScheduleModel.create({
+        hostFqn: fqn,
+        hostName: host.name,
+        hostMac: host.mac,
+        scheduledTime: payload.scheduledTime,
+        frequency: payload.frequency,
+        enabled: payload.enabled ?? true,
+        notifyOnWake: payload.notifyOnWake ?? true,
+        timezone: payload.timezone ?? 'UTC',
       });
 
+      res.status(201).json(created);
+    } catch (error) {
+      logger.error('Failed to create host schedule', { fqn: req.params.fqn, error });
       res.status(500).json({
         error: 'Internal Server Error',
-        message: 'Failed to create wake schedule',
+        message: 'Failed to create host schedule',
       });
     }
   }
 
   /**
    * @swagger
-   * /api/schedules/{id}:
+   * /api/hosts/schedules/{id}:
    *   put:
-   *     summary: Update wake schedule
-   *     description: Updates a wake schedule owned by the authenticated JWT subject.
-   *     tags: [Schedules]
+   *     summary: Update wake schedule by id
+   *     tags: [Hosts]
    *     security:
    *       - bearerAuth: []
    *     parameters:
@@ -187,94 +139,54 @@ export class SchedulesController {
    *         required: true
    *         schema:
    *           type: string
-   *         description: Wake schedule ID
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             $ref: '#/components/schemas/UpdateWakeScheduleRequest'
    *     responses:
    *       200:
-   *         description: Updated wake schedule
-   *         content:
-   *           application/json:
-   *             schema:
-   *               $ref: '#/components/schemas/WakeSchedule'
+   *         description: Updated schedule
    *       400:
    *         $ref: '#/components/responses/BadRequest'
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
    *       404:
    *         $ref: '#/components/responses/NotFound'
-   *       500:
-   *         $ref: '#/components/responses/InternalError'
    */
   async updateSchedule(req: Request, res: Response): Promise<void> {
     try {
-      const authSub = ownerSub(req);
-      if (!authSub) {
-        res.status(401).json({
-          error: 'Unauthorized',
-          message: 'Authentication required',
-          code: 'AUTH_UNAUTHORIZED',
+      const id = req.params.id as string;
+      const parseResult = updateHostWakeScheduleRequestSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid request body',
+          details: parseResult.error.issues,
         });
         return;
       }
 
-      const scheduleId = typeof req.params.id === 'string' ? req.params.id.trim() : '';
-      if (!scheduleId) {
-        badRequest(res, 'Schedule id is required');
-        return;
-      }
-
-      const parseResult = updateWakeScheduleRequestSchema.safeParse(req.body);
-      if (!parseResult.success) {
-        badRequest(res, 'Invalid request body', parseResult.error.issues);
-        return;
-      }
-
-      if (
-        parseResult.data.timezone !== undefined &&
-        !isValidTimezone(parseResult.data.timezone)
-      ) {
-        badRequest(res, 'timezone must be a valid IANA timezone name');
-        return;
-      }
-
-      const updated = await WakeScheduleModel.update(authSub, scheduleId, parseResult.data);
+      const updated = await HostScheduleModel.update(id, parseResult.data);
       if (!updated) {
         res.status(404).json({
           error: 'Not Found',
-          message: `Wake schedule ${scheduleId} not found`,
+          message: `Schedule ${id} not found`,
         });
         return;
       }
 
-      const payload = wakeScheduleSchema.parse(updated);
-      res.status(200).json(payload);
+      res.json(updated);
     } catch (error) {
-      logger.error('Failed to update wake schedule', {
-        ownerSub: req.auth?.sub,
-        scheduleId: req.params.id,
-        correlationId: req.correlationId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
+      logger.error('Failed to update schedule', { id: req.params.id, error });
       res.status(500).json({
         error: 'Internal Server Error',
-        message: 'Failed to update wake schedule',
+        message: 'Failed to update schedule',
       });
     }
   }
 
   /**
    * @swagger
-   * /api/schedules/{id}:
+   * /api/hosts/schedules/{id}:
    *   delete:
-   *     summary: Delete wake schedule
-   *     description: Deletes a wake schedule owned by the authenticated JWT subject.
-   *     tags: [Schedules]
+   *     summary: Delete wake schedule by id
+   *     tags: [Hosts]
    *     security:
    *       - bearerAuth: []
    *     parameters:
@@ -283,56 +195,32 @@ export class SchedulesController {
    *         required: true
    *         schema:
    *           type: string
-   *         description: Wake schedule ID
    *     responses:
    *       200:
-   *         description: Schedule deleted
+   *         description: Deleted schedule
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
    *       404:
    *         $ref: '#/components/responses/NotFound'
-   *       500:
-   *         $ref: '#/components/responses/InternalError'
    */
   async deleteSchedule(req: Request, res: Response): Promise<void> {
     try {
-      const authSub = ownerSub(req);
-      if (!authSub) {
-        res.status(401).json({
-          error: 'Unauthorized',
-          message: 'Authentication required',
-          code: 'AUTH_UNAUTHORIZED',
-        });
-        return;
-      }
-
-      const scheduleId = typeof req.params.id === 'string' ? req.params.id.trim() : '';
-      if (!scheduleId) {
-        badRequest(res, 'Schedule id is required');
-        return;
-      }
-
-      const deleted = await WakeScheduleModel.delete(authSub, scheduleId);
+      const id = req.params.id as string;
+      const deleted = await HostScheduleModel.delete(id);
       if (!deleted) {
         res.status(404).json({
           error: 'Not Found',
-          message: `Wake schedule ${scheduleId} not found`,
+          message: `Schedule ${id} not found`,
         });
         return;
       }
 
-      res.status(200).json({ success: true });
+      res.json({ success: true, id });
     } catch (error) {
-      logger.error('Failed to delete wake schedule', {
-        ownerSub: req.auth?.sub,
-        scheduleId: req.params.id,
-        correlationId: req.correlationId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
+      logger.error('Failed to delete schedule', { id: req.params.id, error });
       res.status(500).json({
         error: 'Internal Server Error',
-        message: 'Failed to delete wake schedule',
+        message: 'Failed to delete schedule',
       });
     }
   }

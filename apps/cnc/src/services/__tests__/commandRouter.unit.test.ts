@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { CommandRouter } from '../commandRouter';
 import { CommandModel } from '../../models/Command';
 import type { CommandResult } from '../../types';
+import { runtimeMetrics } from '../runtimeMetrics';
 import logger from '../../utils/logger';
 
 interface CommandResolver {
@@ -37,6 +38,8 @@ type HostRecord = {
   mac: string;
   ip: string;
   status: 'awake' | 'asleep';
+  notes?: string | null;
+  tags?: string[];
 };
 
 type HostAggregatorMock = {
@@ -88,6 +91,11 @@ function createQueuedRecord(commandId: string, payload: unknown) {
 }
 
 describe('CommandRouter unit behavior', () => {
+  beforeEach(() => {
+    runtimeMetrics.reset(0);
+    jest.spyOn(CommandModel, 'findById').mockResolvedValue(null);
+  });
+
   afterEach(() => {
     jest.restoreAllMocks();
     jest.useRealTimers();
@@ -198,7 +206,53 @@ describe('CommandRouter unit behavior', () => {
           mac: '00:11:22:33:44:55',
           ip: '10.0.0.10',
           status: 'asleep',
+          notes: undefined,
+          tags: undefined,
         },
+      }),
+      {
+        idempotencyKey: null,
+        correlationId: null,
+      }
+    );
+    router.cleanup();
+  });
+
+  it('builds update-host payload with metadata overrides', async () => {
+    const { router, hostAggregator, nodeManager } = createRouter();
+    hostAggregator.getHostByFQN.mockResolvedValue({
+      nodeId: 'node-2',
+      name: 'old-name',
+      mac: '00:11:22:33:44:55',
+      ip: '10.0.0.10',
+      status: 'asleep',
+      notes: 'legacy note',
+      tags: ['legacy'],
+    });
+    nodeManager.getNodeStatus.mockResolvedValue('online');
+
+    const executeSpy = jest.spyOn(
+      router as unknown as CommandRouterInternals,
+      'executeCommand'
+    ).mockResolvedValue({
+      commandId: 'cmd-update-2',
+      success: true,
+      timestamp: new Date(),
+    });
+
+    await router.routeUpdateHostCommand('old-name@SiteA', {
+      notes: null,
+      tags: ['prod', 'critical'],
+    });
+
+    expect(executeSpy).toHaveBeenCalledWith(
+      'node-2',
+      expect.objectContaining({
+        type: 'update-host',
+        data: expect.objectContaining({
+          notes: null,
+          tags: ['prod', 'critical'],
+        }),
       }),
       {
         idempotencyKey: null,
@@ -737,6 +791,38 @@ describe('CommandRouter unit behavior', () => {
       'Failed to mark command as failed',
       expect.objectContaining({ commandId: 'cmd-fail-persist-fail' })
     );
+    router.cleanup();
+  });
+
+  it('attributes metrics to persisted command type when pending state is missing', async () => {
+    const { internals, router } = createRouter();
+    jest.spyOn(CommandModel, 'findById').mockResolvedValue({
+      id: 'cmd-late-result',
+      nodeId: 'node-1',
+      type: 'wake',
+      payload: { type: 'wake', commandId: 'cmd-late-result', data: { hostName: 'desk', mac: 'AA' } },
+      idempotencyKey: null,
+      state: 'sent',
+      error: null,
+      retryCount: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      sentAt: new Date(),
+      completedAt: null,
+    });
+    jest.spyOn(CommandModel, 'markFailed').mockResolvedValue(undefined);
+
+    internals.handleCommandResult({
+      commandId: 'cmd-late-result',
+      success: false,
+      error: 'late result failure',
+      timestamp: new Date(),
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(runtimeMetrics.snapshot().commands.outcomesByType.wake.failed).toBe(1);
+    expect(runtimeMetrics.snapshot().commands.outcomesByType.unknown).toBeUndefined();
     router.cleanup();
   });
 

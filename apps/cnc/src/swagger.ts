@@ -54,12 +54,8 @@ const options: swaggerJsdoc.Options = {
         description: 'Aggregated host management across nodes',
       },
       {
-        name: 'Capabilities',
-        description: 'Feature negotiation and version metadata',
-      },
-      {
-        name: 'Schedules',
-        description: 'Server-managed wake schedule CRUD endpoints',
+        name: 'Meta',
+        description: 'Capability negotiation and metadata endpoints',
       },
       {
         name: 'Admin',
@@ -157,6 +153,20 @@ const options: swaggerJsdoc.Options = {
               description: 'ICMP ping responsiveness: 1 (responds), 0 (no response), null (not tested)',
               example: 1,
               nullable: true,
+            },
+            notes: {
+              type: 'string',
+              description: 'Optional operator notes for this host',
+              example: 'Patch window Sundays 03:00 UTC',
+              nullable: true,
+            },
+            tags: {
+              type: 'array',
+              description: 'Optional host tags for filtering/grouping',
+              items: {
+                type: 'string',
+              },
+              example: ['prod', 'database'],
             },
             nodeId: {
               type: 'string',
@@ -274,238 +284,6 @@ const options: swaggerJsdoc.Options = {
               type: 'string',
               description: 'Request correlation identifier for end-to-end tracing',
               example: 'corr_2a8f6842-6f8f-4e8f-b6dc-f7dbd9a18e68',
-            },
-          },
-        },
-        CapabilitiesResponse: {
-          type: 'object',
-          required: ['apiVersion', 'protocolVersion', 'supportedProtocolVersions', 'capabilities'],
-          properties: {
-            apiVersion: {
-              type: 'string',
-              description: 'CNC API version',
-              example: '1.0.0',
-            },
-            protocolVersion: {
-              type: 'string',
-              description: 'Current active protocol version used by C&C and nodes',
-              example: '1.0.0',
-            },
-            supportedProtocolVersions: {
-              type: 'array',
-              description: 'List of accepted protocol versions',
-              items: {
-                type: 'string',
-              },
-              example: ['1.0.0'],
-            },
-            capabilities: {
-              type: 'object',
-              required: [
-                'scan',
-                'notesTagsPersistence',
-                'schedulesApi',
-                'commandStatusStreaming',
-              ],
-              properties: {
-                scan: {
-                  type: 'boolean',
-                  description: 'Whether CNC scan command API is available for mobile clients',
-                  example: false,
-                },
-                notesTagsPersistence: {
-                  type: 'boolean',
-                  description: 'Whether host notes/tags persistence is supported server-side',
-                  example: true,
-                },
-                schedulesApi: {
-                  type: 'boolean',
-                  description: 'Whether server-managed wake schedule CRUD is available',
-                  example: true,
-                },
-                commandStatusStreaming: {
-                  type: 'boolean',
-                  description: 'Whether command lifecycle streaming is available to clients',
-                  example: false,
-                },
-              },
-            },
-          },
-        },
-        ScheduleFrequency: {
-          type: 'string',
-          enum: ['once', 'daily', 'weekly', 'weekdays', 'weekends'],
-          description: 'Wake schedule recurrence frequency',
-          example: 'daily',
-        },
-        WakeSchedule: {
-          type: 'object',
-          required: [
-            'id',
-            'hostName',
-            'hostMac',
-            'hostFqn',
-            'scheduledTime',
-            'timezone',
-            'frequency',
-            'enabled',
-            'notifyOnWake',
-            'createdAt',
-            'updatedAt',
-            'lastTriggered',
-            'nextTrigger',
-          ],
-          properties: {
-            id: {
-              type: 'string',
-              description: 'Wake schedule identifier',
-              example: '8ca21661-2333-4af7-a78c-c8518caef5ee',
-            },
-            hostName: {
-              type: 'string',
-              description: 'Display host name',
-              example: 'Office-Mac',
-            },
-            hostMac: {
-              type: 'string',
-              description: 'Host MAC address',
-              example: '00:11:22:33:44:55',
-            },
-            hostFqn: {
-              type: 'string',
-              description: 'Fully-qualified host identity (hostname@location)',
-              example: 'Office-Mac@Home',
-            },
-            scheduledTime: {
-              type: 'string',
-              format: 'date-time',
-              description: 'Anchor schedule time in ISO-8601 UTC',
-              example: '2026-02-16T08:00:00.000Z',
-            },
-            timezone: {
-              type: 'string',
-              description: 'IANA timezone used by client-side recurrence calculations',
-              example: 'America/New_York',
-            },
-            frequency: {
-              $ref: '#/components/schemas/ScheduleFrequency',
-            },
-            enabled: {
-              type: 'boolean',
-              description: 'Whether schedule is active',
-              example: true,
-            },
-            notifyOnWake: {
-              type: 'boolean',
-              description: 'Whether client should notify on wake execution',
-              example: true,
-            },
-            createdAt: {
-              type: 'string',
-              format: 'date-time',
-              example: '2026-02-15T20:00:00.000Z',
-            },
-            updatedAt: {
-              type: 'string',
-              format: 'date-time',
-              example: '2026-02-15T20:00:00.000Z',
-            },
-            lastTriggered: {
-              type: 'string',
-              format: 'date-time',
-              nullable: true,
-              example: null,
-            },
-            nextTrigger: {
-              type: 'string',
-              format: 'date-time',
-              nullable: true,
-              example: '2026-02-16T08:00:00.000Z',
-            },
-          },
-        },
-        CreateWakeScheduleRequest: {
-          type: 'object',
-          required: ['hostName', 'hostMac', 'hostFqn', 'scheduledTime', 'frequency'],
-          properties: {
-            hostName: {
-              type: 'string',
-              example: 'Office-Mac',
-            },
-            hostMac: {
-              type: 'string',
-              example: '00:11:22:33:44:55',
-            },
-            hostFqn: {
-              type: 'string',
-              example: 'Office-Mac@Home',
-            },
-            scheduledTime: {
-              type: 'string',
-              format: 'date-time',
-              example: '2026-02-16T08:00:00.000Z',
-            },
-            timezone: {
-              type: 'string',
-              example: 'UTC',
-            },
-            frequency: {
-              $ref: '#/components/schemas/ScheduleFrequency',
-            },
-            enabled: {
-              type: 'boolean',
-              example: true,
-            },
-            notifyOnWake: {
-              type: 'boolean',
-              example: true,
-            },
-            nextTrigger: {
-              type: 'string',
-              format: 'date-time',
-              nullable: true,
-              example: '2026-02-16T08:00:00.000Z',
-            },
-          },
-        },
-        UpdateWakeScheduleRequest: {
-          type: 'object',
-          description: 'Partial update payload; at least one property is required',
-          properties: {
-            hostName: {
-              type: 'string',
-            },
-            hostMac: {
-              type: 'string',
-            },
-            hostFqn: {
-              type: 'string',
-            },
-            scheduledTime: {
-              type: 'string',
-              format: 'date-time',
-            },
-            timezone: {
-              type: 'string',
-            },
-            frequency: {
-              $ref: '#/components/schemas/ScheduleFrequency',
-            },
-            enabled: {
-              type: 'boolean',
-            },
-            notifyOnWake: {
-              type: 'boolean',
-            },
-            nextTrigger: {
-              type: 'string',
-              format: 'date-time',
-              nullable: true,
-            },
-            lastTriggered: {
-              type: 'string',
-              format: 'date-time',
-              nullable: true,
             },
           },
         },

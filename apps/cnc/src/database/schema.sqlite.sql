@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS aggregated_hosts (
     fully_qualified_name TEXT NOT NULL,
     discovered INTEGER NOT NULL DEFAULT 1,
     ping_responsive INTEGER,
+    notes TEXT,
+    tags TEXT NOT NULL DEFAULT '[]',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE,

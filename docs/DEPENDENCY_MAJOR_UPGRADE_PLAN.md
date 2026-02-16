@@ -61,12 +61,12 @@ Primary impact:
 7. Wave G: ESLint 10 compatibility watchdog automation  
    Tracking issue: #159
 
-## 4. Decision Table (2026-02-16 refresh)
+## 4. Decision Table (2026-02-15)
 
 | Dependency | Decision | Rationale | Tracking |
 |---|---|---|---|
 | ESLint v9 | Merged | Adopted with typescript-eslint v8 via PR #151 | #146 |
-| ESLint v10 | Merged | Unblocked by `@typescript-eslint/*@8.56.0` peer support (`eslint ^8.57.0 || ^9.0.0 || ^10.0.0`); adopted with local gate validation in issue #150 | #150 |
+| ESLint v10 | Deferred pending upstream compatibility | Still blocked: latest `@typescript-eslint/*@8.55.0` peers `eslint ^8.57.0 || ^9.0.0`; Renovate PR #11 currently unstable | #150 |
 | typescript-eslint v8 | Merged | Upgraded with ESLint v9 toolchain migration via PR #151 | #146 |
 | eslint-config-prettier v10 | Merged | Upgraded with ESLint v9 toolchain migration via PR #151 | #146 |
 | Zod v4 | Merged | Runtime schema compatibility validated across protocol/C&C/node-agent and merged via PR #152 | #147 |
@@ -83,14 +83,114 @@ Issue #144 is complete when:
 2. Execution/defer follow-up issues are in place (#146, #147, #148, #150).
 3. Dependency dashboard comment history references these decisions for auditability.
 
-## 6. Rolling Operations Checkpoints
+## 6. Checkpoint Updates
 
-- 2026-02-16: Manual-CI operations checkpoint (issue #251) confirmed no unexpected workflow events since `2026-02-15T17:07:43Z`; observed 4 allowlisted `pull_request` runs for `CNC Mobile Contract Gate` and 2 `workflow_dispatch` runs.
-- 2026-02-16: Policy baseline remains manual-first with one approved automation exception (path-scoped `CNC Mobile Contract Gate`), and next weekly review is queued in #273.
-- 2026-02-16: Manual-CI operations checkpoint (issue #273) confirmed no unexpected workflow events since `2026-02-16T18:31:42Z`; scoped window contained 0 runs.
-- 2026-02-16: Manual-first policy baseline remains unchanged; next weekly review is queued in #275.
-- 2026-02-16: Manual-CI operations checkpoint (issue #275) confirmed no unexpected workflow events since `2026-02-16T18:33:09Z`; scoped window contained 0 runs.
-- 2026-02-16: Manual-first policy baseline remains unchanged; next weekly review is queued in #277.
-- 2026-02-16: ESLint 10 compatibility checkpoint (issue #150) is unblocked (`eslint@10.0.0`, `@typescript-eslint/*@8.56.0`) and adopted with local gate validation.
-- 2026-02-16: Manual-CI operations checkpoint (issue #277) confirmed no unexpected workflow events since `2026-02-16T18:35:12Z`; scoped window contained 0 runs.
-- 2026-02-16: Manual-first policy baseline remains unchanged; next weekly review is queued in #280.
+- 2026-02-15 (V15 / issue #210 checkpoint):
+  - Re-checked latest `@typescript-eslint/eslint-plugin` metadata:
+    - version: `8.55.0`
+    - peer `eslint`: `^8.57.0 || ^9.0.0`
+  - Status for ESLint 10 adoption (`#150`): still blocked pending upstream peer compatibility.
+- 2026-02-15 (V15 / issue #150 checkpoint):
+  - Ran `npm run deps:check-eslint10` at `2026-02-15T21:35:59Z`.
+  - Watchdog status: blocked.
+  - Latest values:
+    - `eslint`: `10.0.0`
+    - `@typescript-eslint/eslint-plugin`: `8.55.0`
+    - `@typescript-eslint/parser`: `8.55.0`
+    - peer `eslint` range: `^8.57.0 || ^9.0.0`
+- 2026-02-15 (V16 / issue #230 checkpoint):
+  - Ran scoped manual CI audit for policy review:
+    - `npm run ci:audit:manual -- --since 2026-02-15T21:31:02Z --fail-on-unexpected` (PASS; 0 runs).
+  - ESLint 10 compatibility status unchanged from latest watchdog checkpoint (`2026-02-15T21:35:59Z`): still blocked pending upstream peer range support.
+- 2026-02-15 (V17 / issue #233 checkpoint):
+  - Ran rolling policy audit via helper:
+    - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+  - ESLint 10 compatibility status unchanged (`#150` remains blocked; latest watchdog checkpoint `2026-02-15T21:35:59Z`).
+- 2026-02-15 (V18 / issue #236 checkpoint):
+  - Ran rolling policy audit via helper:
+    - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+  - ESLint 10 compatibility status unchanged (`#150` remains blocked; latest watchdog checkpoint `2026-02-15T21:35:59Z`).
+- 2026-02-15 (V18 / issue #150 checkpoint refresh):
+  - Re-ran watchdog: `npm run deps:check-eslint10` at `2026-02-15T21:49:51Z`.
+  - Result: blocked (no upstream peer range change).
+  - Current values:
+    - `eslint`: `10.0.0`
+    - `@typescript-eslint/eslint-plugin`: `8.55.0`
+    - `@typescript-eslint/parser`: `8.55.0`
+    - peer `eslint` range: `^8.57.0 || ^9.0.0`
+- 2026-02-15 (V19 / issue #238 checkpoint):
+  - Ran rolling policy audit via helper:
+    - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+  - ESLint 10 compatibility status unchanged (`#150` remains blocked; latest watchdog checkpoint `2026-02-15T21:49:51Z`).
+- 2026-02-15 (V19 / issue #240 checkpoint):
+  - Ran rolling policy audit via helper:
+    - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+  - ESLint 10 compatibility status unchanged (`#150` remains blocked; latest watchdog checkpoint `2026-02-15T21:49:51Z`).
+- 2026-02-15 (V19 / issue #150 checkpoint refresh):
+  - Re-ran watchdog: `npm run deps:check-eslint10` at `2026-02-15T22:04:02Z`.
+  - Result: blocked (no upstream peer range change).
+  - Current values:
+    - `eslint`: `10.0.0`
+    - `@typescript-eslint/eslint-plugin`: `8.55.0`
+    - `@typescript-eslint/parser`: `8.55.0`
+    - peer `eslint` range: `^8.57.0 || ^9.0.0`
+- 2026-02-15 (V20 / issue #150 checkpoint refresh):
+  - Posted checkpoint comments using `npm run deps:checkpoint:eslint10:post` with payload timestamp `2026-02-15T22:06:14Z`.
+  - Result: blocked (no upstream peer range change).
+  - Current values:
+    - `eslint`: `10.0.0`
+    - `@typescript-eslint/eslint-plugin`: `8.55.0`
+    - `@typescript-eslint/parser`: `8.55.0`
+    - peer `eslint` range: `^8.57.0 || ^9.0.0`
+- 2026-02-15 (V20 / issue #241 checkpoint):
+  - Ran rolling policy audit via helper:
+    - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+  - ESLint 10 compatibility status unchanged (`#150` remains blocked; latest checkpoint payload `2026-02-15T22:06:14Z`).
+- 2026-02-15 (V21 / issue #150 checkpoint refresh):
+  - Posted checkpoint comments using `npm run deps:checkpoint:eslint10:post` with payload timestamp `2026-02-15T22:11:32Z`.
+  - Result: blocked (no upstream peer range change).
+  - Current values:
+    - `eslint`: `10.0.0`
+    - `@typescript-eslint/eslint-plugin`: `8.55.0`
+    - `@typescript-eslint/parser`: `8.55.0`
+    - peer `eslint` range: `^8.57.0 || ^9.0.0`
+- 2026-02-15 (V21 / issue #243 checkpoint):
+  - Ran rolling policy audit via helper:
+    - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+  - ESLint 10 compatibility status unchanged (`#150` remains blocked; latest checkpoint payload `2026-02-15T22:11:32Z`).
+- 2026-02-15 (V22 / issue #150 checkpoint refresh):
+  - Posted checkpoint comments using `npm run deps:checkpoint:eslint10:post` with payload timestamp `2026-02-15T22:14:39Z`.
+  - Result: blocked (no upstream peer range change).
+  - Current values:
+    - `eslint`: `10.0.0`
+    - `@typescript-eslint/eslint-plugin`: `8.55.0`
+    - `@typescript-eslint/parser`: `8.55.0`
+    - peer `eslint` range: `^8.57.0 || ^9.0.0`
+- 2026-02-15 (V22 / issue #245 checkpoint):
+  - Ran rolling policy audit via helper:
+    - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+  - ESLint 10 compatibility status unchanged (`#150` remains blocked; latest checkpoint payload `2026-02-15T22:14:39Z`).
+- 2026-02-15 (V23 / issue #150 checkpoint refresh):
+  - Posted checkpoint comments using `npm run deps:checkpoint:eslint10:post` with payload timestamp `2026-02-15T22:17:35Z`.
+  - Result: blocked (no upstream peer range change).
+  - Current values:
+    - `eslint`: `10.0.0`
+    - `@typescript-eslint/eslint-plugin`: `8.55.0`
+    - `@typescript-eslint/parser`: `8.55.0`
+    - peer `eslint` range: `^8.57.0 || ^9.0.0`
+- 2026-02-15 (V23 / issue #247 checkpoint):
+  - Ran rolling policy audit via helper:
+    - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+  - ESLint 10 compatibility status unchanged (`#150` remains blocked; latest checkpoint payload `2026-02-15T22:17:35Z`).
+- 2026-02-15 (V24 / issue #150 checkpoint refresh):
+  - Posted checkpoint comments using `npm run deps:checkpoint:eslint10:post` with payload timestamp `2026-02-15T22:19:54Z`.
+  - Result: blocked (no upstream peer range change).
+  - Current values:
+    - `eslint`: `10.0.0`
+    - `@typescript-eslint/eslint-plugin`: `8.55.0`
+    - `@typescript-eslint/parser`: `8.55.0`
+    - peer `eslint` range: `^8.57.0 || ^9.0.0`
+- 2026-02-15 (V24 / issue #249 checkpoint):
+  - Ran rolling policy audit via helper:
+    - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
+  - ESLint 10 compatibility status unchanged (`#150` remains blocked; latest checkpoint payload `2026-02-15T22:19:54Z`).

@@ -40,6 +40,11 @@ jest.mock('../config', () => ({
     auth: {
       apiKey: undefined,
     },
+    wakeVerification: {
+      enabled: false,
+      timeoutMs: 10000,
+      pollIntervalMs: 1000,
+    },
   },
 }));
 
@@ -268,8 +273,8 @@ describe('API Key Authentication Integration Tests', () => {
           .post('/hosts/wakeup/TEST-WOL-AUTH')
           .set('Authorization', `Bearer ${validApiKey}`)
           .expect((res) => {
-            // Accept 200 (success), 204 (no content), 404 (not found), or 500 (WoL error in test env)
-            expect([200, 204, 404, 500]).toContain(res.status);
+            // Accept 200 (success), 204 (no content), 404 (not found), or 502 (WoL send error in test env)
+            expect([200, 204, 404, 500, 502]).toContain(res.status);
           });
       });
 

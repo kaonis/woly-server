@@ -51,7 +51,7 @@ jobs:
         run: npm run test:schema-gate -w apps/cnc
 
   validate:
-    name: Build, Lint, Typecheck, Test
+    name: Build, Lint, Typecheck, Test, Smoke
     runs-on: ubuntu-latest
     timeout-minutes: 8
     needs: protocol-compatibility
@@ -74,8 +74,8 @@ jobs:
       - name: Node-agent dependency security gate
         run: npm run security:audit -w apps/node-agent
 
-      - name: Build, lint, typecheck, test
-        run: npx turbo run lint typecheck test:ci build
+      - name: Run standard validation gate
+        run: npm run validate:standard
 
       - name: Upload coverage
         if: always()

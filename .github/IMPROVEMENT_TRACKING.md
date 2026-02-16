@@ -1,130 +1,68 @@
 # Improvement Tracking
 
-This document provides a quick reference for tracking the implementation status of improvements documented in [IMPROVEMENTS.md](../IMPROVEMENTS.md).
+This document tracks the current implementation status of items in [IMPROVEMENTS.md](../IMPROVEMENTS.md), based on merged code and linked GitHub issues.
 
 ## Quick Links
 
 - [Full Improvements Document](../IMPROVEMENTS.md)
 - [Security Audit](../SECURITY_AUDIT.md)
-- [Contributing Guide](../CONTRIBUTING.md)
-
-## GitHub Issue Creation Template
-
-When creating GitHub issues from the improvements list, use this template:
-
-```markdown
-## Description
-[Brief description from IMPROVEMENTS.md]
-
-## Priority
-[HIGH/MEDIUM/LOW from IMPROVEMENTS.md]
-
-## Category
-[Security/Feature/Operations/Documentation]
-
-## Implementation Checklist
-- [ ] Review detailed plan in IMPROVEMENTS.md §X.X
-- [ ] Create implementation branch
-- [ ] Write tests
-- [ ] Implement changes
-- [ ] Update documentation
-- [ ] Run full test suite
-- [ ] Request code review
-- [ ] Update IMPROVEMENTS.md with issue number
-
-## References
-- IMPROVEMENTS.md §X.X [Title]
-- Related: [link to related issues]
-
-## Breaking Changes
-[Yes/No - If yes, describe migration path]
-```
+- [Roadmap V11](../docs/ROADMAP_V11_AUTONOMOUS_CYCLE.md)
 
 ## Status Overview
 
-| Category | Total | Implemented | In Progress | Planned |
-|----------|-------|-------------|-------------|---------|
-| Security | 7 | 0 | 0 | 7 |
-| Code TODOs | 2 | 0 | 0 | 2 |
+| Category | Total | Implemented | In Progress (Partial) | Planned |
+|----------|-------|-------------|------------------------|---------|
+| Security | 7 | 6 | 1 | 0 |
+| Code TODOs | 2 | 2 | 0 | 0 |
 | Features | 7 | 0 | 0 | 7 |
-| Operations | 4 | 0 | 0 | 4 |
-| Developer Experience | 4 | 0 | 0 | 4 |
+| Operations | 4 | 0 | 3 | 1 |
+| Developer Experience | 4 | 0 | 1 | 3 |
 | Architecture | 3 | 0 | 0 | 3 |
-| Documentation | 3 | 0 | 0 | 3 |
+| Documentation | 3 | 0 | 1 | 2 |
 | Mobile Integration | 2 | 0 | 0 | 2 |
-| **TOTAL** | **32** | **0** | **0** | **32** |
+| **TOTAL** | **32** | **8** | **6** | **18** |
 
-## High Priority Items (Create Issues First)
+## Completed Security / TODO Items
 
-1. **Security §1.1** — Node-Agent API Authentication
-   - Issue: TBD
-   - Status: Planned
+1. `Security §1.1` Node-agent API authentication — [#52](https://github.com/kaonis/woly-server/issues/52)
+2. `Security §1.2` C&C node listing auth — [#53](https://github.com/kaonis/woly-server/issues/53)
+3. `Security §1.3` C&C rate limiting — [#54](https://github.com/kaonis/woly-server/issues/54)
+4. `Security §1.4` WebSocket message rate limiting — [#55](https://github.com/kaonis/woly-server/issues/55)
+5. `Security §1.5` WebSocket connection limits per IP — [#56](https://github.com/kaonis/woly-server/issues/56)
+6. `Security §1.6` Production CORS tightening — [#57](https://github.com/kaonis/woly-server/issues/57)
+7. `Code TODO §2.1` Node-agent version from package metadata — [#88](https://github.com/kaonis/woly-server/issues/88)
+8. `Code TODO §2.2` Subnet/gateway metadata resolution — [#88](https://github.com/kaonis/woly-server/issues/88)
+9. `Operations §4.2` Prometheus export baseline (C&C endpoints + runtime gauges) — [#215](https://github.com/kaonis/woly-server/issues/215) (partial)
 
-2. **Features §3.4** — Wake-on-LAN Success Verification
-   - Issue: TBD
-   - Status: Planned
+## Active Priority Queue
 
-3. **Operations §4.1** — Health Check Improvements
-   - Issue: TBD
-   - Status: Planned
+1. `C1` Host notes/tags metadata support — [#216](https://github.com/kaonis/woly-server/issues/216)
+2. `C2` Wake verification workflow — [#217](https://github.com/kaonis/woly-server/issues/217)
+3. `D1` Cross-service E2E smoke tests — [#218](https://github.com/kaonis/woly-server/issues/218)
+4. `D2` Production deployment guide — [#219](https://github.com/kaonis/woly-server/issues/219)
+5. Dependency follow-up: ESLint 10 revisit — [#150](https://github.com/kaonis/woly-server/issues/150)
 
-4. **Documentation §7.2** — Deployment Guides
-   - Issue: TBD
-   - Status: Planned
+## Label Reference
 
-## Medium Priority Queue
+Use existing repository labels:
 
-- Security §1.2 — CnC Node Listing Authentication
-- Security §1.3 — CnC Rate Limiting
-- Code TODOs §2.2 — Get Actual Subnet and Gateway
-- Features §3.1 — Persistent Host Notes/Metadata
-- Features §3.2 — Host Grouping/Tagging
-- Operations §4.2 — Prometheus Metrics Export
-- Developer Experience §5.1 — End-to-End Tests
-- Mobile Integration §8.1 — Push Notifications
+- `enhancement`
+- `security`
+- `documentation`
+- `developer-experience`
+- `technical-debt`
+- `observability`
+- `testing`
+- `priority:high`
+- `priority:medium`
+- `priority:low`
 
-## Labels to Use
+## Update Rules
 
-Create these labels in GitHub:
-
-- `enhancement` — New features
-- `security` — Security improvements
-- `documentation` — Documentation updates
-- `developer-experience` — DX improvements
-- `operations` — Ops/monitoring improvements
-- `priority:high` — Must have
-- `priority:medium` — Should have
-- `priority:low` — Nice to have
-- `good-first-issue` — Good for new contributors
-- `breaking-change` — Requires migration
-
-## Milestones
-
-Suggested milestone grouping:
-
-### v1.1 — Security & Stability (Q1 2026)
-- All Priority 1 security items
-- Health check improvements
-- Deployment guides
-
-### v1.2 — Core Features (Q2 2026)
-- Host metadata/notes
-- Host grouping/tagging
-- WoL success verification
-- Prometheus metrics
-
-### v1.3 — Advanced Features (Q3 2026)
-- Historical status tracking
-- Host wake schedules
-- End-to-end tests
-- API client libraries
-
-### v2.0 — Architecture Evolution (Q4 2026)
-- GraphQL API
-- Redis cache layer
-- Message queue integration
-- Push notifications
+1. Update this file only after code is merged or issue status materially changes.
+2. Keep implemented items linked to issue numbers.
+3. Keep active queue de-duplicated and aligned with `docs/ROADMAP_V11_AUTONOMOUS_CYCLE.md`.
 
 ---
 
-*Last updated: 2026-02-09*
+*Last updated: 2026-02-15*

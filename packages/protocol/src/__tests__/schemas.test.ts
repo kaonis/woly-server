@@ -1,18 +1,18 @@
 import {
   cncCapabilitiesResponseSchema,
   cncCapabilityDescriptorSchema,
+  createHostWakeScheduleRequestSchema,
+  deleteHostWakeScheduleResponseSchema,
+  hostPortScanResponseSchema,
+  hostSchedulesResponseSchema,
+  hostWakeScheduleSchema,
   hostSchema,
   hostStatusSchema,
-  hostPortSchema,
-  hostPortScanResponseSchema,
   scheduleFrequencySchema,
-  wakeScheduleSchema,
-  wakeScheduleListResponseSchema,
-  createWakeScheduleRequestSchema,
-  updateWakeScheduleRequestSchema,
   commandStateSchema,
   errorResponseSchema,
   outboundNodeMessageSchema,
+  updateHostWakeScheduleRequestSchema,
   inboundCncCommandSchema,
   PROTOCOL_VERSION,
 } from '../index';
@@ -70,6 +70,26 @@ describe('hostSchema', () => {
     expect(hostSchema.safeParse(withoutPing).success).toBe(true);
   });
 
+  it('accepts host with notes and tags metadata', () => {
+    expect(
+      hostSchema.safeParse({
+        ...validHost,
+        notes: 'Preferred machine for deployments',
+        tags: ['prod', 'linux'],
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts host with null notes and empty tags', () => {
+    expect(
+      hostSchema.safeParse({
+        ...validHost,
+        notes: null,
+        tags: [],
+      }).success
+    ).toBe(true);
+  });
+
   it('rejects empty name', () => {
     expect(hostSchema.safeParse({ ...validHost, name: '' }).success).toBe(false);
   });
@@ -81,6 +101,10 @@ describe('hostSchema', () => {
 
   it('rejects non-integer discovered', () => {
     expect(hostSchema.safeParse({ ...validHost, discovered: 1.5 }).success).toBe(false);
+  });
+
+  it('rejects tag metadata with empty values', () => {
+    expect(hostSchema.safeParse({ ...validHost, tags: [''] }).success).toBe(false);
   });
 });
 
@@ -206,16 +230,6 @@ describe('cncCapabilitiesResponseSchema', () => {
   });
 });
 
-describe('hostPortSchema', () => {
-  it('accepts valid host port records', () => {
-    expect(hostPortSchema.safeParse({ port: 22, protocol: 'tcp', service: 'SSH' }).success).toBe(true);
-  });
-
-  it('rejects non-positive ports', () => {
-    expect(hostPortSchema.safeParse({ port: 0, protocol: 'tcp', service: 'SSH' }).success).toBe(false);
-  });
-});
-
 // ---------------------------------------------------------------------------
 // hostPortScanResponseSchema
 // ---------------------------------------------------------------------------
@@ -260,114 +274,141 @@ describe('hostPortScanResponseSchema', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// hostWakeScheduleSchema and related schedule schemas
+// ---------------------------------------------------------------------------
+
 describe('scheduleFrequencySchema', () => {
-  it.each(['once', 'daily', 'weekly', 'weekdays', 'weekends'])('accepts "%s"', (value) => {
-    expect(scheduleFrequencySchema.safeParse(value).success).toBe(true);
+  it.each(['once', 'daily', 'weekly', 'weekdays', 'weekends'])('accepts "%s"', (frequency) => {
+    expect(scheduleFrequencySchema.safeParse(frequency).success).toBe(true);
   });
 
-  it('rejects unsupported values', () => {
+  it('rejects unknown schedule frequency', () => {
     expect(scheduleFrequencySchema.safeParse('monthly').success).toBe(false);
   });
 });
 
-describe('wakeScheduleSchema', () => {
+describe('hostWakeScheduleSchema', () => {
   const validSchedule = {
-    id: 'sched-1',
-    hostName: 'office-pc',
-    hostMac: 'AA:BB:CC:DD:EE:FF',
-    hostFqn: 'office-pc@home-node',
-    scheduledTime: '2026-02-16T08:00:00.000Z',
-    timezone: 'America/New_York',
+    id: 'schedule-1',
+    hostFqn: 'Office-Mac@Home',
+    hostName: 'Office-Mac',
+    hostMac: '00:11:22:33:44:55',
+    scheduledTime: '2026-02-15T09:00:00.000Z',
     frequency: 'daily',
     enabled: true,
     notifyOnWake: true,
-    createdAt: '2026-02-15T08:00:00.000Z',
-    updatedAt: '2026-02-15T08:00:00.000Z',
-    lastTriggered: null,
-    nextTrigger: '2026-02-16T08:00:00.000Z',
+    timezone: 'America/New_York',
+    createdAt: '2026-02-15T00:00:00.000Z',
+    updatedAt: '2026-02-15T00:00:00.000Z',
   };
 
-  it('accepts valid schedule payload', () => {
-    expect(wakeScheduleSchema.safeParse(validSchedule).success).toBe(true);
+  it('accepts a valid host wake schedule', () => {
+    expect(hostWakeScheduleSchema.safeParse(validSchedule).success).toBe(true);
   });
 
-  it('rejects invalid timestamp fields', () => {
+  it('accepts optional trigger metadata', () => {
     expect(
-      wakeScheduleSchema.safeParse({ ...validSchedule, scheduledTime: 'not-a-date' }).success,
+      hostWakeScheduleSchema.safeParse({
+        ...validSchedule,
+        lastTriggered: '2026-02-15T08:00:00.000Z',
+        nextTrigger: '2026-02-16T09:00:00.000Z',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects invalid scheduled time format', () => {
+    expect(
+      hostWakeScheduleSchema.safeParse({
+        ...validSchedule,
+        scheduledTime: 'not-a-date',
+      }).success
     ).toBe(false);
+  });
+});
+
+describe('hostSchedulesResponseSchema', () => {
+  it('accepts schedules response payload', () => {
+    expect(
+      hostSchedulesResponseSchema.safeParse({
+        schedules: [
+          {
+            id: 'schedule-1',
+            hostFqn: 'Office-Mac@Home',
+            hostName: 'Office-Mac',
+            hostMac: '00:11:22:33:44:55',
+            scheduledTime: '2026-02-15T09:00:00.000Z',
+            frequency: 'daily',
+            enabled: true,
+            notifyOnWake: true,
+            timezone: 'UTC',
+            createdAt: '2026-02-15T00:00:00.000Z',
+            updatedAt: '2026-02-15T00:00:00.000Z',
+          },
+        ],
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('createHostWakeScheduleRequestSchema', () => {
+  it('accepts valid schedule create request', () => {
+    expect(
+      createHostWakeScheduleRequestSchema.safeParse({
+        scheduledTime: '2026-02-15T09:00:00.000Z',
+        frequency: 'weekly',
+        enabled: true,
+        notifyOnWake: false,
+        timezone: 'UTC',
+      }).success
+    ).toBe(true);
   });
 
   it('rejects unknown fields', () => {
-    expect(wakeScheduleSchema.safeParse({ ...validSchedule, extra: true }).success).toBe(false);
-  });
-});
-
-describe('wakeScheduleListResponseSchema', () => {
-  it('accepts schedule list responses', () => {
-    const result = wakeScheduleListResponseSchema.safeParse({
-      schedules: [
-        {
-          id: 'sched-1',
-          hostName: 'office-pc',
-          hostMac: 'AA:BB:CC:DD:EE:FF',
-          hostFqn: 'office-pc@home-node',
-          scheduledTime: '2026-02-16T08:00:00.000Z',
-          timezone: 'UTC',
-          frequency: 'daily',
-          enabled: true,
-          notifyOnWake: true,
-          createdAt: '2026-02-15T08:00:00.000Z',
-          updatedAt: '2026-02-15T08:00:00.000Z',
-          lastTriggered: null,
-          nextTrigger: null,
-        },
-      ],
-    });
-
-    expect(result.success).toBe(true);
-  });
-});
-
-describe('createWakeScheduleRequestSchema', () => {
-  it('applies defaults for timezone and flags', () => {
-    const result = createWakeScheduleRequestSchema.safeParse({
-      hostName: 'office-pc',
-      hostMac: 'AA:BB:CC:DD:EE:FF',
-      hostFqn: 'office-pc@home-node',
-      scheduledTime: '2026-02-16T08:00:00.000Z',
-      frequency: 'daily',
-    });
-
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.timezone).toBe('UTC');
-      expect(result.data.enabled).toBe(true);
-      expect(result.data.notifyOnWake).toBe(true);
-    }
-  });
-
-  it('rejects malformed payloads', () => {
     expect(
-      createWakeScheduleRequestSchema.safeParse({
-        hostName: '',
-        hostMac: 'AA:BB:CC:DD:EE:FF',
-        hostFqn: 'office-pc@home-node',
-        scheduledTime: 'invalid-date',
+      createHostWakeScheduleRequestSchema.safeParse({
+        scheduledTime: '2026-02-15T09:00:00.000Z',
         frequency: 'daily',
-      }).success,
+        extra: 'nope',
+      }).success
     ).toBe(false);
   });
 });
 
-describe('updateWakeScheduleRequestSchema', () => {
-  it('accepts partial updates', () => {
-    expect(updateWakeScheduleRequestSchema.safeParse({ enabled: false }).success).toBe(true);
+describe('updateHostWakeScheduleRequestSchema', () => {
+  it('accepts valid partial update request', () => {
+    expect(
+      updateHostWakeScheduleRequestSchema.safeParse({
+        enabled: false,
+      }).success
+    ).toBe(true);
   });
 
-  it('rejects empty payloads', () => {
-    expect(updateWakeScheduleRequestSchema.safeParse({}).success).toBe(false);
+  it('rejects empty update request', () => {
+    expect(updateHostWakeScheduleRequestSchema.safeParse({}).success).toBe(false);
   });
 });
+
+describe('deleteHostWakeScheduleResponseSchema', () => {
+  it('accepts valid delete response payload', () => {
+    expect(
+      deleteHostWakeScheduleResponseSchema.safeParse({
+        success: true,
+        id: 'schedule-1',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects delete response without success=true', () => {
+    expect(
+      deleteHostWakeScheduleResponseSchema.safeParse({
+        success: false,
+        id: 'schedule-1',
+      }).success
+    ).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // outboundNodeMessageSchema (node → C&C)
 // ---------------------------------------------------------------------------
@@ -691,21 +732,8 @@ describe('inboundCncCommandSchema', () => {
           mac: 'AA:BB:CC:DD:EE:FF',
           ip: '192.168.1.50',
           status: 'awake' as const,
-          notes: 'wake before backup',
-          tags: ['infra', 'macos'],
-        },
-      };
-      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
-    });
-
-    it('accepts nullable notes/tags metadata fields', () => {
-      const cmd = {
-        type: 'update-host' as const,
-        commandId: 'cmd-1',
-        data: {
-          name: 'new-name',
-          notes: null,
-          tags: null,
+          notes: 'Renamed workstation',
+          tags: ['desk', 'critical'],
         },
       };
       expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);

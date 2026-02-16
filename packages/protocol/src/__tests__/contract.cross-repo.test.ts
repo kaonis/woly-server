@@ -414,6 +414,8 @@ describe('Cross-repo protocol contract', () => {
             mac: '11:22:33:44:55:66',
             ip: '192.168.1.200',
             status: 'awake' as const,
+            notes: 'Primary office workstation',
+            tags: ['office', 'critical'],
           },
         };
 

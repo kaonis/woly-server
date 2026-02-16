@@ -6,7 +6,9 @@ import dotenv from 'dotenv';
 import { ServerConfig } from '../types';
 
 // Load environment variables
-dotenv.config();
+dotenv.config({
+  quiet: process.env.NODE_ENV === 'test' || process.env.DOTENV_CONFIG_QUIET === 'true',
+});
 
 function getEnvVar(key: string, defaultValue?: string): string {
   const value = process.env[key] || defaultValue;

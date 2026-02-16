@@ -19,10 +19,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "jest",
-    "test:ci": "jest",
-    "typecheck": "tsc --noEmit",
-    "test:consumer-typecheck": "tsc --noEmit -p fixtures/app-consumer/tsconfig.json"
+    "test": "jest --watchman=false",
+    "test:ci": "jest --watchman=false",
+    "typecheck": "tsc --noEmit"
   },
   "repository": {
     "type": "git",

@@ -182,11 +182,48 @@ describe('HostDatabase', () => {
       expect(newHost.status).toBe('asleep');
       expect(newHost.discovered).toBe(0);
       expect(newHost.pingResponsive).toBe(null);
+      expect(newHost.notes).toBe(null);
+      expect(newHost.tags).toEqual([]);
 
       // Verify it's in the database
       const retrieved = await db.getHost('TestHost');
       expect(retrieved).toBeDefined();
       expect(retrieved?.name).toBe('TestHost');
+      expect(retrieved?.notes).toBe(null);
+      expect(retrieved?.tags).toEqual([]);
+    });
+
+    it('should emit host-discovered when adding a host', async () => {
+      const onDiscovered = jest.fn();
+      db.on('host-discovered', onDiscovered);
+
+      await db.addHost('EventHostAdd', 'AA:BB:CC:DD:EE:89', '192.168.1.189');
+
+      expect(onDiscovered).toHaveBeenCalledTimes(1);
+      expect(onDiscovered).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'EventHostAdd',
+          mac: 'AA:BB:CC:DD:EE:89',
+          ip: '192.168.1.189',
+        })
+      );
+    });
+
+    it('should persist notes/tags metadata on create and update', async () => {
+      await db.addHost('MetadataHost', 'AA:BB:CC:DD:EE:88', '192.168.1.188', {
+        notes: 'Rack 7 - top shelf',
+        tags: ['lab', 'linux'],
+      });
+
+      await db.updateHost('MetadataHost', {
+        notes: null,
+        tags: ['primary', 'ssh'],
+      });
+
+      const updated = await db.getHost('MetadataHost');
+      expect(updated).toBeDefined();
+      expect(updated?.notes).toBe(null);
+      expect(updated?.tags).toEqual(['primary', 'ssh']);
     });
 
     it('should normalize MAC addresses on insert so scan updates match', async () => {
@@ -234,14 +271,37 @@ describe('HostDatabase', () => {
       expect(updated?.status).toBe('awake');
     });
 
+    it('should emit host-updated when updating a host', async () => {
+      await db.addHost('EventHostUpdate', 'AA:BB:CC:DD:EE:90', '192.168.1.190');
+      const onUpdated = jest.fn();
+      db.on('host-updated', onUpdated);
+
+      await db.updateHost('EventHostUpdate', {
+        status: 'awake',
+        notes: 'updated via event test',
+      });
+
+      expect(onUpdated).toHaveBeenCalledTimes(1);
+      expect(onUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'EventHostUpdate',
+          status: 'awake',
+          notes: 'updated via event test',
+        })
+      );
+    });
+
     it('should treat idempotent update as success', async () => {
       await db.addHost('NoOpHost', 'AA:BB:CC:DD:EE:12', '192.168.1.213');
+      const onUpdated = jest.fn();
+      db.on('host-updated', onUpdated);
 
       await expect(
         db.updateHost('NoOpHost', {
           ip: '192.168.1.213',
         })
       ).resolves.toBeUndefined();
+      expect(onUpdated).not.toHaveBeenCalled();
     });
 
     it('should reject update for missing host', async () => {
@@ -258,6 +318,17 @@ describe('HostDatabase', () => {
 
       const deleted = await db.getHost('ToDelete');
       expect(deleted).toBeUndefined();
+    });
+
+    it('should emit host-removed when deleting a host', async () => {
+      await db.addHost('EventHostDelete', 'AA:BB:CC:DD:EE:91', '192.168.1.191');
+      const onRemoved = jest.fn();
+      db.on('host-removed', onRemoved);
+
+      await db.deleteHost('EventHostDelete');
+
+      expect(onRemoved).toHaveBeenCalledTimes(1);
+      expect(onRemoved).toHaveBeenCalledWith('EventHostDelete');
     });
   });
 

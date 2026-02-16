@@ -104,7 +104,7 @@ describe('config parsing and validation', () => {
     ).rejects.toThrow('Invalid numeric environment variable: PORT');
   });
 
-  it('throws when SCHEDULE_POLL_INTERVAL_MS is not greater than zero', async () => {
+  it('throws when schedule poll interval is not greater than zero', async () => {
     await expect(
       loadConfig({
         SCHEDULE_POLL_INTERVAL_MS: '0',

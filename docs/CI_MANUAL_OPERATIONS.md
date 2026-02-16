@@ -2,27 +2,30 @@
 
 Date: 2026-02-15
 
-This repository is currently in a temporary budget-control mode with manual-first
-workflows plus one minimal automated gate.
+This repository is currently in a temporary budget-control mode where all GitHub
+Actions workflows are manual-only.
 
 ## Current Policy
 
-- Workflow triggers are manual-only (`workflow_dispatch`) except for one scoped gate:
-  - `.github/workflows/cnc-mobile-contract-gate.yml` on `pull_request` for protocol/route-impact paths only.
-- Automatic `push`, `schedule`, and broad unscoped PR/tag workflow runs are disabled.
+- Workflow triggers are limited to `workflow_dispatch`.
+- Automatic `push`, `pull_request`, `schedule`, and tag-triggered workflow runs are disabled.
 - GitHub CodeQL default setup is disabled (`state: not-configured`) to prevent automatic dynamic runs.
 - Each workflow job has `timeout-minutes: 8` to cap manual-run spend and prevent hangs.
 
 ## Required Local Gate Before PR
 
-Run all commands from repo root and require exit code 0 for each:
+Run the standard validation gate from repo root and require exit code 0:
 
 ```bash
-npm run lint
-npm run typecheck
-npm run test:ci
-npm run build
+npm run validate:standard
 ```
+
+The gate includes:
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test:ci`
+- `npm run build`
+- `npm run test:e2e:smoke`
 
 ## Manual Workflow Dispatch
 
@@ -55,6 +58,9 @@ gh run view <run-id> --log-failed
 Run structured local audit for weekly review windows:
 
 ```bash
+# Preferred helper: uses latest recorded checkpoint from review log
+npm run ci:audit:latest -- --fail-on-unexpected
+
 # Example: only runs created after previous review timestamp
 npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --fail-on-unexpected
 
@@ -62,21 +68,41 @@ npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --fail-on-unexpected
 npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --json
 ```
 
-Generate copy-ready markdown snippets for weekly checkpoint docs (dry-run only):
-
-```bash
-npm run ci:snippets:checkpoint -- \
-  --issue 251 \
-  --follow-up 252 \
-  --checkpoint 2026-02-15T17:07:43Z \
-  --roadmap-file docs/ROADMAP_V11.md
-```
-
-Run policy guard to verify workflow files still enforce manual-first policy:
+Run policy guard to verify workflow files still enforce manual-only mode:
 
 ```bash
 npm run ci:policy:check
 npm run ci:policy:check -- --json
+```
+
+Create the next rolling manual-review follow-up issue with the standard template:
+
+```bash
+# Preview title/body/labels without creating the issue
+npm run ci:followup:create -- --after <current-review-issue-number> --dry-run
+
+# Create the follow-up issue
+npm run ci:followup:create -- --after <current-review-issue-number>
+```
+
+Generate or post a standardized closeout comment for the current review issue:
+
+```bash
+# Preview closeout comment body
+npm run ci:closeout:comment -- --issue <current-review-issue-number> --followup <next-review-issue-number> --cycle "post-merge cycle (#x to #y)" --roadmap docs/ROADMAP_VXX_AUTONOMOUS_CYCLE.md --deps-payload <checkpoint-iso>
+
+# Post comment directly to the issue
+npm run ci:closeout:comment -- --issue <current-review-issue-number> --followup <next-review-issue-number> --cycle "post-merge cycle (#x to #y)" --roadmap docs/ROADMAP_VXX_AUTONOMOUS_CYCLE.md --deps-payload <checkpoint-iso> --post
+```
+
+Run the common rolling-cycle sequence with one command:
+
+```bash
+# Preview planned commands only
+npm run ci:cycle:run -- --after <current-review-issue-number> --dry-run
+
+# Execute audit + follow-up issue creation + dependency checkpoint posting
+npm run ci:cycle:run -- --after <current-review-issue-number>
 ```
 
 ## Rollback Criteria (Re-enable Automatic Runs)
@@ -96,19 +122,21 @@ Re-enable automatic CI only when all of the following are true:
 Weekly checklist:
 
 1. Confirm no unexpected automatic workflow runs since previous review:
-   - `npm run ci:audit:manual -- --since <previous-review-iso> --fail-on-unexpected`
-   - Expected exception: path-scoped `CNC Mobile Contract Gate` PR runs.
-2. Verify manual-first policy still matches budget and throughput needs:
+   - `npm run ci:audit:latest -- --fail-on-unexpected`
+   - fallback/manual override: `npm run ci:audit:manual -- --since <previous-review-iso> --fail-on-unexpected`
+2. Verify manual-only policy still matches budget and throughput needs:
    - count merges since last review
    - count manually dispatched runs since last review
    - `npm run ci:policy:check`
 3. Confirm local validation gate remains standard before merge:
-   - `npm run lint`
-   - `npm run typecheck`
-   - `npm run test:ci`
-   - `npm run build`
+   - `npm run validate:standard`
 4. Record decision in the review log:
-   - `Continue manual-first policy` or `Start rollback`
+   - template helper: `npm run ci:review:template`
+   - `Continue manual-only` or `Start rollback`
+5. Queue next rolling review issue:
+   - `npm run ci:followup:create -- --after <current-review-issue-number>`
+6. Post standardized closeout issue comment:
+   - `npm run ci:closeout:comment -- --issue <current-review-issue-number> --followup <next-review-issue-number> --cycle "<review-cycle>" --roadmap <roadmap-path> --deps-payload <checkpoint-iso> --post`
 
 ## Objective Exit Criteria
 
