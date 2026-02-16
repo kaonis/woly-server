@@ -234,6 +234,10 @@ Environment variables (`.env`):
 | `JWT_TTL_SECONDS` | Issued JWT lifetime (seconds) | `3600` |
 | `WS_REQUIRE_TLS` | Require TLS for node WebSocket upgrades | `true` in production, else `false` |
 | `WS_ALLOW_QUERY_TOKEN_AUTH` | Allow legacy query token auth (`?token=`) | `false` in production, else `true` |
+| `API_RATE_LIMIT_WINDOW_MS` | General API rate-limit window (ms) | `900000` |
+| `API_RATE_LIMIT_MAX` | General API max requests per window | `300` in production, `10000` in development |
+| `SCHEDULE_RATE_LIMIT_WINDOW_MS` | Host schedule API rate-limit window (ms) | `900000` |
+| `SCHEDULE_RATE_LIMIT_MAX` | Host schedule API max requests per window | `3000` in production, `20000` in development |
 | `NODE_HEARTBEAT_INTERVAL` | Expected heartbeat interval (ms) | `30000` |
 | `NODE_TIMEOUT` | Node offline threshold (ms) | `90000` |
 | `COMMAND_TIMEOUT` | Command acknowledgement timeout (ms) | `30000` |

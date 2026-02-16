@@ -1,4 +1,5 @@
 import rateLimit from 'express-rate-limit';
+import type { Request } from 'express';
 import { logger } from '../utils/logger';
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -30,6 +31,32 @@ const AUTH_RATE_LIMIT_MAX = parsePositiveInt(
   process.env.AUTH_RATE_LIMIT_MAX,
   5,
 ); // 5 attempts default
+
+const API_RATE_LIMIT_WINDOW_MS = parsePositiveInt(
+  process.env.API_RATE_LIMIT_WINDOW_MS,
+  15 * 60 * 1000,
+);
+const API_RATE_LIMIT_MAX = parsePositiveInt(
+  process.env.API_RATE_LIMIT_MAX,
+  isDevelopment ? 10000 : 300,
+);
+const SCHEDULE_RATE_LIMIT_WINDOW_MS = parsePositiveInt(
+  process.env.SCHEDULE_RATE_LIMIT_WINDOW_MS,
+  15 * 60 * 1000,
+);
+const SCHEDULE_RATE_LIMIT_MAX = parsePositiveInt(
+  process.env.SCHEDULE_RATE_LIMIT_MAX,
+  isDevelopment ? 20000 : 3000,
+);
+
+function isHealthEndpoint(path: string): boolean {
+  return path === '/' || path === '/health' || path === '/api/health';
+}
+
+function isHostScheduleRoute(req: Request): boolean {
+  const path = req.originalUrl || req.path || '';
+  return /\/api\/hosts\/(?:[^/]+\/schedules|schedules\/[^/]+)\/?$/.test(path);
+}
 
 /**
  * Strict authentication endpoint rate limiter
@@ -65,10 +92,7 @@ export const authLimiter = rateLimit({
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
   skip: (req) => {
     // Skip rate limiting for health check endpoints in development
-    if (
-      isDevelopment &&
-      (req.path === '/' || req.path === '/health' || req.path === '/api/health')
-    ) {
+    if (isDevelopment && isHealthEndpoint(req.path)) {
       return true;
     }
     return false;
@@ -90,18 +114,21 @@ export const authLimiter = rateLimit({
  * Production: 300 requests per 15 minutes per IP
  */
 export const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDevelopment ? 10000 : 300, // Much higher limit in development
+  windowMs: API_RATE_LIMIT_WINDOW_MS,
+  max: API_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Skip rate limiting for health check endpoints in development
-    if (
-      isDevelopment &&
-      (req.path === '/' || req.path === '/health' || req.path === '/api/health')
-    ) {
+    // Schedule sync can burst on startup; dedicated schedule limiter handles these routes.
+    if (isHostScheduleRoute(req)) {
       return true;
     }
+
+    // Skip rate limiting for health check endpoints in development.
+    if (isDevelopment && isHealthEndpoint(req.path)) {
+      return true;
+    }
+
     return false;
   },
   handler: (req, res) => {
@@ -109,6 +136,27 @@ export const apiLimiter = rateLimit({
     res.status(429).json({
       error: 'Too Many Requests',
       message: 'Too many requests from this IP, please try again later.',
+      code: 'RATE_LIMIT_EXCEEDED',
+    });
+  },
+});
+
+/**
+ * Host schedule API limiter
+ * Dedicated higher throughput for app schedule sync bursts.
+ * Development: 20000 requests per 15 minutes per IP
+ * Production: 3000 requests per 15 minutes per IP
+ */
+export const scheduleSyncLimiter = rateLimit({
+  windowMs: SCHEDULE_RATE_LIMIT_WINDOW_MS,
+  max: SCHEDULE_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logger.warn(`Schedule API rate limit exceeded for IP: ${req.ip} on path: ${req.path}`);
+    res.status(429).json({
+      error: 'Too Many Requests',
+      message: 'Too many schedule sync requests from this IP, please try again later.',
       code: 'RATE_LIMIT_EXCEEDED',
     });
   },

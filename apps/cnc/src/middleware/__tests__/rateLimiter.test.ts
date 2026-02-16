@@ -4,6 +4,7 @@ import request from 'supertest';
 type RateLimiterModule = {
   authLimiter: express.RequestHandler;
   apiLimiter: express.RequestHandler;
+  scheduleSyncLimiter: express.RequestHandler;
   strictAuthLimiter: express.RequestHandler;
 };
 
@@ -114,6 +115,45 @@ describe('cnc rateLimiter middleware', () => {
 
     const limited = await request(app).post('/auth');
 
+    expect(limited.status).toBe(429);
+    expect(limited.body).toMatchObject({
+      error: 'Too Many Requests',
+      code: 'RATE_LIMIT_EXCEEDED',
+    });
+  });
+
+  it('skips schedule endpoints in apiLimiter while rate limiting other host routes', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.API_RATE_LIMIT_MAX = '1';
+
+    const { apiLimiter } = loadRateLimiter();
+    const app = express();
+    app.use('/api', apiLimiter, (_req, res) => {
+      res.status(200).json({ ok: true });
+    });
+
+    const scheduleFirst = await request(app).get('/api/hosts/office%40home/schedules');
+    const scheduleSecond = await request(app).get('/api/hosts/office%40home/schedules');
+    expect(scheduleFirst.status).toBe(200);
+    expect(scheduleSecond.status).toBe(200);
+
+    const hostsFirst = await request(app).get('/api/hosts');
+    const hostsSecond = await request(app).get('/api/hosts');
+    expect(hostsFirst.status).toBe(200);
+    expect(hostsSecond.status).toBe(429);
+  });
+
+  it('enforces dedicated scheduleSyncLimiter threshold', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.SCHEDULE_RATE_LIMIT_MAX = '2';
+
+    const { scheduleSyncLimiter } = loadRateLimiter();
+    const app = createApp(scheduleSyncLimiter, '/api/hosts/office%40home/schedules');
+
+    expect((await request(app).get('/api/hosts/office%40home/schedules')).status).toBe(200);
+    expect((await request(app).get('/api/hosts/office%40home/schedules')).status).toBe(200);
+
+    const limited = await request(app).get('/api/hosts/office%40home/schedules');
     expect(limited.status).toBe(429);
     expect(limited.body).toMatchObject({
       error: 'Too Many Requests',

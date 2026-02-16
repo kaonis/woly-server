@@ -48,6 +48,7 @@ jest.mock('../../middleware/rateLimiter', () => ({
   authLimiter: (_req: any, _res: any, next: any) => next(),
   strictAuthLimiter: (_req: any, _res: any, next: any) => next(),
   apiLimiter: (_req: any, _res: any, next: any) => next(),
+  scheduleSyncLimiter: (_req: any, _res: any, next: any) => next(),
 }));
 
 describe('Auth Token Endpoint Authentication', () => {

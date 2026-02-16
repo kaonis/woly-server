@@ -14,7 +14,7 @@ import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
 import { runtimeMetrics } from '../services/runtimeMetrics';
 import { authenticateJwt, authorizeRoles } from '../middleware/auth';
-import { apiLimiter, strictAuthLimiter } from '../middleware/rateLimiter';
+import { apiLimiter, scheduleSyncLimiter, strictAuthLimiter } from '../middleware/rateLimiter';
 import { assignCorrelationId } from '../middleware/correlationId';
 import { CNC_VERSION } from '../utils/cncVersion';
 import { prometheusContentType, renderPrometheusMetrics } from '../services/promMetrics';
@@ -60,10 +60,18 @@ export function createRoutes(
   router.get('/hosts/ports/:fqn', (req, res) => hostsController.getHostPorts(req, res));
   router.get('/hosts/scan-ports/:fqn', (req, res) => hostsController.scanHostPorts(req, res));
   // IMPORTANT: schedule routes must be registered before the :fqn catch-all
-  router.get('/hosts/:fqn/schedules', (req, res) => schedulesController.listHostSchedules(req, res));
-  router.post('/hosts/:fqn/schedules', (req, res) => schedulesController.createHostSchedule(req, res));
-  router.put('/hosts/schedules/:id', (req, res) => schedulesController.updateSchedule(req, res));
-  router.delete('/hosts/schedules/:id', (req, res) => schedulesController.deleteSchedule(req, res));
+  router.get('/hosts/:fqn/schedules', scheduleSyncLimiter, (req, res) =>
+    schedulesController.listHostSchedules(req, res),
+  );
+  router.post('/hosts/:fqn/schedules', scheduleSyncLimiter, (req, res) =>
+    schedulesController.createHostSchedule(req, res),
+  );
+  router.put('/hosts/schedules/:id', scheduleSyncLimiter, (req, res) =>
+    schedulesController.updateSchedule(req, res),
+  );
+  router.delete('/hosts/schedules/:id', scheduleSyncLimiter, (req, res) =>
+    schedulesController.deleteSchedule(req, res),
+  );
   router.get('/hosts', (req, res) => hostsController.getHosts(req, res));
   router.get('/hosts/:fqn', (req, res) => hostsController.getHostByFQN(req, res));
   router.post('/hosts/wakeup/:fqn', (req, res) => hostsController.wakeupHost(req, res));

@@ -34,6 +34,7 @@ jest.mock('../../middleware/rateLimiter', () => ({
   authLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   strictAuthLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
   apiLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+  scheduleSyncLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
 describe('Capabilities Route', () => {
