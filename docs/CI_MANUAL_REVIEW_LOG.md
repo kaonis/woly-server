@@ -105,3 +105,13 @@ Period reviewed: post-merge cycle (#207 to #209)
 - Budget and throughput assessment: Scoped audit (`ci:audit:manual --since 2026-02-15T17:07:43Z`) analyzed 1 run and observed only `workflow_dispatch` events.
 - Decision: Continue manual-only
 - Follow-up actions: Execute the next weekly review cycle under issue #210.
+
+Date: 2026-02-16
+Reviewer: Codex autonomous loop
+Period reviewed: post-merge cycle (#210 to #251)
+
+- Unexpected automatic workflow runs observed: Yes (allowlisted `CNC Mobile Contract Gate` PR runs only)
+- Local gate policy followed: Yes
+- Budget and throughput assessment: Scoped audit (`npm run ci:audit:manual -- --since 2026-02-15T17:07:43Z --fail-on-unexpected`) analyzed 6 runs (4 allowlisted `pull_request`, 2 `workflow_dispatch`) with 0 unexpected events.
+- Decision: Continue manual-first policy
+- Follow-up actions: Execute the next weekly review cycle under issue #273.

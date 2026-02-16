@@ -27,6 +27,7 @@
     "ci:policy:check": "node scripts/manual-ci-workflow-policy-check.cjs",
     "ci:snippets:checkpoint": "node scripts/manual-cycle-checkpoint-snippets.cjs",
     "test:docs-snippets": "node --test scripts/__tests__/manual-cycle-checkpoint-snippets.test.cjs",
+    "test:scripts": "node --test scripts/__tests__/*.test.cjs",
     "protocol:build": "npm run build --workspace=@kaonis/woly-protocol",
     "protocol:publish": "npm run protocol:build && npm publish --workspace=@kaonis/woly-protocol",
     "protocol:publish:next": "npm run protocol:build && npm publish --workspace=@kaonis/woly-protocol --tag next",
