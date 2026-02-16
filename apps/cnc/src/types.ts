@@ -38,6 +38,8 @@ export type {
   CreateWakeScheduleRequest,
   ErrorResponse,
   HostPayload,
+  HostPort,
+  HostPortScanResponse,
   HostStatus,
   NodeMessage,
   NodeRegistration,

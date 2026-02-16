@@ -30,7 +30,8 @@
     "protocol:publish:next": "npm run protocol:build && npm publish --workspace=@kaonis/woly-protocol --tag next",
     "protocol:version:patch": "npm version patch --workspace=@kaonis/woly-protocol",
     "protocol:version:minor": "npm version minor --workspace=@kaonis/woly-protocol",
-    "protocol:version:major": "npm version major --workspace=@kaonis/woly-protocol"
+    "protocol:version:major": "npm version major --workspace=@kaonis/woly-protocol",
+    "protocol:consumer-typecheck": "npm run test:consumer-typecheck --workspace=@kaonis/woly-protocol"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

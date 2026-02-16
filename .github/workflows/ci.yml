@@ -28,6 +28,9 @@ jobs:
       - name: Build protocol package
         run: npm run build -w packages/protocol
 
+      - name: Run protocol consumer typecheck fixture
+        run: npm run test:consumer-typecheck -w packages/protocol
+
       - name: Run protocol schema tests
         run: npm run test -w packages/protocol -- schemas.test
 
