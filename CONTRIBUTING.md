@@ -25,6 +25,18 @@ cp apps/cnc/.env.example apps/cnc/.env
 3. Run `npm run build && npm run typecheck && npm run test` to verify
 4. Push and open a PR against `master`
 
+## CNC Mode Sync Requirements
+
+For CNC feature work, follow `docs/CNC_SYNC_POLICY.md`.
+
+Before merge:
+- link issues in both repos (`kaonis/woly-server` and `kaonis/woly`)
+- keep the 3-part chain explicit:
+  1. protocol contract
+  2. backend endpoint/command
+  3. frontend integration
+- run contract gates (mobile compatibility + protocol consumer typecheck when protocol is touched)
+
 ## Working With Workspaces
 
 This is an npm workspaces monorepo with Turborepo for task orchestration.
