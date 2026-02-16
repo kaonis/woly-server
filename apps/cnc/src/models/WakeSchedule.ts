@@ -27,6 +27,74 @@ interface WakeScheduleRow {
 
 const isSqlite = db.isSqlite;
 
+function computeNextTrigger(
+  scheduledTimeIso: string,
+  frequency: ScheduleFrequency,
+  enabled: boolean,
+  referenceNow: Date = new Date(),
+): string | null {
+  if (!enabled) {
+    return null;
+  }
+
+  const scheduledTime = new Date(scheduledTimeIso);
+  if (Number.isNaN(scheduledTime.getTime())) {
+    return null;
+  }
+
+  if (frequency === 'once') {
+    return scheduledTime > referenceNow ? scheduledTime.toISOString() : null;
+  }
+
+  const buildCandidate = (base: Date): Date => {
+    const candidate = new Date(base);
+    candidate.setUTCHours(
+      scheduledTime.getUTCHours(),
+      scheduledTime.getUTCMinutes(),
+      scheduledTime.getUTCSeconds(),
+      0,
+    );
+    return candidate;
+  };
+
+  const today = new Date(referenceNow);
+  today.setUTCHours(0, 0, 0, 0);
+
+  if (frequency === 'daily') {
+    const candidate = buildCandidate(today);
+    if (candidate <= referenceNow) {
+      candidate.setUTCDate(candidate.getUTCDate() + 1);
+    }
+    return candidate.toISOString();
+  }
+
+  if (frequency === 'weekly') {
+    const targetDay = scheduledTime.getUTCDay();
+    const candidate = buildCandidate(today);
+    const currentDay = candidate.getUTCDay();
+    let deltaDays = (targetDay - currentDay + 7) % 7;
+    if (deltaDays === 0 && candidate <= referenceNow) {
+      deltaDays = 7;
+    }
+    candidate.setUTCDate(candidate.getUTCDate() + deltaDays);
+    return candidate.toISOString();
+  }
+
+  const daySet = frequency === 'weekdays'
+    ? new Set([1, 2, 3, 4, 5])
+    : new Set([0, 6]);
+
+  const candidate = buildCandidate(today);
+  for (let i = 0; i < 8; i += 1) {
+    if (daySet.has(candidate.getUTCDay()) && candidate > referenceNow) {
+      return candidate.toISOString();
+    }
+    candidate.setUTCDate(candidate.getUTCDate() + 1);
+  }
+
+  return null;
+}
+
 function toBoolean(value: boolean | number): boolean {
   if (typeof value === 'boolean') {
     return value;
@@ -93,6 +161,13 @@ export class WakeScheduleModel {
 
     const scheduleId = randomUUID();
 
+    const enabled = input.enabled ?? true;
+    const nextTrigger = input.nextTrigger ?? computeNextTrigger(
+      input.scheduledTime,
+      input.frequency,
+      enabled,
+    );
+
     const result = await db.query<WakeScheduleRow>(query, [
       scheduleId,
       ownerSub,
@@ -102,9 +177,9 @@ export class WakeScheduleModel {
       input.scheduledTime,
       input.timezone ?? 'UTC',
       input.frequency,
-      asDbBoolean(input.enabled ?? true),
+      asDbBoolean(enabled),
       asDbBoolean(input.notifyOnWake ?? true),
-      input.nextTrigger ?? null,
+      nextTrigger,
     ]);
 
     if (!result.rows.length) {
@@ -161,6 +236,24 @@ export class WakeScheduleModel {
     id: string,
     updates: UpdateWakeScheduleRequest,
   ): Promise<WakeSchedule | null> {
+    const existing = await this.findById(ownerSub, id);
+    if (!existing) {
+      return null;
+    }
+
+    const nextEnabled = updates.enabled ?? existing.enabled;
+    const nextScheduledTime = updates.scheduledTime ?? existing.scheduledTime;
+    const nextFrequency = updates.frequency ?? existing.frequency;
+    const nextTrigger = updates.nextTrigger !== undefined
+      ? updates.nextTrigger
+      : (
+        updates.enabled !== undefined ||
+        updates.scheduledTime !== undefined ||
+        updates.frequency !== undefined
+      )
+        ? computeNextTrigger(nextScheduledTime, nextFrequency, nextEnabled)
+        : undefined;
+
     const assignments: string[] = [];
     const params: unknown[] = [];
     let index = 1;
@@ -181,11 +274,11 @@ export class WakeScheduleModel {
     if (updates.notifyOnWake !== undefined) {
       setField('notify_on_wake', asDbBoolean(updates.notifyOnWake));
     }
-    if (updates.nextTrigger !== undefined) setField('next_trigger', updates.nextTrigger);
+    if (nextTrigger !== undefined) setField('next_trigger', nextTrigger);
     if (updates.lastTriggered !== undefined) setField('last_triggered', updates.lastTriggered);
 
     if (!assignments.length) {
-      return this.findById(ownerSub, id);
+      return existing;
     }
 
     assignments.push(`updated_at = ${isSqlite ? 'CURRENT_TIMESTAMP' : 'NOW()'}`);
@@ -240,6 +333,91 @@ export class WakeScheduleModel {
     }
 
     return result.rowCount > 0;
+  }
+
+  static async listDue(limit = 25, nowIso = new Date().toISOString()): Promise<WakeSchedule[]> {
+    const enabledPredicate = isSqlite ? 'enabled = 1' : 'enabled = true';
+    const result = await db.query<WakeScheduleRow>(
+      `
+        SELECT *
+        FROM wake_schedules
+        WHERE ${enabledPredicate}
+          AND next_trigger IS NOT NULL
+          AND next_trigger <= $1
+        ORDER BY next_trigger ASC
+        LIMIT $2
+      `,
+      [nowIso, limit],
+    );
+
+    return result.rows.map(rowToRecord);
+  }
+
+  static async recordExecutionAttempt(
+    id: string,
+    attemptedAtIso = new Date().toISOString(),
+  ): Promise<WakeSchedule | null> {
+    const current = await this.findByIdByScheduleId(id);
+    if (!current) {
+      return null;
+    }
+
+    const shouldRemainEnabled = current.enabled && current.frequency !== 'once';
+    const referenceNow = new Date(attemptedAtIso);
+    const nextTrigger = shouldRemainEnabled
+      ? computeNextTrigger(
+        current.scheduledTime,
+        current.frequency,
+        true,
+        Number.isNaN(referenceNow.getTime()) ? new Date() : referenceNow,
+      )
+      : null;
+
+    if (isSqlite) {
+      await db.query(
+        `
+          UPDATE wake_schedules
+          SET enabled = $1,
+              last_triggered = $2,
+              next_trigger = $3,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = $4
+        `,
+        [shouldRemainEnabled ? 1 : 0, attemptedAtIso, nextTrigger, id],
+      );
+    } else {
+      await db.query(
+        `
+          UPDATE wake_schedules
+          SET enabled = $1,
+              last_triggered = $2,
+              next_trigger = $3,
+              updated_at = NOW()
+          WHERE id = $4
+        `,
+        [shouldRemainEnabled, attemptedAtIso, nextTrigger, id],
+      );
+    }
+
+    return this.findByIdByScheduleId(id);
+  }
+
+  private static async findByIdByScheduleId(id: string): Promise<WakeSchedule | null> {
+    const result = await db.query<WakeScheduleRow>(
+      `
+        SELECT *
+        FROM wake_schedules
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [id],
+    );
+
+    if (!result.rows.length) {
+      return null;
+    }
+
+    return rowToRecord(result.rows[0]);
   }
 }
 

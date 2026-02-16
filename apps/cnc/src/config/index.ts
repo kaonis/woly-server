@@ -95,6 +95,9 @@ export const config: ServerConfig = {
   commandRetentionDays: getEnvNumber('COMMAND_RETENTION_DAYS', 30),
   commandMaxRetries: getEnvNumber('COMMAND_MAX_RETRIES', 3),
   commandRetryBaseDelayMs: getEnvNumber('COMMAND_RETRY_BASE_DELAY_MS', 1000),
+  scheduleWorkerEnabled: getEnvBoolean('SCHEDULE_WORKER_ENABLED', true),
+  schedulePollIntervalMs: getEnvNumber('SCHEDULE_POLL_INTERVAL_MS', 60000),
+  scheduleBatchSize: getEnvNumber('SCHEDULE_BATCH_SIZE', 25),
   logLevel: getEnvVar('LOG_LEVEL', 'info'),
 };
 
@@ -129,6 +132,14 @@ if (!Number.isFinite(config.wsMaxConnectionsPerIp) || config.wsMaxConnectionsPer
 
 if (!Number.isFinite(config.jwtTtlSeconds) || config.jwtTtlSeconds <= 0) {
   throw new Error('JWT_TTL_SECONDS must be a finite number > 0');
+}
+
+if (!Number.isFinite(config.schedulePollIntervalMs) || config.schedulePollIntervalMs <= 0) {
+  throw new Error('SCHEDULE_POLL_INTERVAL_MS must be a finite number > 0');
+}
+
+if (!Number.isFinite(config.scheduleBatchSize) || config.scheduleBatchSize <= 0) {
+  throw new Error('SCHEDULE_BATCH_SIZE must be a finite number > 0');
 }
 
 export default config;

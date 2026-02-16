@@ -47,6 +47,9 @@ describe('config parsing and validation', () => {
       CORS_ORIGINS: 'https://a.example, https://b.example ,',
       WS_REQUIRE_TLS: 'YES',
       WS_ALLOW_QUERY_TOKEN_AUTH: 'off',
+      SCHEDULE_WORKER_ENABLED: 'false',
+      SCHEDULE_POLL_INTERVAL_MS: '45000',
+      SCHEDULE_BATCH_SIZE: '10',
     });
 
     expect(config.operatorAuthTokens).toEqual(['node-token-1', 'node-token-2']);
@@ -54,6 +57,9 @@ describe('config parsing and validation', () => {
     expect(config.corsOrigins).toEqual(['https://a.example', 'https://b.example']);
     expect(config.wsRequireTls).toBe(true);
     expect(config.wsAllowQueryTokenAuth).toBe(false);
+    expect(config.scheduleWorkerEnabled).toBe(false);
+    expect(config.schedulePollIntervalMs).toBe(45000);
+    expect(config.scheduleBatchSize).toBe(10);
   });
 
   it('throws when NODE_TIMEOUT is less than 2x NODE_HEARTBEAT_INTERVAL', async () => {
@@ -96,5 +102,13 @@ describe('config parsing and validation', () => {
         PORT: 'abc',
       })
     ).rejects.toThrow('Invalid numeric environment variable: PORT');
+  });
+
+  it('throws when SCHEDULE_POLL_INTERVAL_MS is not greater than zero', async () => {
+    await expect(
+      loadConfig({
+        SCHEDULE_POLL_INTERVAL_MS: '0',
+      }),
+    ).rejects.toThrow('SCHEDULE_POLL_INTERVAL_MS must be a finite number > 0');
   });
 });

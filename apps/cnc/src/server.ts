@@ -17,6 +17,7 @@ import { createRoutes } from './routes';
 import { createWebSocketServer } from './websocket/server';
 import { errorHandler } from './middleware/errorHandler';
 import { reconcileCommandsOnStartup, startCommandPruning, stopCommandPruning } from './services/commandReconciler';
+import { startWakeScheduleWorker, stopWakeScheduleWorker } from './services/wakeScheduleWorker';
 import { specs } from './swagger';
 import { runtimeMetrics } from './services/runtimeMetrics';
 
@@ -181,6 +182,14 @@ class Server {
       // Start periodic command pruning
       startCommandPruning(config.commandRetentionDays);
 
+      // Start wake schedule execution worker
+      startWakeScheduleWorker({
+        commandRouter: this.commandRouter,
+        enabled: config.scheduleWorkerEnabled,
+        pollIntervalMs: config.schedulePollIntervalMs,
+        batchSize: config.scheduleBatchSize,
+      });
+
       // Start HTTP server
       this.httpServer.listen(config.port, () => {
         logger.info(`Server listening on port ${config.port}`);
@@ -207,6 +216,9 @@ class Server {
 
       // Stop command pruning
       stopCommandPruning();
+
+      // Stop wake schedule worker
+      stopWakeScheduleWorker();
 
       // Shutdown node manager
       this.nodeManager.shutdown();
