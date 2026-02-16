@@ -61,6 +61,16 @@ npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --fail-on-unexpected
 npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --json
 ```
 
+Generate copy-ready markdown snippets for weekly checkpoint docs (dry-run only):
+
+```bash
+npm run ci:snippets:checkpoint -- \
+  --issue 251 \
+  --follow-up 252 \
+  --checkpoint 2026-02-15T17:07:43Z \
+  --roadmap-file docs/ROADMAP_V11.md
+```
+
 Run policy guard to verify workflow files still enforce manual-only mode:
 
 ```bash
