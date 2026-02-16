@@ -6,14 +6,14 @@ Scope: Post-V10 operational cadence with manual-first CI checkpoint automation.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `53df133` (PR #272).
-- Active execution branch: `codex/issue-251-weekly-manual-review`.
+- `master` synced at merge commit `c53ace2` (PR #274).
+- Active execution branch: `codex/issue-273-weekly-manual-review`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #251 `[CI] Schedule weekly manual-only operations review (rolling follow-up after #249)`
 - #273 `[CI] Schedule weekly manual-only operations review (rolling follow-up after #251)`
+- #275 `[CI] Schedule weekly manual-only operations review (rolling follow-up after #273)`
 
 ### CI snapshot
 - Policy is manual-first:
@@ -22,11 +22,10 @@ Scope: Post-V10 operational cadence with manual-first CI checkpoint automation.
 - Local guard commands remain active:
   - `npm run ci:audit:manual`
   - `npm run ci:policy:check`
-- Latest scoped audit (`2026-02-16T18:29:40Z`) since `2026-02-15T17:07:43Z`:
-  - `workflow_dispatch`: 2
-  - allowlisted `pull_request` (`CNC Mobile Contract Gate`): 4
+- Latest scoped audit (`2026-02-16T18:33:09Z`) since `2026-02-16T18:31:42Z`:
+  - runs in scope: 0
   - unexpected non-manual runs: 0
-- Latest policy check (`2026-02-16T18:29:38Z`): PASS across all workflow files.
+- Latest policy check (`2026-02-16T18:33:07Z`): PASS across all workflow files.
 
 ## 2. Iterative Phases
 
@@ -55,7 +54,7 @@ Acceptance criteria:
   - `npm run ci:policy:check`
 - Append review entry and progress updates.
 
-Status: `Completed` (2026-02-16, follow-up queued in #273)
+Status: `Completed` (2026-02-16, PR #274; follow-up queued in #273)
 
 ### Phase 3: ESLint 10 compatibility checkpoint
 Issue: #150  
@@ -75,12 +74,22 @@ Labels: `technical-debt`
 
 Acceptance criteria:
 - Keep dependency dashboard comment trail aligned with phase outcomes.
-- Link relevant blocker/next-step issues (#150, #251, #273).
+- Link relevant blocker/next-step issues (#150, #273, #275).
 
 Status: `Planned`
 
 ### Phase 5: Next weekly operations review cycle
 Issue: #273  
+Labels: `priority:low`, `technical-debt`, `developer-experience`
+
+Acceptance criteria:
+- Re-run scoped audit and policy checks for the next review window.
+- Append review log and roadmap/dependency checkpoint updates.
+
+Status: `Completed` (2026-02-16, follow-up queued in #275)
+
+### Phase 6: Next weekly operations review cycle
+Issue: #275  
 Labels: `priority:low`, `technical-debt`, `developer-experience`
 
 Acceptance criteria:
@@ -99,3 +108,8 @@ Status: `Planned`
 - 2026-02-16: Ran scoped audit for #251 (`npm run ci:audit:manual -- --since 2026-02-15T17:07:43Z --fail-on-unexpected`) and observed 0 unexpected non-manual runs.
 - 2026-02-16: Ran workflow policy guard for #251 (`npm run ci:policy:check`) and observed full PASS compliance.
 - 2026-02-16: Appended review/dependency checkpoints and created follow-up issue #273.
+- 2026-02-16: Merged issue #251 via PR #274.
+- 2026-02-16: Started issue #273 on branch `codex/issue-273-weekly-manual-review`.
+- 2026-02-16: Ran scoped audit for #273 (`npm run ci:audit:manual -- --since 2026-02-16T18:31:42Z --fail-on-unexpected`) and observed 0 runs in scope.
+- 2026-02-16: Ran workflow policy guard for #273 (`npm run ci:policy:check`) and observed full PASS compliance.
+- 2026-02-16: Appended review/dependency checkpoints and created follow-up issue #275.
