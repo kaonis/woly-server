@@ -6,6 +6,7 @@ import { Request, Response } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
 import { hostStatusSchema } from '@kaonis/woly-protocol';
+import type { HostPortScanResponse } from '@kaonis/woly-protocol';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
 import { lookupMacVendor, MAC_ADDRESS_PATTERN } from '../services/macVendorService';
@@ -21,21 +22,9 @@ const updateHostBodySchema = z.object({
   mac: z.string().regex(MAC_ADDRESS_PATTERN).optional(),
   ip: ipAddressSchema.optional(),
   status: hostStatusSchema.optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  tags: z.array(z.string().min(1).max(64)).max(32).nullable().optional(),
 }).strict();
-
-type PortScanEndpointResponse = {
-  target: string;
-  scannedAt: string;
-  openPorts: Array<{ port: number; protocol: 'tcp'; service: string }>;
-  scan?: {
-    commandId?: string;
-    state?: 'acknowledged' | 'failed';
-    nodeId?: string;
-    message?: string;
-  };
-  message?: string;
-  correlationId?: string;
-};
 
 function mapCommandError(error: unknown, fallbackMessage: string): {
   statusCode: number;
@@ -367,7 +356,7 @@ export class HostsController {
         return;
       }
 
-      const response: PortScanEndpointResponse = {
+      const response: HostPortScanResponse = {
         target: fqn,
         scannedAt: new Date().toISOString(),
         openPorts: [],
@@ -440,7 +429,7 @@ export class HostsController {
 
       const result = await this.commandRouter.routeScanCommand(host.nodeId, true, routeOptions);
 
-      const response: PortScanEndpointResponse = {
+      const response: HostPortScanResponse = {
         target: fqn,
         scannedAt: new Date().toISOString(),
         openPorts: [],
