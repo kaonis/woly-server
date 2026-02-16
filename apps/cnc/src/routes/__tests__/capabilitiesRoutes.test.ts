@@ -85,14 +85,20 @@ describe('Capabilities Routes', () => {
 
       expect(response.status).toBe(200);
       expect(cncCapabilitiesResponseSchema.safeParse(response.body).success).toBe(true);
-      expect(response.body.protocolVersion).toBe(PROTOCOL_VERSION);
-      expect(response.body.supportedProtocolVersions).toContain(PROTOCOL_VERSION);
-      expect(response.body.capabilities).toEqual({
-        scan: false,
-        notesTagsPersistence: true,
-        schedulesApi: true,
-        commandStatusStreaming: false,
+      expect(response.body).toMatchObject({
+        mode: 'cnc',
+        versions: {
+          cncApi: expect.any(String),
+          protocol: PROTOCOL_VERSION,
+        },
+        capabilities: {
+          scan: expect.objectContaining({ supported: true }),
+          notesTags: expect.objectContaining({ supported: true, persistence: 'backend' }),
+          schedules: expect.objectContaining({ supported: true, persistence: 'backend' }),
+          commandStatusStreaming: expect.objectContaining({ supported: false, transport: null }),
+        },
       });
+      expect(response.body.versions.cncApi.toLowerCase()).not.toBe('unknown');
     });
   });
 });

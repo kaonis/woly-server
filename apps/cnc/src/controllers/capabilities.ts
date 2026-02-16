@@ -2,23 +2,85 @@ import { Request, Response } from 'express';
 import {
   PROTOCOL_VERSION,
   SUPPORTED_PROTOCOL_VERSIONS,
-  cncCapabilitiesResponseSchema,
   type CncCapabilitiesResponse,
 } from '@kaonis/woly-protocol';
 import logger from '../utils/logger';
 
+const FALLBACK_CNC_API_VERSION = '0.0.0';
 const CNC_API_VERSION = '1.0.0';
+const FALLBACK_PROTOCOL_VERSION = (() => {
+  const firstSupported = Array.isArray(SUPPORTED_PROTOCOL_VERSIONS)
+    ? SUPPORTED_PROTOCOL_VERSIONS.find(
+      (version): version is string => typeof version === 'string' && version.trim().length > 0,
+    )
+    : undefined;
+  return firstSupported ?? '1.0.0';
+})();
 
-const CNC_FEATURE_CAPABILITIES = {
-  // Scan command endpoint parity is still in progress.
-  scan: false,
-  // Host metadata persistence is available through host update flows.
-  notesTagsPersistence: true,
-  // Schedule API CRUD + backend execution worker are available server-side.
-  schedulesApi: true,
-  // Mobile currently uses polling for command lifecycle visibility.
-  commandStatusStreaming: false,
-} as const;
+function resolveCapabilityVersion(
+  candidate: unknown,
+  fallback: string,
+  field: 'cncApi' | 'protocol',
+): string {
+  if (typeof candidate === 'string' && candidate.trim().length > 0) {
+    return candidate.trim();
+  }
+
+  logger.warn('Capabilities version missing or invalid; using fallback', {
+    field,
+    fallback,
+    receivedType: typeof candidate,
+  });
+  return fallback;
+}
+
+const capabilityMatrix: CncCapabilitiesResponse['capabilities'] = {
+  scan: {
+    supported: true,
+    routes: ['/api/hosts/ports/:fqn', '/api/hosts/scan-ports/:fqn'],
+    note: 'Compatibility endpoints are available; per-host open-port telemetry remains protocol-limited.',
+  },
+  notesTags: {
+    supported: true,
+    persistence: 'backend',
+    note: 'Host notes/tags are accepted via PUT /api/hosts/:fqn.',
+  },
+  schedules: {
+    supported: true,
+    routes: ['/api/schedules', '/api/schedules/:id'],
+    persistence: 'backend',
+    note: 'Host wake schedules are persisted and executed in CNC backend.',
+  },
+  commandStatusStreaming: {
+    supported: false,
+    transport: null,
+    note: 'Dedicated frontend-facing stream is planned alongside kaonis/woly#311.',
+  },
+};
+
+export function buildCncCapabilitiesResponse(
+  versions: { cncApi?: unknown; protocol?: unknown } = {},
+): CncCapabilitiesResponse {
+  const cncApi = resolveCapabilityVersion(
+    versions.cncApi ?? CNC_API_VERSION,
+    FALLBACK_CNC_API_VERSION,
+    'cncApi',
+  );
+  const protocol = resolveCapabilityVersion(
+    versions.protocol ?? PROTOCOL_VERSION,
+    FALLBACK_PROTOCOL_VERSION,
+    'protocol',
+  );
+
+  return {
+    mode: 'cnc',
+    versions: {
+      cncApi,
+      protocol,
+    },
+    capabilities: capabilityMatrix,
+  };
+}
 
 export class CapabilitiesController {
   /**
@@ -44,15 +106,7 @@ export class CapabilitiesController {
    */
   async getCapabilities(req: Request, res: Response): Promise<void> {
     try {
-      const response: CncCapabilitiesResponse = {
-        apiVersion: CNC_API_VERSION,
-        protocolVersion: PROTOCOL_VERSION,
-        supportedProtocolVersions: [...SUPPORTED_PROTOCOL_VERSIONS],
-        capabilities: { ...CNC_FEATURE_CAPABILITIES },
-      };
-
-      const payload = cncCapabilitiesResponseSchema.parse(response);
-      res.status(200).json(payload);
+      res.status(200).json(buildCncCapabilitiesResponse());
     } catch (error) {
       logger.error('Failed to get capabilities', {
         correlationId: req.correlationId,

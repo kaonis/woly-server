@@ -1,6 +1,10 @@
 import express, { Express } from 'express';
 import request from 'supertest';
-import { cncCapabilitiesResponseSchema, wakeScheduleListResponseSchema } from '@kaonis/woly-protocol';
+import {
+  PROTOCOL_VERSION,
+  cncCapabilitiesResponseSchema,
+  wakeScheduleListResponseSchema,
+} from '@kaonis/woly-protocol';
 import { createRoutes } from '../index';
 import { NodeManager } from '../../services/nodeManager';
 import { HostAggregator } from '../../services/hostAggregator';
@@ -352,13 +356,19 @@ describe('Mobile API compatibility smoke checks', () => {
       expect(response.status).toBe(200);
       expect(cncCapabilitiesResponseSchema.safeParse(response.body).success).toBe(true);
       expect(response.body).toMatchObject({
+        mode: 'cnc',
+        versions: {
+          cncApi: expect.any(String),
+          protocol: PROTOCOL_VERSION,
+        },
         capabilities: {
-          scan: expect.any(Boolean),
-          notesTagsPersistence: expect.any(Boolean),
-          schedulesApi: expect.any(Boolean),
-          commandStatusStreaming: expect.any(Boolean),
+          scan: expect.objectContaining({ supported: true }),
+          notesTags: expect.objectContaining({ supported: true, persistence: 'backend' }),
+          schedules: expect.objectContaining({ supported: true, persistence: 'backend' }),
+          commandStatusStreaming: expect.objectContaining({ supported: false, transport: null }),
         },
       });
+      expect(response.body.versions.cncApi.toLowerCase()).not.toBe('unknown');
     });
 
     it('returns auth error envelope when JWT is missing', async () => {

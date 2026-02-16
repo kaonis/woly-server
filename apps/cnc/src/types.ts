@@ -7,7 +7,6 @@ import type {
   CncCapabilityDescriptor as ProtocolCncCapabilityDescriptor,
   CommandState,
   Host,
-  HostPortScanResponse as ProtocolHostPortScanResponse,
   NodeMetadata as ProtocolNodeMetadata,
 } from '@kaonis/woly-protocol';
 
@@ -81,7 +80,6 @@ export interface HostsResponse {
 
 export type CapabilityDescriptor = ProtocolCncCapabilityDescriptor;
 export type CncCapabilitiesResponse = ProtocolCncCapabilitiesResponse;
-export type HostPortScanResponse = ProtocolHostPortScanResponse;
 export interface WakeupResponse {
   success: boolean;
   message: string;
