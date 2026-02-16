@@ -61,12 +61,12 @@ Primary impact:
 7. Wave G: ESLint 10 compatibility watchdog automation  
    Tracking issue: #159
 
-## 4. Decision Table (2026-02-15)
+## 4. Decision Table (2026-02-16 refresh)
 
 | Dependency | Decision | Rationale | Tracking |
 |---|---|---|---|
 | ESLint v9 | Merged | Adopted with typescript-eslint v8 via PR #151 | #146 |
-| ESLint v10 | Deferred pending upstream compatibility | Still blocked: latest `@typescript-eslint/*@8.55.0` peers `eslint ^8.57.0 || ^9.0.0`; Renovate PR #11 currently unstable | #150 |
+| ESLint v10 | Merged | Unblocked by `@typescript-eslint/*@8.56.0` peer support (`eslint ^8.57.0 || ^9.0.0 || ^10.0.0`); adopted with local gate validation in issue #150 | #150 |
 | typescript-eslint v8 | Merged | Upgraded with ESLint v9 toolchain migration via PR #151 | #146 |
 | eslint-config-prettier v10 | Merged | Upgraded with ESLint v9 toolchain migration via PR #151 | #146 |
 | Zod v4 | Merged | Runtime schema compatibility validated across protocol/C&C/node-agent and merged via PR #152 | #147 |
@@ -91,3 +91,4 @@ Issue #144 is complete when:
 - 2026-02-16: Manual-first policy baseline remains unchanged; next weekly review is queued in #275.
 - 2026-02-16: Manual-CI operations checkpoint (issue #275) confirmed no unexpected workflow events since `2026-02-16T18:33:09Z`; scoped window contained 0 runs.
 - 2026-02-16: Manual-first policy baseline remains unchanged; next weekly review is queued in #277.
+- 2026-02-16: ESLint 10 compatibility checkpoint (issue #150) is unblocked (`eslint@10.0.0`, `@typescript-eslint/*@8.56.0`) and adopted with local gate validation.

@@ -6,13 +6,12 @@ Scope: Post-V10 operational cadence with manual-first CI checkpoint automation.
 ## 1. Status Audit
 
 ### Repository and branch status
-- `master` synced at merge commit `0f1bea7` (PR #276).
-- Active execution branch: `codex/issue-275-weekly-manual-review`.
+- `master` synced at merge commit `4698b37` (PR #278).
+- Active execution branch: `codex/issue-150-eslint10-checkpoint`.
 
 ### Open issue snapshot (`kaonis/woly-server`)
 - #4 `Dependency Dashboard`
 - #150 `[Dependencies] Revisit ESLint 10 adoption after typescript-eslint compatibility`
-- #275 `[CI] Schedule weekly manual-only operations review (rolling follow-up after #273)`
 - #277 `[CI] Schedule weekly manual-only operations review (rolling follow-up after #275)`
 
 ### CI snapshot
@@ -63,10 +62,10 @@ Labels: `priority:low`, `technical-debt`, `testing`
 Acceptance criteria:
 - Re-run compatibility check:
   - `npm run deps:check-eslint10`
-- If support is unblocked, open implementation issue and execute full local gates.
+- If support is unblocked, execute ESLint 10 adoption with full local gates.
 - If still blocked, record current evidence and continue monitoring.
 
-Status: `Blocked` (last checkpoint 2026-02-15: latest `@typescript-eslint/*` peer range excludes ESLint 10)
+Status: `Completed` (2026-02-16, unblocked by `@typescript-eslint/*@8.56.0` and adopted in #150)
 
 ### Phase 4: Dependency dashboard checkpoint consistency
 Issue: #4  
@@ -74,7 +73,7 @@ Labels: `technical-debt`
 
 Acceptance criteria:
 - Keep dependency dashboard comment trail aligned with phase outcomes.
-- Link relevant blocker/next-step issues (#150, #275, #277).
+- Link relevant blocker/next-step issues (#150, #277).
 
 Status: `Planned`
 
@@ -128,3 +127,7 @@ Status: `Planned`
 - 2026-02-16: Ran scoped audit for #275 (`npm run ci:audit:manual -- --since 2026-02-16T18:33:09Z --fail-on-unexpected`) and observed 0 runs in scope.
 - 2026-02-16: Ran workflow policy guard for #275 (`npm run ci:policy:check`) and observed full PASS compliance.
 - 2026-02-16: Appended review/dependency checkpoints and created follow-up issue #277.
+- 2026-02-16: Merged issue #275 via PR #278.
+- 2026-02-16: Started issue #150 on branch `codex/issue-150-eslint10-checkpoint`.
+- 2026-02-16: Re-ran compatibility checkpoint (`npm run deps:check-eslint10`) and confirmed ESLint 10 support is unblocked (`@typescript-eslint/*@8.56.0`, peer range includes `^10`).
+- 2026-02-16: Adopted ESLint 10 toolchain (`eslint@10.0.0`, `@eslint/js@10.0.1`) and revalidated local gates (`lint`, `typecheck`, `test:ci`, `build`) successfully.
