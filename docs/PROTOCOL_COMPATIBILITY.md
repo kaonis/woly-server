@@ -8,15 +8,21 @@ The WoLy distributed system uses a shared protocol package (`@kaonis/woly-protoc
 
 **Package**: `@kaonis/woly-protocol`  
 **Purpose**: Shared TypeScript types and Zod runtime schemas for node ↔ C&C communication  
-**Current Package Version**: 1.1.0  
+**Current Package Version**: 1.1.1  
 **Current Protocol Version**: 1.0.0 (see `PROTOCOL_VERSION` constant)  
 **Location**: `packages/protocol/`
 
 ### Exports
 
-- **Types**: `Host`, `HostStatus`, `CommandState`, `NodeMessage`, `CncCommand`, etc.
-- **Schemas**: `outboundNodeMessageSchema`, `inboundCncCommandSchema`, etc.
+- **Types**: `Host`, `HostStatus`, `CommandState`, `NodeMessage`, `CncCommand`, CNC API DTOs (`CncCapabilitiesResponse`, `WakeSchedule`, `HostPortScanResponse`), etc.
+- **Schemas**: `outboundNodeMessageSchema`, `inboundCncCommandSchema`, CNC API schemas (`cncCapabilitiesResponseSchema`, `wakeScheduleSchema`, `hostPortScanResponseSchema`), etc.
 - **Constants**: `PROTOCOL_VERSION`, `SUPPORTED_PROTOCOL_VERSIONS`
+
+### Consumer Migration Notes
+
+- `1.0.x`: Base node ↔ C&C message contracts.
+- `1.1.x`: CNC app/backend API DTOs for capabilities + schedules.
+- Next minor release from this branch: host port scan DTO exports + consumer typecheck fixture.
 
 ## Versioning Policy
 
@@ -81,6 +87,7 @@ CI includes a dedicated `protocol-compatibility` job that runs **before** main v
 ```yaml
 protocol-compatibility:
   - Build protocol package
+  - Run protocol consumer fixture typecheck
   - Run protocol contract tests (packages/protocol)
   - Verify node-agent contract tests (apps/node-agent)
   - Verify cnc contract tests (apps/cnc)
@@ -97,6 +104,11 @@ This job **blocks** the main build if:
 - Location: `packages/protocol/src/__tests__/contract.cross-repo.test.ts`
 - Coverage: All message/command types, JSON serialization, version validation
 - Runs: 90+ tests total (32 contract tests + ~58 schema unit tests) covering full protocol surface area
+
+#### Consumer Typecheck Fixture
+- Location: `packages/protocol/fixtures/app-consumer/`
+- Purpose: ensures exported protocol types/schemas are consumable by app/backend integration code
+- Command: `npm run test:consumer-typecheck -w packages/protocol`
 
 #### Node Agent Contract Tests
 - Location: `apps/node-agent/src/__tests__/protocol.contract.unit.test.ts`

@@ -11,6 +11,9 @@
 - `HostPayload` — **@deprecated** Alias for `Host`, kept for backwards compatibility
 - `CommandState` — Command lifecycle state: `'queued' | 'sent' | 'acknowledged' | 'failed' | 'timed_out'`
 - `ErrorResponse` — Standardized error response shape with `error`, `message`, optional `code` and `details`
+- `CncCapabilitiesResponse` / `CncFeatureCapabilities` — CNC mode feature negotiation response
+- `HostPort` / `HostPortScanResponse` — CNC host port-scan API DTOs
+- `WakeSchedule`, `CreateWakeScheduleRequest`, `UpdateWakeScheduleRequest`, `ScheduleFrequency` — CNC schedules API DTOs
 - `NodeMetadata` — Agent platform/version/network info
 - `NodeRegistration` — Registration payload sent by nodes
 - `NodeMessage` — Discriminated union of all node → C&C messages
@@ -24,6 +27,9 @@
 - `hostSchema` — Validates `Host` object
 - `commandStateSchema` — Validates `CommandState`
 - `errorResponseSchema` — Validates `ErrorResponse` object
+- `cncCapabilitiesResponseSchema` / `cncFeatureCapabilitiesSchema` — Validates CNC capabilities payload
+- `hostPortSchema` / `hostPortScanResponseSchema` — Validates host port scan payloads
+- `wakeScheduleSchema` / `wakeScheduleListResponseSchema` / `createWakeScheduleRequestSchema` / `updateWakeScheduleRequestSchema` — Validates schedules payloads
 - `outboundNodeMessageSchema` — Validates `NodeMessage` at runtime
 - `inboundCncCommandSchema` — Validates `CncCommand` at runtime
 
@@ -85,11 +91,18 @@ cd packages/protocol && npx tsc
 
 Output goes to `dist/`. Both `main` and `types` in package.json point there.
 
+## Consumer Migration Notes
+
+- `1.0.x`: Base node ↔ C&C message contracts (`Host`, `NodeMessage`, `CncCommand`).
+- `1.1.x`: CNC app/backend API contracts (`CncCapabilitiesResponse`, schedule DTOs/schemas).
+- Next minor from this branch: CNC host port scan DTO exports (`HostPortScanResponse`) plus consumer fixture typecheck.
+
 ## Testing
 
 ```bash
 # From monorepo root
 npm test -w packages/protocol
+npm run test:consumer-typecheck -w packages/protocol
 
 # Or directly
 cd packages/protocol && npm test

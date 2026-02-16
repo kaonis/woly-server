@@ -21,7 +21,8 @@
     "build": "tsc",
     "test": "jest",
     "test:ci": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:consumer-typecheck": "tsc --noEmit -p fixtures/app-consumer/tsconfig.json"
   },
   "repository": {
     "type": "git",

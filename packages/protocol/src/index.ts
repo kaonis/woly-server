@@ -75,6 +75,26 @@ export interface CncCapabilitiesResponse {
   capabilities: CncFeatureCapabilities;
 }
 
+export interface HostPort {
+  port: number;
+  protocol: 'tcp';
+  service: string;
+}
+
+export interface HostPortScanResponse {
+  target: string;
+  scannedAt: string;
+  openPorts: HostPort[];
+  scan?: {
+    commandId?: string;
+    state?: CommandState;
+    nodeId?: string;
+    message?: string;
+  };
+  message?: string;
+  correlationId?: string;
+}
+
 // --- Wake schedule API ---
 
 export type ScheduleFrequency = 'once' | 'daily' | 'weekly' | 'weekdays' | 'weekends';
@@ -153,6 +173,8 @@ export type CncCommand =
         mac?: string;
         ip?: string;
         status?: HostStatus;
+        notes?: string | null;
+        tags?: string[] | null;
       };
     }
   | { type: 'delete-host'; commandId: string; data: { name: string } }
@@ -204,6 +226,26 @@ export const cncCapabilitiesResponseSchema = z.object({
 
 const isoTimestampSchema = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
   message: 'Expected ISO-8601 timestamp',
+});
+
+export const hostPortSchema: z.ZodType<HostPort> = z.object({
+  port: z.number().int().positive(),
+  protocol: z.literal('tcp'),
+  service: z.string().min(1),
+});
+
+export const hostPortScanResponseSchema: z.ZodType<HostPortScanResponse> = z.object({
+  target: z.string().min(1),
+  scannedAt: isoTimestampSchema,
+  openPorts: z.array(hostPortSchema),
+  scan: z.object({
+    commandId: z.string().min(1).optional(),
+    state: commandStateSchema.optional(),
+    nodeId: z.string().min(1).optional(),
+    message: z.string().min(1).optional(),
+  }).optional(),
+  message: z.string().min(1).optional(),
+  correlationId: z.string().min(1).optional(),
 });
 
 export const scheduleFrequencySchema = z.enum([
@@ -377,6 +419,8 @@ export const inboundCncCommandSchema: z.ZodType<CncCommand> = z.discriminatedUni
       mac: z.string().min(1).optional(),
       ip: z.string().min(1).optional(),
       status: hostStatusSchema.optional(),
+      notes: z.string().max(2000).nullable().optional(),
+      tags: z.array(z.string().min(1)).max(32).nullable().optional(),
     }),
   }),
   z.object({

@@ -3,6 +3,8 @@ import {
   hostStatusSchema,
   cncCapabilitiesResponseSchema,
   cncFeatureCapabilitiesSchema,
+  hostPortSchema,
+  hostPortScanResponseSchema,
   scheduleFrequencySchema,
   wakeScheduleSchema,
   wakeScheduleListResponseSchema,
@@ -190,6 +192,50 @@ describe('cncFeatureCapabilitiesSchema', () => {
       commandStatusStreaming: true,
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('hostPortSchema', () => {
+  it('accepts valid host port records', () => {
+    expect(hostPortSchema.safeParse({ port: 22, protocol: 'tcp', service: 'SSH' }).success).toBe(true);
+  });
+
+  it('rejects non-positive ports', () => {
+    expect(hostPortSchema.safeParse({ port: 0, protocol: 'tcp', service: 'SSH' }).success).toBe(false);
+  });
+});
+
+describe('hostPortScanResponseSchema', () => {
+  it('accepts valid host port scan payloads', () => {
+    const result = hostPortScanResponseSchema.safeParse({
+      target: 'office-pc@home-node',
+      scannedAt: '2026-02-16T08:00:00.000Z',
+      openPorts: [
+        { port: 22, protocol: 'tcp', service: 'SSH' },
+        { port: 443, protocol: 'tcp', service: 'HTTPS' },
+      ],
+      scan: {
+        commandId: 'cmd-1',
+        state: 'acknowledged',
+        nodeId: 'node-1',
+      },
+      correlationId: 'corr-1',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects invalid scan state values', () => {
+    const result = hostPortScanResponseSchema.safeParse({
+      target: 'office-pc@home-node',
+      scannedAt: '2026-02-16T08:00:00.000Z',
+      openPorts: [],
+      scan: {
+        state: 'unknown',
+      },
+    });
+
+    expect(result.success).toBe(false);
   });
 });
 
@@ -625,6 +671,21 @@ describe('inboundCncCommandSchema', () => {
           mac: 'AA:BB:CC:DD:EE:FF',
           ip: '192.168.1.50',
           status: 'awake' as const,
+          notes: 'wake before backup',
+          tags: ['infra', 'macos'],
+        },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
+    });
+
+    it('accepts nullable notes/tags metadata fields', () => {
+      const cmd = {
+        type: 'update-host' as const,
+        commandId: 'cmd-1',
+        data: {
+          name: 'new-name',
+          notes: null,
+          tags: null,
         },
       };
       expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
