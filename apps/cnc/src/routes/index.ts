@@ -56,7 +56,8 @@ export function createRoutes(
   router.get('/hosts/mac-vendor/:mac', (req, res) =>
     hostsController.getMacVendor(req, res),
   );
-  // IMPORTANT: ports/scan-ports must be registered before the :fqn catch-all
+  // IMPORTANT: ping/ports/scan-ports must be registered before the :fqn catch-all
+  router.get('/hosts/ping/:fqn', (req, res) => hostsController.pingHost(req, res));
   router.get('/hosts/ports/:fqn', (req, res) => hostsController.getHostPorts(req, res));
   router.get('/hosts/scan-ports/:fqn', (req, res) => hostsController.scanHostPorts(req, res));
   // IMPORTANT: schedule routes must be registered before the :fqn catch-all

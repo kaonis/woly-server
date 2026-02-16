@@ -8,6 +8,7 @@ import type {
   CommandState,
   HostWakeSchedule as ProtocolHostWakeSchedule,
   Host,
+  HostPingResult as ProtocolHostPingResult,
   HostPortScanResponse as ProtocolHostPortScanResponse,
   NodeMetadata as ProtocolNodeMetadata,
   ScheduleFrequency as ProtocolScheduleFrequency,
@@ -55,7 +56,9 @@ export type {
 export interface CommandResult {
   commandId: string;
   success: boolean;
+  message?: string;
   error?: string;
+  hostPing?: ProtocolHostPingResult;
   timestamp: Date;
   correlationId?: string;
 }
@@ -77,9 +80,20 @@ export interface HostsResponse {
 
 export type CapabilityDescriptor = ProtocolCncCapabilityDescriptor;
 export type CncCapabilitiesResponse = ProtocolCncCapabilitiesResponse;
+export type HostPingResult = ProtocolHostPingResult;
 export type HostPortScanResponse = ProtocolHostPortScanResponse;
 export type ScheduleFrequency = ProtocolScheduleFrequency;
 export type HostWakeSchedule = ProtocolHostWakeSchedule;
+
+export interface HostPingResponse {
+  target: string;
+  checkedAt: string;
+  latencyMs: number;
+  success: boolean;
+  status: 'awake' | 'asleep' | 'unknown';
+  source: 'node-agent';
+  correlationId?: string;
+}
 
 export interface WakeupResponse {
   success: boolean;

@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
-import { CncCommand, CommandResult, WakeupResponse } from '../types';
+import { CncCommand, CommandResult, HostPingResponse, WakeupResponse } from '../types';
 import { NodeManager } from './nodeManager';
 import { HostAggregator } from './hostAggregator';
 import logger from '../utils/logger';
@@ -20,6 +20,11 @@ interface HostUpdateData {
   notes?: string | null;
   tags?: string[];
 }
+
+type PingHostCommandResult = {
+  hostPing: NonNullable<CommandResult['hostPing']>;
+  correlationId?: string;
+};
 
 /**
  * CommandRouter
@@ -125,6 +130,59 @@ export class CommandRouter extends EventEmitter {
       nodeId,
       location,
       correlationId: result.correlationId ?? correlationId ?? undefined,
+    };
+  }
+
+  /**
+   * Route a host ping command to the appropriate node.
+   *
+   * @param fqn Fully qualified name (hostname@location)
+   * @returns Promise with host ping response
+   */
+  async routePingHostCommand(
+    fqn: string,
+    options?: { correlationId?: string | null }
+  ): Promise<HostPingResponse> {
+    logger.info(`Routing ping-host command for ${fqn}`);
+
+    const { location } = this.parseFQN(fqn);
+    const host = await this.hostAggregator.getHostByFQN(fqn);
+    if (!host) {
+      throw new Error(`Host not found: ${fqn}`);
+    }
+
+    const nodeId = host.nodeId;
+    const nodeStatus = await this.nodeManager.getNodeStatus(nodeId);
+    if (nodeStatus !== 'online') {
+      throw new Error(`Node ${nodeId} (${location}) is offline`);
+    }
+
+    const commandId = this.generateCommandId();
+    const command: DispatchCommand = {
+      type: 'ping-host',
+      commandId,
+      data: {
+        hostName: host.name,
+        mac: host.mac,
+        ip: host.ip,
+      },
+    };
+
+    const correlationId = options?.correlationId ?? null;
+    const result = await this.executeCommand(nodeId, command, {
+      idempotencyKey: null,
+      correlationId,
+    });
+    const pingResult = this.assertPingHostResult(result);
+
+    return {
+      target: fqn,
+      checkedAt: pingResult.hostPing.checkedAt,
+      latencyMs: pingResult.hostPing.latencyMs,
+      success: pingResult.hostPing.reachable,
+      status: pingResult.hostPing.status,
+      source: 'node-agent',
+      correlationId: pingResult.correlationId ?? correlationId ?? undefined,
     };
   }
 
@@ -617,5 +675,20 @@ export class CommandRouter extends EventEmitter {
     this.pendingCommands.clear();
     this.nodeManager.off('command-result', this.boundHandleCommandResult);
     this.removeAllListeners();
+  }
+
+  private assertPingHostResult(result: CommandResult): PingHostCommandResult {
+    if (!result.success) {
+      throw new Error(result.error ?? 'Ping command failed');
+    }
+
+    if (!result.hostPing) {
+      throw new Error('Ping command result missing host ping payload');
+    }
+
+    return {
+      hostPing: result.hostPing,
+      correlationId: result.correlationId,
+    };
   }
 }

@@ -606,6 +606,28 @@ describe('outboundNodeMessageSchema', () => {
       expect(outboundNodeMessageSchema.safeParse(msg).success).toBe(true);
     });
 
+    it('accepts command result with host ping payload', () => {
+      const msg = {
+        type: 'command-result' as const,
+        data: {
+          nodeId: 'node-1',
+          commandId: 'cmd-ping-1',
+          success: true,
+          hostPing: {
+            hostName: 'office-pc',
+            mac: 'AA:BB:CC:DD:EE:FF',
+            ip: '192.168.1.20',
+            reachable: true,
+            status: 'awake' as const,
+            latencyMs: 12,
+            checkedAt: new Date().toISOString(),
+          },
+          timestamp: new Date().toISOString(),
+        },
+      };
+      expect(outboundNodeMessageSchema.safeParse(msg).success).toBe(true);
+    });
+
     it('rejects command result without commandId', () => {
       const msg = {
         type: 'command-result' as const,
@@ -764,6 +786,33 @@ describe('inboundCncCommandSchema', () => {
         type: 'delete-host' as const,
         commandId: 'cmd-1',
         data: { name: '' },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(false);
+    });
+  });
+
+  describe('ping-host', () => {
+    it('accepts valid ping-host command', () => {
+      const cmd = {
+        type: 'ping-host' as const,
+        commandId: 'cmd-1',
+        data: {
+          hostName: 'office-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.20',
+        },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
+    });
+
+    it('rejects ping-host without ip', () => {
+      const cmd = {
+        type: 'ping-host' as const,
+        commandId: 'cmd-1',
+        data: {
+          hostName: 'office-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+        },
       };
       expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(false);
     });

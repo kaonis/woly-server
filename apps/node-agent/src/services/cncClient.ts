@@ -265,6 +265,9 @@ export class CncClient extends EventEmitter {
         case 'delete-host':
           this.emit('command:delete-host', message);
           break;
+        case 'ping-host':
+          this.emit('command:ping-host', message);
+          break;
         case 'ping':
           this.handlePing(message.data);
           break;

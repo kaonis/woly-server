@@ -305,6 +305,67 @@ describe('CommandRouter unit behavior', () => {
     router.cleanup();
   });
 
+  it('routes ping-host command and returns node-agent ping payload', async () => {
+    const { router, hostAggregator, nodeManager } = createRouter();
+    hostAggregator.getHostByFQN.mockResolvedValue({
+      nodeId: 'node-9',
+      name: 'desk-pc',
+      mac: 'AA:BB:CC:DD:EE:FF',
+      ip: '192.168.1.40',
+      status: 'awake',
+    });
+    nodeManager.getNodeStatus.mockResolvedValue('online');
+
+    const executeSpy = jest.spyOn(
+      router as unknown as CommandRouterInternals,
+      'executeCommand'
+    ).mockResolvedValue({
+      commandId: 'cmd-ping-1',
+      success: true,
+      timestamp: new Date(),
+      correlationId: 'corr-ping',
+      hostPing: {
+        hostName: 'desk-pc',
+        mac: 'AA:BB:CC:DD:EE:FF',
+        ip: '192.168.1.40',
+        reachable: false,
+        status: 'asleep',
+        latencyMs: 19,
+        checkedAt: '2026-02-16T23:00:00.000Z',
+      },
+    });
+
+    const result = await router.routePingHostCommand('desk-pc@Lab', {
+      correlationId: 'corr-ping',
+    });
+
+    expect(executeSpy).toHaveBeenCalledWith(
+      'node-9',
+      expect.objectContaining({
+        type: 'ping-host',
+        data: {
+          hostName: 'desk-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.40',
+        },
+      }),
+      {
+        idempotencyKey: null,
+        correlationId: 'corr-ping',
+      }
+    );
+    expect(result).toEqual({
+      target: 'desk-pc@Lab',
+      checkedAt: '2026-02-16T23:00:00.000Z',
+      latencyMs: 19,
+      success: false,
+      status: 'asleep',
+      source: 'node-agent',
+      correlationId: 'corr-ping',
+    });
+    router.cleanup();
+  });
+
   it('throws when update-host routing cannot find host', async () => {
     const { router, hostAggregator } = createRouter();
     hostAggregator.getHostByFQN.mockResolvedValue(null);

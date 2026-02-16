@@ -56,6 +56,16 @@ type PortScanEndpointResponse = {
   correlationId?: string;
 };
 
+type PingEndpointResponse = {
+  target: string;
+  checkedAt: string;
+  latencyMs: number;
+  success: boolean;
+  status: 'awake' | 'asleep' | 'unknown';
+  source: 'node-agent';
+  correlationId?: string;
+};
+
 function mapCommandError(error: unknown, fallbackMessage: string): {
   statusCode: number;
   errorTitle: string;
@@ -340,6 +350,69 @@ export class HostsController {
       }
 
       res.status(statusCode).json(errorBody);
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/hosts/ping/{fqn}:
+   *   get:
+   *     summary: Ping a host via its managing node agent
+   *     description: Executes ICMP reachability from the node agent (not from the mobile app) and returns a normalized ping result.
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Fully qualified name (hostname@location)
+   *         example: PHANTOM-MBP@home-network
+   *     responses:
+   *       200:
+   *         description: Host ping command completed
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       503:
+   *         $ref: '#/components/responses/ServiceUnavailable'
+   *       504:
+   *         $ref: '#/components/responses/GatewayTimeout'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
+   */
+  async pingHost(req: Request, res: Response): Promise<void> {
+    try {
+      const fqn = req.params.fqn as string;
+      const correlationId = req.correlationId ?? null;
+
+      const routeOptions: { correlationId?: string } = {};
+      if (correlationId) {
+        routeOptions.correlationId = correlationId;
+      }
+
+      const result = await this.commandRouter.routePingHostCommand(fqn, routeOptions);
+      const response: PingEndpointResponse = {
+        ...result,
+      };
+
+      res.json(response);
+    } catch (error: unknown) {
+      logger.error('Failed to ping host', { fqn: req.params.fqn, error });
+
+      const mapped = mapCommandError(error, 'Failed to ping host');
+      const errorBody: { error: string; message: string; correlationId?: string } = {
+        error: mapped.errorTitle,
+        message: mapped.message,
+      };
+      if (req.correlationId) {
+        errorBody.correlationId = req.correlationId;
+      }
+
+      res.status(mapped.statusCode).json(errorBody);
     }
   }
 

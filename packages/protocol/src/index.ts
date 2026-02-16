@@ -146,6 +146,16 @@ export interface DeleteHostWakeScheduleResponse {
   id: string;
 }
 
+export interface HostPingResult {
+  hostName: string;
+  mac: string;
+  ip: string;
+  reachable: boolean;
+  status: HostStatus;
+  latencyMs: number;
+  checkedAt: string;
+}
+
 // --- WebSocket message types ---
 
 export type NodeMessage =
@@ -163,6 +173,7 @@ export type NodeMessage =
         success: boolean;
         message?: string;
         error?: string;
+        hostPing?: HostPingResult;
         timestamp: Date;
       };
     };
@@ -193,6 +204,15 @@ export type CncCommand =
       };
     }
   | { type: 'delete-host'; commandId: string; data: { name: string } }
+  | {
+      type: 'ping-host';
+      commandId: string;
+      data: {
+        hostName: string;
+        mac: string;
+        ip: string;
+      };
+    }
   | { type: 'ping'; data: { timestamp: Date } }
   | { type: 'error'; message: string };
 
@@ -212,6 +232,16 @@ export const hostSchema = z.object({
   pingResponsive: z.number().int().nullable().optional(),
   notes: hostNotesSchema.optional(),
   tags: hostTagsSchema.optional(),
+});
+
+export const hostPingResultSchema: z.ZodType<HostPingResult> = z.object({
+  hostName: z.string().min(1),
+  mac: z.string().min(1),
+  ip: z.string().min(1),
+  reachable: z.boolean(),
+  status: hostStatusSchema,
+  latencyMs: z.number().int().nonnegative(),
+  checkedAt: z.string().min(1),
 });
 
 export const commandStateSchema = z.enum([
@@ -339,6 +369,7 @@ const commandResultPayloadSchema = z.object({
   success: z.boolean(),
   message: z.string().optional(),
   error: z.string().optional(),
+  hostPing: hostPingResultSchema.optional(),
   timestamp: z.coerce.date(),
 });
 
@@ -439,6 +470,15 @@ export const inboundCncCommandSchema: z.ZodType<CncCommand> = z.discriminatedUni
     commandId: z.string().min(1),
     data: z.object({
       name: z.string().min(1),
+    }),
+  }),
+  z.object({
+    type: z.literal('ping-host'),
+    commandId: z.string().min(1),
+    data: z.object({
+      hostName: z.string().min(1),
+      mac: z.string().min(1),
+      ip: z.string().min(1),
     }),
   }),
   z.object({

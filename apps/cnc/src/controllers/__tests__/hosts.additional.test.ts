@@ -44,6 +44,7 @@ describe('HostsController additional branches', () => {
   };
   let commandRouter: {
     routeWakeCommand: jest.Mock;
+    routePingHostCommand: jest.Mock;
     routeUpdateHostCommand: jest.Mock;
     routeDeleteHostCommand: jest.Mock;
   };
@@ -59,6 +60,7 @@ describe('HostsController additional branches', () => {
     };
     commandRouter = {
       routeWakeCommand: jest.fn(),
+      routePingHostCommand: jest.fn(),
       routeUpdateHostCommand: jest.fn(),
       routeDeleteHostCommand: jest.fn(),
     };
@@ -296,6 +298,60 @@ describe('HostsController additional branches', () => {
       expect(res.json).toHaveBeenCalledWith({
         error: 'Internal Server Error',
         message: 'Failed to wake host',
+      });
+    });
+  });
+
+  describe('pingHost', () => {
+    it('returns node-agent ping result payload', async () => {
+      commandRouter.routePingHostCommand.mockResolvedValue({
+        target: 'desktop@lab',
+        checkedAt: '2026-02-16T23:00:00.000Z',
+        latencyMs: 14,
+        success: true,
+        status: 'awake',
+        source: 'node-agent',
+      });
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        correlationId: 'cid-request',
+      });
+      const res = createMockResponse();
+
+      await controller.pingHost(req, res);
+
+      expect(commandRouter.routePingHostCommand).toHaveBeenCalledWith('desktop@lab', {
+        correlationId: 'cid-request',
+      });
+      expect(res.json).toHaveBeenCalledWith({
+        target: 'desktop@lab',
+        checkedAt: '2026-02-16T23:00:00.000Z',
+        latencyMs: 14,
+        success: true,
+        status: 'awake',
+        source: 'node-agent',
+      });
+    });
+
+    it('maps node offline errors to 503 and includes correlation id', async () => {
+      commandRouter.routePingHostCommand.mockRejectedValue(
+        new Error('Node node-1 is offline')
+      );
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        correlationId: 'cid-request',
+      });
+      const res = createMockResponse();
+
+      await controller.pingHost(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Service Unavailable',
+        message: 'Node node-1 is offline',
+        correlationId: 'cid-request',
       });
     });
   });

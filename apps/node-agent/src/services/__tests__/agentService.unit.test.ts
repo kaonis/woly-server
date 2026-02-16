@@ -5,6 +5,7 @@ import { runtimeTelemetry } from '../runtimeTelemetry';
 import { Host } from '../../types';
 import { validateAgentConfig } from '../../config/agent';
 import * as wakeOnLan from 'wake_on_lan';
+import * as networkDiscovery from '../networkDiscovery';
 
 type MockCncClient = {
   send: jest.Mock;
@@ -43,6 +44,10 @@ jest.mock('wake_on_lan', () => ({
   wake: jest.fn(),
 }));
 
+jest.mock('../networkDiscovery', () => ({
+  isHostAlive: jest.fn(),
+}));
+
 describe('AgentService command handlers', () => {
   let service: AgentService;
   let mockCncClient: MockCncClient;
@@ -50,6 +55,7 @@ describe('AgentService command handlers', () => {
     getAllHosts: jest.Mock;
     getHost: jest.Mock;
     getHostByMAC: jest.Mock;
+    updateHostSeen: jest.Mock;
     updateHost: jest.Mock;
     deleteHost: jest.Mock;
   };
@@ -85,6 +91,7 @@ describe('AgentService command handlers', () => {
       getAllHosts: jest.fn().mockResolvedValue([sampleHost]),
       getHost: jest.fn(),
       getHostByMAC: jest.fn(),
+      updateHostSeen: jest.fn().mockResolvedValue(undefined),
       updateHost: jest.fn().mockResolvedValue(undefined),
       deleteHost: jest.fn().mockResolvedValue(undefined),
     };
@@ -102,6 +109,7 @@ describe('AgentService command handlers', () => {
     ((wakeOnLan.wake as unknown) as jest.Mock).mockImplementation(
       (_mac: string, callback: (error: Error | null) => void) => callback(null)
     );
+    ((networkDiscovery.isHostAlive as unknown) as jest.Mock).mockResolvedValue(true);
   });
 
   it('starts and stops agent service lifecycle', async () => {
@@ -812,6 +820,43 @@ describe('AgentService command handlers', () => {
           commandId: 'cmd-delete-fail',
           success: false,
           error: 'delete failed',
+        }),
+      })
+    );
+  });
+
+  it('handles ping-host command by probing from node-agent', async () => {
+    hostDbMock.getHost.mockResolvedValueOnce(sampleHost);
+    hostDbMock.getHostByMAC.mockResolvedValueOnce(sampleHost);
+    ((networkDiscovery.isHostAlive as unknown) as jest.Mock).mockResolvedValueOnce(true);
+
+    await ((service as unknown) as {
+      handlePingHostCommand: (command: unknown) => Promise<void>;
+    }).handlePingHostCommand({
+      type: 'ping-host',
+      commandId: 'cmd-ping-host',
+      data: {
+        hostName: sampleHost.name,
+        mac: sampleHost.mac,
+        ip: sampleHost.ip,
+      },
+    });
+
+    expect(networkDiscovery.isHostAlive).toHaveBeenCalledWith(sampleHost.ip);
+    expect(hostDbMock.updateHostSeen).toHaveBeenCalledWith(sampleHost.mac, 'awake', 1);
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-ping-host',
+          success: true,
+          hostPing: expect.objectContaining({
+            hostName: sampleHost.name,
+            mac: sampleHost.mac,
+            ip: sampleHost.ip,
+            reachable: true,
+            status: 'awake',
+          }),
         }),
       })
     );

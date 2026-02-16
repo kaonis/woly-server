@@ -308,6 +308,35 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     );
   });
 
+  it('dispatches ping-host commands to the node-agent command handler', async () => {
+    await client.connect();
+
+    const onPingHost = jest.fn();
+    client.on('command:ping-host', onPingHost);
+
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'ping-host',
+          commandId: 'cmd-ping-1',
+          data: {
+            hostName: 'PC-01',
+            mac: 'AA:BB:CC:DD:EE:FF',
+            ip: '192.168.1.50',
+          },
+        })
+      )
+    );
+
+    expect(onPingHost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'ping-host',
+        commandId: 'cmd-ping-1',
+      })
+    );
+  });
+
   it('rejects malformed outbound node messages and logs validation errors', async () => {
     await client.connect();
 

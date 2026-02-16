@@ -8,18 +8,28 @@ import { CncCommand, Host, NodeMessage } from '../types';
 import HostDatabase from './hostDatabase';
 import ScanOrchestrator from './scanOrchestrator';
 import { runtimeTelemetry } from './runtimeTelemetry';
+import * as networkDiscovery from './networkDiscovery';
 
 type WakeCommand = Extract<CncCommand, { type: 'wake' }>;
 type ScanCommand = Extract<CncCommand, { type: 'scan' }>;
 type UpdateHostCommand = Extract<CncCommand, { type: 'update-host' }>;
 type DeleteHostCommand = Extract<CncCommand, { type: 'delete-host' }>;
-type DispatchableCommand = WakeCommand | ScanCommand | UpdateHostCommand | DeleteHostCommand;
+type PingHostCommand = Extract<CncCommand, { type: 'ping-host' }>;
+type DispatchableCommand =
+  | WakeCommand
+  | ScanCommand
+  | UpdateHostCommand
+  | DeleteHostCommand
+  | PingHostCommand;
 type HostEventMessage = Extract<
   NodeMessage,
   { type: 'host-discovered' | 'host-updated' | 'host-removed' | 'scan-complete' }
 >;
 type CommandResultMessage = Extract<NodeMessage, { type: 'command-result' }>;
-type CommandResultPayload = Pick<CommandResultMessage['data'], 'success' | 'message' | 'error'>;
+type CommandResultPayload = Pick<
+  CommandResultMessage['data'],
+  'success' | 'message' | 'error' | 'hostPing'
+>;
 
 type ValidatedUpdateHostData = {
   currentName?: string;
@@ -72,6 +82,12 @@ const COMMAND_EXECUTION_POLICIES: Record<DispatchableCommand['type'], CommandExe
     retryOnFailure: false,
   },
   'delete-host': {
+    timeoutMs: 5_000,
+    maxAttempts: 1,
+    retryDelayMs: 200,
+    retryOnFailure: false,
+  },
+  'ping-host': {
     timeoutMs: 5_000,
     maxAttempts: 1,
     retryDelayMs: 200,
@@ -248,6 +264,10 @@ export class AgentService extends EventEmitter {
 
     cncClient.on('command:delete-host', async (command: DeleteHostCommand) => {
       await this.handleDeleteHostCommand(command);
+    });
+
+    cncClient.on('command:ping-host', async (command: PingHostCommand) => {
+      await this.handlePingHostCommand(command);
     });
   }
 
@@ -1003,6 +1023,62 @@ export class AgentService extends EventEmitter {
       return {
         success: true,
         message: `Host ${name} deleted successfully`,
+      };
+    });
+  }
+
+  /**
+   * Handle ping-host command from C&C
+   */
+  private async handlePingHostCommand(command: PingHostCommand): Promise<void> {
+    const { commandId, data } = command;
+    const { hostName, mac, ip } = data;
+
+    logger.info('Received ping-host command from C&C', { commandId, hostName, ip });
+
+    await this.executeCommandWithReliability(command, async () => {
+      if (!this.hostDb) {
+        throw new NonRetryableCommandError('Host database not initialized');
+      }
+
+      let host = await this.hostDb.getHost(hostName);
+      if (!host) {
+        host = await this.hostDb.getHostByMAC(mac);
+      }
+
+      const targetIp = host?.ip ?? ip;
+      if (!targetIp || isIP(targetIp) === 0) {
+        throw new NonRetryableCommandError(`Host ${hostName} has no valid IP to ping`);
+      }
+
+      const startedAtMs = Date.now();
+      const reachable = await networkDiscovery.isHostAlive(targetIp);
+      const latencyMs = Math.max(0, Date.now() - startedAtMs);
+      const status: Host['status'] = reachable ? 'awake' : 'asleep';
+      const pingResponsive = reachable ? 1 : 0;
+      const checkedAt = new Date().toISOString();
+
+      const resolvedMac = host?.mac ?? mac;
+      if (resolvedMac) {
+        await this.hostDb.updateHostSeen(resolvedMac, status, pingResponsive);
+        const refreshedHost = await this.hostDb.getHostByMAC(resolvedMac);
+        if (refreshedHost) {
+          this.sendHostUpdated(refreshedHost);
+        }
+      }
+
+      return {
+        success: true,
+        message: `Host ${host?.name ?? hostName} is ${status}`,
+        hostPing: {
+          hostName: host?.name ?? hostName,
+          mac: resolvedMac,
+          ip: targetIp,
+          reachable,
+          status,
+          latencyMs,
+          checkedAt,
+        },
       };
     });
   }
