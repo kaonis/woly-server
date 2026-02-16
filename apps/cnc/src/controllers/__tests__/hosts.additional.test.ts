@@ -45,6 +45,7 @@ describe('HostsController additional branches', () => {
   let commandRouter: {
     routeWakeCommand: jest.Mock;
     routePingHostCommand: jest.Mock;
+    routeScanCommand: jest.Mock;
     routeUpdateHostCommand: jest.Mock;
     routeDeleteHostCommand: jest.Mock;
   };
@@ -61,6 +62,7 @@ describe('HostsController additional branches', () => {
     commandRouter = {
       routeWakeCommand: jest.fn(),
       routePingHostCommand: jest.fn(),
+      routeScanCommand: jest.fn(),
       routeUpdateHostCommand: jest.fn(),
       routeDeleteHostCommand: jest.fn(),
     };
@@ -473,6 +475,84 @@ describe('HostsController additional branches', () => {
       expect(res.json).toHaveBeenCalledWith({
         error: 'Internal Server Error',
         message: 'Failed to delete host',
+        correlationId: 'cid-request',
+      });
+    });
+  });
+
+  describe('scanHostPorts', () => {
+    it('returns scan payload and prefers router correlation id', async () => {
+      hostAggregator.getHostByFQN.mockResolvedValue({
+        name: 'desktop',
+        nodeId: 'node-1',
+      });
+      commandRouter.routeScanCommand.mockResolvedValue({
+        success: true,
+        commandId: 'scan-command-1',
+        correlationId: 'cid-router',
+      });
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        correlationId: 'cid-request',
+      });
+      const res = createMockResponse();
+
+      await controller.scanHostPorts(req, res);
+
+      expect(commandRouter.routeScanCommand).toHaveBeenCalledWith('node-1', true, {
+        correlationId: 'cid-request',
+      });
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          target: 'desktop@lab',
+          openPorts: [],
+          scan: expect.objectContaining({
+            commandId: 'scan-command-1',
+            state: 'acknowledged',
+            nodeId: 'node-1',
+          }),
+          message: 'Scan command executed successfully',
+          correlationId: 'cid-router',
+        })
+      );
+    });
+
+    it('returns 404 when scan target host is not found', async () => {
+      hostAggregator.getHostByFQN.mockResolvedValue(null);
+
+      const req = createMockRequest({ params: { fqn: 'missing@lab' } });
+      const res = createMockResponse();
+
+      await controller.scanHostPorts(req, res);
+
+      expect(commandRouter.routeScanCommand).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Not Found',
+        message: 'Host missing@lab not found',
+      });
+    });
+
+    it('maps already-in-progress scan errors to 409 and includes correlation id', async () => {
+      hostAggregator.getHostByFQN.mockResolvedValue({
+        name: 'desktop',
+        nodeId: 'node-1',
+      });
+      commandRouter.routeScanCommand.mockRejectedValue(new Error('Scan already in progress'));
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        correlationId: 'cid-request',
+      });
+      const res = createMockResponse();
+
+      await controller.scanHostPorts(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Conflict',
+        message: 'Scan already in progress',
         correlationId: 'cid-request',
       });
     });

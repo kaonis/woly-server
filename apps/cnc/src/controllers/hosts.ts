@@ -66,6 +66,20 @@ type PingEndpointResponse = {
   correlationId?: string;
 };
 
+function toLogError(error: unknown): { error: string; errorName?: string; stack?: string } {
+  if (error instanceof Error) {
+    return {
+      error: error.message,
+      ...(error.name ? { errorName: error.name } : {}),
+      ...(error.stack ? { stack: error.stack } : {}),
+    };
+  }
+
+  return {
+    error: typeof error === 'string' ? error : String(error),
+  };
+}
+
 function mapCommandError(error: unknown, fallbackMessage: string): {
   statusCode: number;
   errorTitle: string;
@@ -76,13 +90,16 @@ function mapCommandError(error: unknown, fallbackMessage: string): {
 
   if (error instanceof Error) {
     message = error.message;
-    if (error.message.includes('Invalid FQN')) {
+    const normalized = error.message.toLowerCase();
+    if (normalized.includes('invalid fqn')) {
       statusCode = 400;
-    } else if (error.message.includes('not found')) {
+    } else if (normalized.includes('not found')) {
       statusCode = 404;
-    } else if (error.message.includes('offline')) {
+    } else if (normalized.includes('already in progress')) {
+      statusCode = 409;
+    } else if (normalized.includes('offline')) {
       statusCode = 503;
-    } else if (error.message.includes('timeout')) {
+    } else if (normalized.includes('timeout')) {
       statusCode = 504;
     }
   }
@@ -94,6 +111,9 @@ function mapCommandError(error: unknown, fallbackMessage: string): {
       break;
     case 404:
       errorTitle = 'Not Found';
+      break;
+    case 409:
+      errorTitle = 'Conflict';
       break;
     case 503:
       errorTitle = 'Service Unavailable';
@@ -171,7 +191,7 @@ export class HostsController {
         stats,
       });
     } catch (error) {
-      logger.error('Failed to get hosts', { error });
+      logger.error('Failed to get hosts', { ...toLogError(error) });
       res.status(500).json({
         error: 'Internal Server Error',
         message: 'Failed to retrieve hosts',
@@ -226,7 +246,7 @@ export class HostsController {
 
       res.json(host);
     } catch (error) {
-      logger.error('Failed to get host', { fqn: req.params.fqn, error });
+      logger.error('Failed to get host', { fqn: req.params.fqn, ...toLogError(error) });
       res.status(500).json({
         error: 'Internal Server Error',
         message: 'Failed to retrieve host',
@@ -301,7 +321,7 @@ export class HostsController {
 
       res.json(responseBody);
     } catch (error: unknown) {
-      logger.error('Failed to wake host', { fqn: req.params.fqn, error });
+      logger.error('Failed to wake host', { fqn: req.params.fqn, ...toLogError(error) });
 
       // Determine appropriate status code
       let statusCode = 500;
@@ -401,7 +421,7 @@ export class HostsController {
 
       res.json(response);
     } catch (error: unknown) {
-      logger.error('Failed to ping host', { fqn: req.params.fqn, error });
+      logger.error('Failed to ping host', { fqn: req.params.fqn, ...toLogError(error) });
 
       const mapped = mapCommandError(error, 'Failed to ping host');
       const errorBody: { error: string; message: string; correlationId?: string } = {
@@ -468,7 +488,7 @@ export class HostsController {
 
       res.json(response);
     } catch (error) {
-      logger.error('Failed to get host ports', { fqn: req.params.fqn, error });
+      logger.error('Failed to get host ports', { fqn: req.params.fqn, ...toLogError(error) });
       res.status(500).json({
         error: 'Internal Server Error',
         message: 'Failed to retrieve host port data',
@@ -504,6 +524,8 @@ export class HostsController {
    *         $ref: '#/components/responses/Unauthorized'
    *       404:
    *         $ref: '#/components/responses/NotFound'
+   *       409:
+   *         description: Scan already in progress on target node
    *       503:
    *         $ref: '#/components/responses/ServiceUnavailable'
    *       504:
@@ -565,7 +587,7 @@ export class HostsController {
 
       res.json(response);
     } catch (error: unknown) {
-      logger.error('Failed to scan host ports', { fqn: req.params.fqn, error });
+      logger.error('Failed to scan host ports', { fqn: req.params.fqn, ...toLogError(error) });
 
       const mapped = mapCommandError(error, 'Failed to scan host ports');
       const errorBody: { error: string; message: string; correlationId?: string } = {
@@ -705,7 +727,7 @@ export class HostsController {
 
       res.json(responseBody);
     } catch (error: unknown) {
-      logger.error('Failed to update host', { fqn: req.params.fqn, error });
+      logger.error('Failed to update host', { fqn: req.params.fqn, ...toLogError(error) });
 
       // Determine appropriate status code
       let statusCode = 500;
@@ -845,7 +867,7 @@ export class HostsController {
 
       res.json(responseBody);
     } catch (error: unknown) {
-      logger.error('Failed to delete host', { fqn: req.params.fqn, error });
+      logger.error('Failed to delete host', { fqn: req.params.fqn, ...toLogError(error) });
 
       // Determine appropriate status code
       let statusCode = 500;
@@ -990,7 +1012,7 @@ export class HostsController {
       res.json(result);
     } catch (error: unknown) {
       // Log the full error object for stack/context
-      logger.error('MAC vendor lookup failed', { mac: req.params.mac, error });
+      logger.error('MAC vendor lookup failed', { mac: req.params.mac, ...toLogError(error) });
 
       // Type guard for error with statusCode property
       const hasStatusCode = (err: unknown): err is { statusCode: number; message: string } =>
