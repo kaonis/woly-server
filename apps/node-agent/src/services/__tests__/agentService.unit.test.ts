@@ -67,12 +67,19 @@ describe('AgentService command handlers', () => {
     pingResponsive: 1,
   };
 
+  const flushAsyncTasks = async (): Promise<void> => {
+    await Promise.resolve();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await Promise.resolve();
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
     runtimeTelemetry.reset(0);
     mockCncClient = (cncClient as unknown) as MockCncClient;
     mockCncClient.removeAllListeners();
+    mockCncClient.isConnected.mockReturnValue(true);
     service = new AgentService();
     hostDbMock = {
       getAllHosts: jest.fn().mockResolvedValue([sampleHost]),
@@ -350,7 +357,7 @@ describe('AgentService command handlers', () => {
     mockCncClient.send.mockClear();
     mockCncClient.isConnected.mockReturnValue(true);
     mockCncClient.emit('connected');
-    await Promise.resolve();
+    await flushAsyncTasks();
 
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -866,7 +873,7 @@ describe('AgentService command handlers', () => {
 
     mockCncClient.isConnected.mockReturnValue(true);
     mockCncClient.emit('connected');
-    await Promise.resolve();
+    await flushAsyncTasks();
 
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'host-discovered' })
@@ -932,8 +939,34 @@ describe('AgentService command handlers', () => {
     service.setHostDatabase((dbEmitter as unknown) as any);
 
     mockCncClient.emit('connected');
-    await Promise.resolve();
+    await flushAsyncTasks();
 
+    expect(scanOrchestratorMock.syncWithNetwork).toHaveBeenCalledTimes(1);
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'host-discovered',
+        data: expect.objectContaining({ name: sampleHost.name }),
+      })
+    );
+  });
+
+  it('continues initial host sync when pre-sync scan fails', async () => {
+    scanOrchestratorMock.syncWithNetwork.mockResolvedValueOnce({
+      success: false,
+      code: 'SCAN_FAILED',
+      error: 'arp failed',
+    });
+
+    await service.start();
+    const dbEmitter = Object.assign(new EventEmitter(), {
+      getAllHosts: jest.fn().mockResolvedValue([sampleHost]),
+    });
+    service.setHostDatabase((dbEmitter as unknown) as any);
+
+    mockCncClient.emit('connected');
+    await flushAsyncTasks();
+
+    expect(scanOrchestratorMock.syncWithNetwork).toHaveBeenCalledTimes(1);
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'host-discovered',

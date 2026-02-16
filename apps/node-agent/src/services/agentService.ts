@@ -260,6 +260,7 @@ export class AgentService extends EventEmitter {
       return;
     }
 
+    await this.refreshHostsFromNetwork();
     this.flushPendingHostUpdates();
     this.flushBufferedCommandResults();
     this.flushBufferedHostEvents();
@@ -274,6 +275,26 @@ export class AgentService extends EventEmitter {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Failed to send initial host list to C&C', { error: message });
+    }
+  }
+
+  private async refreshHostsFromNetwork(): Promise<void> {
+    if (!this.scanOrchestrator) {
+      return;
+    }
+
+    try {
+      const syncResult = await this.scanOrchestrator.syncWithNetwork();
+      if (!syncResult.success && syncResult.code !== 'SCAN_IN_PROGRESS') {
+        logger.warn('Network refresh before initial host sync failed', {
+          error: syncResult.error,
+          code: syncResult.code,
+        });
+      }
+    } catch (error: unknown) {
+      logger.warn('Network refresh before initial host sync threw an error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
