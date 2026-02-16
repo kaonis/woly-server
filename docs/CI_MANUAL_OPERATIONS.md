@@ -2,13 +2,14 @@
 
 Date: 2026-02-15
 
-This repository is currently in a temporary budget-control mode where all GitHub
-Actions workflows are manual-only.
+This repository is currently in a temporary budget-control mode with manual-first
+workflows plus one minimal automated gate.
 
 ## Current Policy
 
-- Workflow triggers are limited to `workflow_dispatch`.
-- Automatic `push`, `pull_request`, `schedule`, and tag-triggered workflow runs are disabled.
+- Workflow triggers are manual-only (`workflow_dispatch`) except for one scoped gate:
+  - `.github/workflows/cnc-mobile-contract-gate.yml` on `pull_request` for protocol/route-impact paths only.
+- Automatic `push`, `schedule`, and broad unscoped PR/tag workflow runs are disabled.
 - GitHub CodeQL default setup is disabled (`state: not-configured`) to prevent automatic dynamic runs.
 - Each workflow job has `timeout-minutes: 8` to cap manual-run spend and prevent hangs.
 
@@ -71,7 +72,7 @@ npm run ci:snippets:checkpoint -- \
   --roadmap-file docs/ROADMAP_V11.md
 ```
 
-Run policy guard to verify workflow files still enforce manual-only mode:
+Run policy guard to verify workflow files still enforce manual-first policy:
 
 ```bash
 npm run ci:policy:check
@@ -96,7 +97,8 @@ Weekly checklist:
 
 1. Confirm no unexpected automatic workflow runs since previous review:
    - `npm run ci:audit:manual -- --since <previous-review-iso> --fail-on-unexpected`
-2. Verify manual-only policy still matches budget and throughput needs:
+   - Expected exception: path-scoped `CNC Mobile Contract Gate` PR runs.
+2. Verify manual-first policy still matches budget and throughput needs:
    - count merges since last review
    - count manually dispatched runs since last review
    - `npm run ci:policy:check`
@@ -106,7 +108,7 @@ Weekly checklist:
    - `npm run test:ci`
    - `npm run build`
 4. Record decision in the review log:
-   - `Continue manual-only` or `Start rollback`
+   - `Continue manual-first policy` or `Start rollback`
 
 ## Objective Exit Criteria
 

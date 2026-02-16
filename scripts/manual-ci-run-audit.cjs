@@ -3,6 +3,15 @@
 
 const { execFileSync } = require('node:child_process');
 
+const ALLOWLISTED_NON_MANUAL_RUNS = [
+  {
+    event: 'pull_request',
+    workflowName: 'CNC Mobile Contract Gate',
+    rationale:
+      'Required minimal automation gate for CNC protocol/app compatibility.',
+  },
+];
+
 function parseArgs(argv) {
   const options = {
     limit: 50,
@@ -84,6 +93,12 @@ function fetchRuns(limit) {
   return JSON.parse(output);
 }
 
+function isAllowlistedNonManualRun(run) {
+  return ALLOWLISTED_NON_MANUAL_RUNS.some(
+    (rule) => run.event === rule.event && run.workflowName === rule.workflowName
+  );
+}
+
 function buildSummary(runs, sinceIso) {
   const checkedAt = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
   const threshold = sinceIso ? new Date(sinceIso).getTime() : null;
@@ -101,8 +116,14 @@ function buildSummary(runs, sinceIso) {
     countsByEvent[key] = (countsByEvent[key] || 0) + 1;
   }
 
-  const unexpectedRuns = filteredRuns.filter(
+  const nonManualRuns = filteredRuns.filter(
     (run) => run.event !== 'workflow_dispatch'
+  );
+  const allowlistedNonManualRuns = nonManualRuns.filter(
+    isAllowlistedNonManualRun
+  );
+  const unexpectedRuns = nonManualRuns.filter(
+    (run) => !isAllowlistedNonManualRun(run)
   );
 
   return {
@@ -110,6 +131,9 @@ function buildSummary(runs, sinceIso) {
     since: sinceIso,
     totalRuns: filteredRuns.length,
     countsByEvent,
+    nonManualRunCount: nonManualRuns.length,
+    allowlistedNonManualRunCount: allowlistedNonManualRuns.length,
+    allowlistedNonManualRuns,
     unexpectedRunCount: unexpectedRuns.length,
     unexpectedRuns,
   };
@@ -127,7 +151,11 @@ function renderMarkdown(summary, limit) {
     `Scope: latest ${limit} runs${summary.since ? ` since \`${summary.since}\`` : ''}`,
     '',
     `- Total runs analyzed: ${summary.totalRuns}`,
-    '- Allowed event: `workflow_dispatch`',
+    '- Baseline allowed events:',
+    '  - `workflow_dispatch`',
+    '  - `pull_request` for `CNC Mobile Contract Gate` (path-scoped, minimal automation exception)',
+    `- Non-manual runs observed: ${summary.nonManualRunCount}`,
+    `- Allowlisted non-manual runs: ${summary.allowlistedNonManualRunCount}`,
     `- Unexpected non-manual runs: ${summary.unexpectedRunCount}`,
     '- Event distribution:',
   ];
@@ -136,6 +164,15 @@ function renderMarkdown(summary, limit) {
     lines.push('- none');
   } else {
     lines.push(...eventLines);
+  }
+
+  if (summary.allowlistedNonManualRunCount > 0) {
+    lines.push('', 'Allowlisted non-manual runs:');
+    for (const run of summary.allowlistedNonManualRuns.slice(0, 10)) {
+      lines.push(
+        `- #${run.databaseId} \`${run.event}\` ${run.workflowName} (${run.createdAt}, branch \`${run.headBranch || 'unknown'}\`, conclusion \`${run.conclusion || 'none'}\`)`
+      );
+    }
   }
 
   if (summary.unexpectedRunCount > 0) {
@@ -151,7 +188,7 @@ function renderMarkdown(summary, limit) {
     '',
     summary.unexpectedRunCount > 0
       ? 'Status: **FAIL** (unexpected non-manual workflow events detected)'
-      : 'Status: **PASS** (manual-only workflow policy observed in this scope)'
+      : 'Status: **PASS** (manual-first workflow policy observed in this scope)'
   );
 
   return lines.join('\n');
@@ -207,7 +244,9 @@ if (require.main === module) {
 }
 
 module.exports = {
+  ALLOWLISTED_NON_MANUAL_RUNS,
   buildSummary,
+  isAllowlistedNonManualRun,
   parseArgs,
   renderMarkdown,
 };

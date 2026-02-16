@@ -121,24 +121,24 @@ function renderCiReviewLogSnippet(options) {
     '',
     '- Unexpected automatic workflow runs observed: No',
     '- Local gate policy followed: Yes',
-    `- Budget and throughput assessment: Scoped audit (\`npm run ci:audit:manual -- --since ${options.checkpoint} --fail-on-unexpected\`) observed only \`workflow_dispatch\` events.`,
-    '- Decision: Continue manual-only',
+    `- Budget and throughput assessment: Scoped audit (\`npm run ci:audit:manual -- --since ${options.checkpoint} --fail-on-unexpected\`) observed no unexpected workflow events while preserving minimal automation budget controls.`,
+    '- Decision: Continue manual-first policy',
     `- Follow-up actions: Execute the next weekly review cycle under issue #${options.followUpIssue}.`,
   ].join('\n');
 }
 
 function renderDependencyPlanSnippet(options) {
   return [
-    `- ${options.date}: Manual-only operations checkpoint (issue #${options.issue}) confirmed no unexpected automatic workflow events since \`${options.checkpoint}\`; continue manual-only mode and track the next review in #${options.followUpIssue}.`,
+    `- ${options.date}: Manual-CI operations checkpoint (issue #${options.issue}) confirmed no unexpected workflow events since \`${options.checkpoint}\`; continue manual-first policy and track the next review in #${options.followUpIssue}.`,
     `- ${options.date}: Logged rolling-cycle progress in \`${options.roadmapFile}\` for issue #${options.issue} and queued follow-up issue #${options.followUpIssue}.`,
   ].join('\n');
 }
 
 function renderRoadmapProgressSnippet(options) {
   return [
-    `- ${options.date}: Ran scoped manual-only workflow audit for issue #${options.issue}: \`npm run ci:audit:manual -- --since ${options.checkpoint} --fail-on-unexpected\` (PASS).`,
+    `- ${options.date}: Ran scoped manual-first workflow audit for issue #${options.issue}: \`npm run ci:audit:manual -- --since ${options.checkpoint} --fail-on-unexpected\` (PASS).`,
     `- ${options.date}: Generated copy-ready checkpoint snippets for \`docs/CI_MANUAL_REVIEW_LOG.md\`, \`docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md\`, and \`${options.roadmapFile}\`.`,
-    `- ${options.date}: Created follow-up issue #${options.followUpIssue} to queue the next weekly manual-only review cycle.`,
+    `- ${options.date}: Created follow-up issue #${options.followUpIssue} to queue the next weekly manual-first review cycle.`,
   ].join('\n');
 }
 

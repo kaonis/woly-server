@@ -82,3 +82,8 @@ Issue #144 is complete when:
 1. Decision table is documented and linked in roadmap progress.
 2. Execution/defer follow-up issues are in place (#146, #147, #148, #150).
 3. Dependency dashboard comment history references these decisions for auditability.
+
+## 6. Rolling Operations Checkpoints
+
+- 2026-02-16: Manual-CI operations checkpoint (issue #251) confirmed no unexpected workflow events since `2026-02-15T17:07:43Z`; observed 4 allowlisted `pull_request` runs for `CNC Mobile Contract Gate` and 2 `workflow_dispatch` runs.
+- 2026-02-16: Policy baseline remains manual-first with one approved automation exception (path-scoped `CNC Mobile Contract Gate`), and next weekly review is queued in #273.
