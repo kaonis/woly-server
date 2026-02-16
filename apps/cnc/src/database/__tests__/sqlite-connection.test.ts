@@ -389,6 +389,46 @@ describe('SqliteDatabase', () => {
     });
   });
 
+  describe('Compatibility migrations', () => {
+    it('adds retry_count column for legacy commands table', async () => {
+      await db.query('DROP TABLE IF EXISTS commands');
+      await db.query(`
+        CREATE TABLE commands (
+          id TEXT PRIMARY KEY,
+          node_id TEXT NOT NULL,
+          type TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          idempotency_key TEXT,
+          state TEXT NOT NULL CHECK(state IN ('queued', 'sent', 'acknowledged', 'failed', 'timed_out')),
+          error TEXT,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          sent_at DATETIME,
+          completed_at DATETIME
+        )
+      `);
+
+      (db as unknown as { initializeSchema: () => void }).initializeSchema();
+
+      const columns = await db.query<{ name: string }>(
+        "SELECT name FROM pragma_table_info('commands')"
+      );
+      expect(columns.rows.some((column) => column.name === 'retry_count')).toBe(true);
+
+      await db.query(
+        `INSERT INTO commands (id, node_id, type, payload, idempotency_key, state)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        ['cmd-legacy', 'node-legacy', 'update-host', '{}', null, 'queued']
+      );
+
+      const updateResult = await db.query(
+        'UPDATE commands SET state = $1, retry_count = retry_count + 1 WHERE id = $2',
+        ['sent', 'cmd-legacy']
+      );
+      expect(updateResult.rowCount).toBe(1);
+    });
+  });
+
   describe('Connection management', () => {
     it('should throw error when querying without connection', async () => {
       const disconnectedDb = new SqliteDatabase();

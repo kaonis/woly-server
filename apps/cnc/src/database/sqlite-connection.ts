@@ -63,10 +63,46 @@ class SqliteDatabase {
       const schemaPath = join(__dirname, 'schema.sqlite.sql');
       const schema = readFileSync(schemaPath, 'utf-8');
       this.db.exec(schema);
+      this.runCompatibilityMigrations();
       logger.info('SQLite schema initialized');
     } catch (error) {
       logger.warn('Could not auto-initialize SQLite schema', { error });
     }
+  }
+
+  private runCompatibilityMigrations(): void {
+    if (!this.db) {
+      return;
+    }
+
+    if (this.tableExists('commands') && !this.tableHasColumn('commands', 'retry_count')) {
+      this.db.exec('ALTER TABLE commands ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0');
+      logger.warn('Applied SQLite compatibility migration', {
+        migration: 'commands.retry_count',
+      });
+    }
+  }
+
+  private tableExists(tableName: string): boolean {
+    if (!this.db) {
+      return false;
+    }
+
+    const stmt = this.db.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1"
+    );
+    const row = stmt.get(tableName) as { name?: string } | undefined;
+    return row !== undefined;
+  }
+
+  private tableHasColumn(tableName: string, columnName: string): boolean {
+    if (!this.db || !this.tableExists(tableName)) {
+      return false;
+    }
+
+    const pragmaStmt = this.db.prepare(`PRAGMA table_info(${tableName})`);
+    const rows = pragmaStmt.all() as Array<{ name?: unknown }>;
+    return rows.some((row) => row.name === columnName);
   }
 
   async query<T = unknown>(text: string, params?: unknown[]): Promise<DatabaseQueryResult<T>> {

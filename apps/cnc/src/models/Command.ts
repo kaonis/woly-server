@@ -49,7 +49,7 @@ function rowToRecord(row: CommandRow): CommandRecord {
     idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
     state: row.state as CommandState,
     error: row.error ? String(row.error) : null,
-    retryCount: Number(row.retry_count),
+    retryCount: Number(row.retry_count ?? 0),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
     sentAt: row.sent_at ? new Date(row.sent_at) : null,
