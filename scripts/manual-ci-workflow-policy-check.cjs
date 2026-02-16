@@ -6,6 +6,7 @@ const path = require('node:path');
 
 const WORKFLOWS_DIR = path.join(process.cwd(), '.github', 'workflows');
 const MAX_TIMEOUT_MINUTES = 8;
+const ALLOWED_AUTOMATED_WORKFLOWS = new Set(['cnc-sync-policy.yml']);
 
 function parseArgs(argv) {
   const options = {
@@ -87,18 +88,27 @@ function parseJobs(lines) {
 
 function validateWorkflow(filePath) {
   const source = fs.readFileSync(filePath, 'utf8');
+  const workflowFile = path.basename(filePath);
   const lines = source.split('\n');
   const violations = [];
   const jobs = parseJobs(lines);
+  const allowsAutomatedPullRequest = ALLOWED_AUTOMATED_WORKFLOWS.has(workflowFile);
 
   if (!/^\s*workflow_dispatch:\s*$/m.test(source)) {
     violations.push('missing `workflow_dispatch` trigger');
   }
 
   for (const forbidden of ['push', 'pull_request', 'schedule']) {
-    if (new RegExp(`^\\s*${forbidden}:\\s*$`, 'm').test(source)) {
-      violations.push(`forbidden trigger present: \`${forbidden}\``);
+    const triggerPresent = new RegExp(`^\\s*${forbidden}:\\s*$`, 'm').test(source);
+    if (!triggerPresent) {
+      continue;
     }
+
+    if (forbidden === 'pull_request' && allowsAutomatedPullRequest) {
+      continue;
+    }
+
+    violations.push(`forbidden trigger present: \`${forbidden}\``);
   }
 
   if (jobs.length === 0) {
@@ -165,8 +175,8 @@ function renderReport(summary) {
   lines.push(
     '',
     summary.failedFiles === 0
-      ? 'Status: **PASS** (manual-only workflow policy is compliant).'
-      : 'Status: **FAIL** (manual-only workflow policy violations detected).'
+      ? 'Status: **PASS** (budget-mode workflow policy is compliant).'
+      : 'Status: **FAIL** (budget-mode workflow policy violations detected).'
   );
 
   return lines.join('\n');

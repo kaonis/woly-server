@@ -1,15 +1,7 @@
 name: CNC Mobile Contract Gate
 
 on:
-  pull_request:
-    paths:
-      - 'apps/cnc/src/routes/**'
-      - 'apps/cnc/src/controllers/**'
-      - 'apps/cnc/src/types.ts'
-      - 'packages/protocol/src/**'
-      - 'packages/protocol/package.json'
-      - 'apps/cnc/package.json'
-      - '.github/workflows/cnc-mobile-contract-gate.yml'
+  workflow_dispatch:
 
 concurrency:
   group: cnc-mobile-contract-${{ github.workflow }}-${{ github.ref }}
