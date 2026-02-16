@@ -1,16 +1,7 @@
 name: CNC Mobile Contract Gate
 
 on:
-  pull_request:
-    paths:
-      - 'apps/cnc/src/routes/**'
-      - 'apps/cnc/src/controllers/**'
-      - 'apps/cnc/src/types.ts'
-      - 'packages/protocol/src/**'
-      - 'packages/protocol/fixtures/**'
-      - 'packages/protocol/package.json'
-      - 'apps/cnc/package.json'
-      - '.github/workflows/cnc-mobile-contract-gate.yml'
+  workflow_dispatch:
 
 concurrency:
   group: cnc-mobile-contract-${{ github.workflow }}-${{ github.ref }}
@@ -39,9 +30,6 @@ jobs:
 
       - name: Build protocol package
         run: npm run build -w packages/protocol
-
-      - name: Run protocol consumer typecheck fixture
-        run: npm run test:consumer-typecheck -w packages/protocol
 
       - name: Run protocol schema tests
         run: npm run test -w packages/protocol -- schemas.test

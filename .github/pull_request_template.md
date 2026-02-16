@@ -1,32 +1,28 @@
-## Linked Issues
+## CNC Sync Classification
+- [ ] This PR is a CNC feature change.
 
-- Backend issue (`woly-server`): #
-- Frontend issue (`woly`): #
-- Protocol issue (if contract changed): #
+## Linked Issues (required when CNC feature checkbox is checked)
+- Protocol issue: kaonis/woly-server#REQUIRED
+- Backend issue: kaonis/woly-server#REQUIRED
+- Frontend issue: kaonis/woly#REQUIRED
 
-## CNC 3-Part Chain
+## 3-Part Chain Checklist (required for CNC feature changes)
+- [ ] Protocol contract updated or verified.
+- [ ] Backend endpoint/command implemented or explicitly unchanged.
+- [ ] Frontend integration implemented or tracked in linked issue.
 
-- [ ] Protocol contract stage is covered (or explicitly unchanged with rationale).
-- [ ] Backend endpoint/command stage is implemented.
-- [ ] Frontend integration stage is linked and tracked.
+## Ordering Gates
+- [ ] Capability negotiation endpoint is implemented/linked (kaonis/woly-server#254) before probe-based behavior changes.
+- [ ] Standalone probing de-scope work (kaonis/woly#307) is blocked until parity issues are complete.
 
-## Contract Compatibility
+## Local Validation (required for CNC feature changes)
+Commands run:
+```bash
+# paste exact commands
+```
 
-- [ ] `npm run test -w apps/cnc -- src/routes/__tests__/mobileCompatibility.smoke.test.ts`
-- [ ] `npm run typecheck -w apps/cnc`
-- [ ] `npm run test:consumer-typecheck -w packages/protocol` (if protocol/contracts touched)
-- [ ] App-side protocol export/typecheck link included (when relevant).
+Result summary:
+- [ ] Local validation passed
+- [ ] Any known gaps are documented below
 
-## Capability Negotiation / Mode Behavior
-
-- [ ] CNC behavior is capability-driven (not probe-driven) for the touched feature.
-- [ ] Any standalone fallback change is sequenced after CNC parity validation.
-
-## CI Budget
-
-- [ ] No broad always-on workflow added.
-- [ ] Any new automatic gate is path-scoped and minimal.
-
-## Notes
-
-<!-- Add rollout/migration details and cross-repo links -->
+Notes:

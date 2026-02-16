@@ -6,19 +6,7 @@ const path = require('node:path');
 
 const WORKFLOWS_DIR = path.join(process.cwd(), '.github', 'workflows');
 const MAX_TIMEOUT_MINUTES = 8;
-const DEFAULT_POLICY = {
-  requireWorkflowDispatch: true,
-  requiredTriggers: [],
-  forbiddenTriggers: ['push', 'pull_request', 'schedule'],
-};
-const WORKFLOW_POLICY_BY_FILE = {
-  'cnc-mobile-contract-gate.yml': {
-    requireWorkflowDispatch: false,
-    requiredTriggers: ['pull_request'],
-    forbiddenTriggers: ['push', 'schedule'],
-    requiresPathScopedPullRequest: true,
-  },
-};
+const ALLOWED_AUTOMATED_WORKFLOWS = new Set(['cnc-sync-policy.yml']);
 
 function parseArgs(argv) {
   const options = {
@@ -98,47 +86,29 @@ function parseJobs(lines) {
   return jobs;
 }
 
-function hasTrigger(source, triggerName) {
-  return new RegExp(`^\\s*${triggerName}:\\s*$`, 'm').test(source);
-}
-
-function getWorkflowPolicy(filePath) {
-  const fileName = path.basename(filePath);
-  return WORKFLOW_POLICY_BY_FILE[fileName] || DEFAULT_POLICY;
-}
-
 function validateWorkflow(filePath) {
   const source = fs.readFileSync(filePath, 'utf8');
+  const workflowFile = path.basename(filePath);
   const lines = source.split('\n');
   const violations = [];
   const jobs = parseJobs(lines);
-  const policy = getWorkflowPolicy(filePath);
+  const allowsAutomatedPullRequest = ALLOWED_AUTOMATED_WORKFLOWS.has(workflowFile);
 
-  if (policy.requireWorkflowDispatch && !hasTrigger(source, 'workflow_dispatch')) {
+  if (!/^\s*workflow_dispatch:\s*$/m.test(source)) {
     violations.push('missing `workflow_dispatch` trigger');
   }
 
-  for (const required of policy.requiredTriggers || []) {
-    if (!hasTrigger(source, required)) {
-      violations.push(`missing required trigger: \`${required}\``);
+  for (const forbidden of ['push', 'pull_request', 'schedule']) {
+    const triggerPresent = new RegExp(`^\\s*${forbidden}:\\s*$`, 'm').test(source);
+    if (!triggerPresent) {
+      continue;
     }
-  }
 
-  for (const forbidden of policy.forbiddenTriggers || []) {
-    if (hasTrigger(source, forbidden)) {
-      violations.push(`forbidden trigger present: \`${forbidden}\``);
+    if (forbidden === 'pull_request' && allowsAutomatedPullRequest) {
+      continue;
     }
-  }
 
-  if (policy.requiresPathScopedPullRequest) {
-    const pullRequestHasPaths = /pull_request:\s*\n(?:\s+.*\n)*?\s+paths:\s*$/m.test(
-      source
-    );
-    if (!pullRequestHasPaths) {
-      violations.push(
-        '`pull_request` trigger must be path-scoped for minimal-automation policy'
-      );
-    }
+    violations.push(`forbidden trigger present: \`${forbidden}\``);
   }
 
   if (jobs.length === 0) {
@@ -205,8 +175,8 @@ function renderReport(summary) {
   lines.push(
     '',
     summary.failedFiles === 0
-      ? 'Status: **PASS** (manual-first workflow policy is compliant).'
-      : 'Status: **FAIL** (manual-first workflow policy violations detected).'
+      ? 'Status: **PASS** (budget-mode workflow policy is compliant).'
+      : 'Status: **FAIL** (budget-mode workflow policy violations detected).'
   );
 
   return lines.join('\n');
@@ -260,10 +230,6 @@ if (require.main === module) {
 }
 
 module.exports = {
-  DEFAULT_POLICY,
-  WORKFLOW_POLICY_BY_FILE,
-  getWorkflowPolicy,
-  hasTrigger,
   parseArgs,
   parseJobs,
   validateWorkflow,

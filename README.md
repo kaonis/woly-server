@@ -88,6 +88,8 @@ npm run build -w packages/protocol
 | `npm run build` | Build all workspaces (protocol → apps) |
 | `npm run test` | Run all tests |
 | `npm run test:ci` | CI mode with coverage |
+| `npm run test:e2e:smoke` | Run cross-service C&C <-> node-agent E2E smoke suite |
+| `npm run validate:standard` | Run standard repo validation gate (`lint`, `typecheck`, `test:ci`, `build`, smoke) |
 | `npm run typecheck` | Type-check all workspaces |
 | `npm run lint` | Lint all workspaces |
 | `npm run dev:node-agent` | Start node agent in dev mode |
@@ -140,6 +142,20 @@ Upgrade sequencing and compatibility requirements are documented in:
 - [docs/compatibility.md](docs/compatibility.md)
 - [docs/PROTOCOL_COMPATIBILITY.md](docs/PROTOCOL_COMPATIBILITY.md)
 
+## CNC Sync Policy (Budget Mode)
+
+This repo and the mobile app (`kaonis/woly`) follow a shared CNC sync process:
+1. Protocol contract
+2. Backend endpoint/command
+3. Frontend integration
+
+Policy docs:
+- [docs/CNC_SYNC_POLICY.md](docs/CNC_SYNC_POLICY.md)
+- [docs/ROADMAP_CNC_SYNC_V1.md](docs/ROADMAP_CNC_SYNC_V1.md)
+- [woly/docs/CNC_SYNC_POLICY.md](https://github.com/kaonis/woly/blob/master/docs/CNC_SYNC_POLICY.md)
+
+Each CNC feature PR must link protocol/backend/frontend issues and include local validation evidence.
+
 ### Publishing the Protocol Package
 
 To publish `@kaonis/woly-protocol` to npm (for the mobile app):
@@ -175,23 +191,34 @@ docker run -d --net host \
   woly-node-agent
 ```
 
+For full production rollout guidance (topology, secrets, TLS, backup/restore, and rollback):
+- [docs/PRODUCTION_DEPLOYMENT_GUIDE.md](docs/PRODUCTION_DEPLOYMENT_GUIDE.md)
+- [docs/COMMAND_OUTCOME_METRICS.md](docs/COMMAND_OUTCOME_METRICS.md)
+
 ## CI
 
-GitHub Actions is currently in a temporary manual-only mode to control Actions spend.
-Automatic runs on `push`/`pull_request` are disabled.
+GitHub Actions is budget-scoped:
+- Heavy validation workflow (`.github/workflows/ci.yml`) runs manual-only.
+- Lightweight policy workflow (`.github/workflows/cnc-sync-policy.yml`) runs automatically on PR updates.
 
 Current validation flow:
 
-1. Protocol compatibility gate (schema tests, cross-repo contracts, app protocol contracts, C&C schema gate)
-2. Build, lint, typecheck, and test all workspaces via Turborepo (via local gate and optional manual workflow dispatch)
-3. Upload coverage reports as artifacts when `ci.yml` is manually dispatched
+1. Lightweight PR policy gate (`.github/workflows/cnc-sync-policy.yml`) for linked issues + checklist compliance
+2. Protocol compatibility gate (schema tests, cross-repo contracts, app protocol contracts, C&C schema gate)
+3. Standard validation gate via `npm run validate:standard` (`lint`, `typecheck`, `test:ci`, `build`, cross-service smoke)
+4. Upload coverage reports as artifacts when `ci.yml` is manually dispatched
 
 Required local gate before PR merge:
-- `npx turbo run lint typecheck test:ci build`
+- `npm ci`
+- `npm run build -w packages/protocol`
+- `npm run test -w packages/protocol -- contract.cross-repo`
+- `npm run test -w apps/cnc -- src/routes/__tests__/mobileCompatibility.smoke.test.ts`
+- `npm run validate:standard`
 
 Manual operations and rollback criteria are documented in:
 - [docs/CI_MANUAL_OPERATIONS.md](docs/CI_MANUAL_OPERATIONS.md)
 - [docs/CI_MANUAL_REVIEW_LOG.md](docs/CI_MANUAL_REVIEW_LOG.md)
+- [docs/CROSS_SERVICE_E2E_SMOKE.md](docs/CROSS_SERVICE_E2E_SMOKE.md)
 
 Main workflow definition:
 - [.github/workflows/ci.yml](.github/workflows/ci.yml)

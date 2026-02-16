@@ -1,0 +1,110 @@
+name: CNC Sync Policy
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+      - ready_for_review
+
+concurrency:
+  group: cnc-sync-policy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+
+    steps:
+      - name: Validate CNC sync policy
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) return;
+
+            const body = pr.body || '';
+            const title = pr.title || '';
+            const combined = `${title}\n${body}`;
+            const errors = [];
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+            const filenames = files.map((file) => file.filename);
+            const touchesCncPaths = filenames.some((name) =>
+              /^apps\/cnc\/src\//.test(name) || /^packages\/protocol\/src\//.test(name)
+            );
+
+            const isCncFeature = /\[(x|X)\]\s+This PR is a CNC feature change\./.test(body);
+
+            if (touchesCncPaths && !isCncFeature) {
+              errors.push('This PR touches CNC/protocol source paths. Check "This PR is a CNC feature change." in the PR template.');
+            }
+
+            if (isCncFeature) {
+              const requiredFields = [
+                {
+                  name: 'Protocol issue',
+                  regex: /Protocol issue:\s*(kaonis\/woly-server#\d+|https:\/\/github\.com\/kaonis\/woly-server\/issues\/\d+)/i,
+                },
+                {
+                  name: 'Backend issue',
+                  regex: /Backend issue:\s*(kaonis\/woly-server#\d+|https:\/\/github\.com\/kaonis\/woly-server\/issues\/\d+)/i,
+                },
+                {
+                  name: 'Frontend issue',
+                  regex: /Frontend issue:\s*(kaonis\/woly#\d+|https:\/\/github\.com\/kaonis\/woly\/issues\/\d+)/i,
+                },
+              ];
+
+              for (const field of requiredFields) {
+                if (!field.regex.test(body)) {
+                  errors.push(`Missing or invalid ${field.name}. Use explicit cross-repo reference format.`);
+                }
+              }
+
+              const requiredChecks = [
+                /\[(x|X)\]\s+Protocol contract updated or verified\./,
+                /\[(x|X)\]\s+Backend endpoint\/command implemented or explicitly unchanged\./,
+                /\[(x|X)\]\s+Frontend integration implemented or tracked in linked issue\./,
+                /\[(x|X)\]\s+Local validation passed/,
+              ];
+
+              for (const check of requiredChecks) {
+                if (!check.test(body)) {
+                  errors.push(`Missing required checked checklist item matching: ${check}`);
+                }
+              }
+
+              const capabilityIssue = await github.rest.issues.get({
+                owner: 'kaonis',
+                repo: 'woly-server',
+                issue_number: 254,
+              });
+              const capabilityMentioned =
+                /kaonis\/woly-server#254/.test(combined) ||
+                /https:\/\/github\.com\/kaonis\/woly-server\/issues\/254/.test(combined) ||
+                /\b#254\b/.test(combined);
+
+              if (capabilityIssue.data.state !== 'closed' && !capabilityMentioned) {
+                errors.push('Issue kaonis/woly-server#254 is still open. CNC feature PRs must implement/link this capability work first.');
+              }
+            }
+
+            if (errors.length > 0) {
+              core.setFailed(`CNC sync policy check failed:\n- ${errors.join('\n- ')}`);
+            }
