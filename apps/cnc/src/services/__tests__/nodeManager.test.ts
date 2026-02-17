@@ -107,6 +107,36 @@ describe('NodeManager', () => {
       expect(node!.name).toBe('Test WS Node');
     });
 
+    it('negotiates protocol version for legacy nodes when supported', async () => {
+      await nodeManager.handleConnection(mockWs, { kind: 'static-token', token: 'dev-token-home' });
+      const messageHandler = mockWs.on.mock.calls.find((call: any) => call[0] === 'message')[1];
+
+      const registrationMessage = JSON.stringify({
+        type: 'register',
+        data: {
+          nodeId: 'test-ws-node-legacy-protocol',
+          name: 'Legacy Protocol Node',
+          location: 'WS Test Location',
+          authToken: 'dev-token-home',
+          metadata: {
+            version: '1.0.0',
+            platform: 'linux',
+            protocolVersion: '1.0.0',
+            networkInfo: {
+              subnet: '192.168.1.0/24',
+              gateway: '192.168.1.1',
+            },
+          },
+        },
+      });
+
+      await messageHandler(Buffer.from(registrationMessage));
+
+      const sentData = JSON.parse(mockWs.send.mock.calls[0][0]);
+      expect(sentData.type).toBe('registered');
+      expect(sentData.data.protocolVersion).toBe('1.0.0');
+    });
+
     it('rejects re-registration on an already registered connection', async () => {
       await nodeManager.handleConnection(mockWs, { kind: 'static-token', token: 'dev-token-home' });
       const messageHandler = mockWs.on.mock.calls.find((call: any) => call[0] === 'message')[1];

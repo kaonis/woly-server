@@ -167,10 +167,17 @@ describe('Mobile API compatibility smoke checks', () => {
     } as unknown as HostAggregator;
 
     const commandRouter = {
-      routeScanCommand: jest.fn().mockResolvedValue({
+      routeScanHostPortsCommand: jest.fn().mockResolvedValue({
         commandId: 'scan-command-1',
-        success: true,
-        timestamp: new Date('2026-02-15T00:00:00.000Z'),
+        nodeId: 'node-1',
+        message: 'Port scan completed, found 1 open TCP port(s)',
+        hostPortScan: {
+          hostName: 'Office-Mac',
+          mac: '00:11:22:33:44:55',
+          ip: '192.168.1.10',
+          scannedAt: '2026-02-15T00:00:00.000Z',
+          openPorts: [{ port: 22, protocol: 'tcp', service: 'SSH' }],
+        },
       }),
       routeUpdateHostCommand: jest.fn().mockResolvedValue({
         commandId: 'update-command-1',
@@ -306,7 +313,7 @@ describe('Mobile API compatibility smoke checks', () => {
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
         target: 'Office-Mac@Home',
-        openPorts: [],
+        openPorts: [{ port: 22, protocol: 'tcp', service: 'SSH' }],
       });
       expect(typeof response.body.scannedAt).toBe('string');
       expect(new Date(response.body.scannedAt).toString()).not.toBe('Invalid Date');
@@ -331,7 +338,7 @@ describe('Mobile API compatibility smoke checks', () => {
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
         target: 'Office-Mac@Home',
-        openPorts: [],
+        openPorts: [{ port: 22, protocol: 'tcp', service: 'SSH' }],
         scan: {
           commandId: 'scan-command-1',
           state: 'acknowledged',

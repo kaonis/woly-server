@@ -337,6 +337,37 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     );
   });
 
+  it('dispatches scan-host-ports commands to the node-agent command handler', async () => {
+    await client.connect();
+
+    const onScanHostPorts = jest.fn();
+    client.on('command:scan-host-ports', onScanHostPorts);
+
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'scan-host-ports',
+          commandId: 'cmd-port-scan-1',
+          data: {
+            hostName: 'PC-01',
+            mac: 'AA:BB:CC:DD:EE:FF',
+            ip: '192.168.1.50',
+            ports: [22, 443],
+            timeoutMs: 250,
+          },
+        })
+      )
+    );
+
+    expect(onScanHostPorts).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'scan-host-ports',
+        commandId: 'cmd-port-scan-1',
+      })
+    );
+  });
+
   it('rejects malformed outbound node messages and logs validation errors', async () => {
     await client.connect();
 

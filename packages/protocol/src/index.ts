@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 // --- Protocol versioning ---
 
-export const PROTOCOL_VERSION = '1.0.0' as const;
-export const SUPPORTED_PROTOCOL_VERSIONS: readonly string[] = [PROTOCOL_VERSION];
+export const PROTOCOL_VERSION = '1.1.1' as const;
+export const SUPPORTED_PROTOCOL_VERSIONS: readonly string[] = [PROTOCOL_VERSION, '1.0.0'];
 
 // --- Shared types ---
 
@@ -156,6 +156,14 @@ export interface HostPingResult {
   checkedAt: string;
 }
 
+export interface HostPortScanResult {
+  hostName: string;
+  mac: string;
+  ip: string;
+  scannedAt: string;
+  openPorts: HostPort[];
+}
+
 // --- WebSocket message types ---
 
 export type NodeMessage =
@@ -174,6 +182,7 @@ export type NodeMessage =
         message?: string;
         error?: string;
         hostPing?: HostPingResult;
+        hostPortScan?: HostPortScanResult;
         timestamp: Date;
       };
     };
@@ -190,6 +199,17 @@ export type CncCommand =
   | { type: 'registered'; data: RegisteredCommandData }
   | { type: 'wake'; commandId: string; data: { hostName: string; mac: string } }
   | { type: 'scan'; commandId: string; data: { immediate: boolean } }
+  | {
+      type: 'scan-host-ports';
+      commandId: string;
+      data: {
+        hostName: string;
+        mac: string;
+        ip: string;
+        ports?: number[];
+        timeoutMs?: number;
+      };
+    }
   | {
       type: 'update-host';
       commandId: string;
@@ -287,6 +307,14 @@ export const hostPortSchema: z.ZodType<HostPort> = z.object({
   service: z.string().min(1),
 });
 
+export const hostPortScanResultSchema: z.ZodType<HostPortScanResult> = z.object({
+  hostName: z.string().min(1),
+  mac: z.string().min(1),
+  ip: z.string().min(1),
+  scannedAt: z.string().min(1),
+  openPorts: z.array(hostPortSchema),
+});
+
 export const hostPortScanResponseSchema: z.ZodType<HostPortScanResponse> = z.object({
   target: z.string().min(1),
   scannedAt: z.string().min(1),
@@ -370,6 +398,7 @@ const commandResultPayloadSchema = z.object({
   message: z.string().optional(),
   error: z.string().optional(),
   hostPing: hostPingResultSchema.optional(),
+  hostPortScan: hostPortScanResultSchema.optional(),
   timestamp: z.coerce.date(),
 });
 
@@ -450,6 +479,17 @@ export const inboundCncCommandSchema: z.ZodType<CncCommand> = z.discriminatedUni
     commandId: z.string().min(1),
     data: z.object({
       immediate: z.boolean(),
+    }),
+  }),
+  z.object({
+    type: z.literal('scan-host-ports'),
+    commandId: z.string().min(1),
+    data: z.object({
+      hostName: z.string().min(1),
+      mac: z.string().min(1),
+      ip: z.string().min(1),
+      ports: z.array(z.number().int().min(1).max(65535)).min(1).max(1024).optional(),
+      timeoutMs: z.number().int().min(50).max(5000).optional(),
     }),
   }),
   z.object({

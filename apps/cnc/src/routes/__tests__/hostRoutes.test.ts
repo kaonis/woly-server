@@ -47,9 +47,11 @@ describe('Host Routes Authentication and Authorization', () => {
     } as unknown as HostAggregator;
 
     const commandRouter = {
-      sendWakeCommand: jest.fn().mockResolvedValue({ success: false, error: 'Node not connected' }),
+      routeWakeCommand: jest.fn().mockRejectedValue(new Error('Node not connected')),
       routePingHostCommand: jest.fn().mockRejectedValue(new Error('Host not found: node1.example.com')),
-      routeScanCommand: jest.fn().mockResolvedValue({ success: true, commandId: 'scan-1' }),
+      routeScanHostPortsCommand: jest
+        .fn()
+        .mockRejectedValue(new Error('Host not found: node1.example.com')),
       routeUpdateHostCommand: jest.fn().mockResolvedValue({ success: false, error: 'Node not connected' }),
       routeDeleteHostCommand: jest.fn().mockResolvedValue({ success: false, error: 'Node not connected' }),
     } as unknown as CommandRouter;

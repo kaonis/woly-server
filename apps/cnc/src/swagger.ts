@@ -346,7 +346,7 @@ const options: swaggerJsdoc.Options = {
             },
             type: {
               type: 'string',
-              enum: ['wake', 'update-host', 'delete-host', 'scan', 'ping'],
+              enum: ['wake', 'update-host', 'delete-host', 'scan', 'scan-host-ports', 'ping-host', 'ping'],
               description: 'Command type',
               example: 'wake',
             },

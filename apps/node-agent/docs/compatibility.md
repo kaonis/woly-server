@@ -1,10 +1,11 @@
 # Compatibility Matrix (Node <-> C&C)
 
-Date: 2026-02-07
+Date: 2026-02-17
 
 | Node Version | C&C Version | Protocol Version | WS Auth Mode | Notes                                                    |
 | ------------ | ----------- | ---------------- | ------------ | -------------------------------------------------------- |
-| 0.0.1        | 1.0.0       | v1 (legacy)      | query token  | Current baseline; migrate to session token + header auth |
+| 0.0.1        | 1.0.0       | 1.1.1 (current)  | query token  | Current baseline for new deployments; negotiated at registration |
+| 0.0.1        | 1.0.0       | 1.0.0 (legacy)   | query token  | Transitional compatibility while older C&C/node versions coexist |
 
 ## Rules
 

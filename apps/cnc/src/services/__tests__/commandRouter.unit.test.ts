@@ -305,6 +305,74 @@ describe('CommandRouter unit behavior', () => {
     router.cleanup();
   });
 
+  it('routes scan-host-ports command and returns host port scan payload', async () => {
+    const { router, hostAggregator, nodeManager } = createRouter();
+    hostAggregator.getHostByFQN.mockResolvedValue({
+      nodeId: 'node-7',
+      name: 'desk-pc',
+      mac: 'AA:BB:CC:DD:EE:FF',
+      ip: '192.168.1.40',
+      status: 'awake',
+    });
+    nodeManager.getNodeStatus.mockResolvedValue('online');
+    const executeSpy = jest.spyOn(router as unknown as CommandRouterInternals, 'executeCommand')
+      .mockResolvedValue({
+        commandId: 'cmd-port-scan-1',
+        success: true,
+        message: 'Port scan completed, found 2 open TCP port(s)',
+        timestamp: new Date(),
+        correlationId: 'corr-ports',
+        hostPortScan: {
+          hostName: 'desk-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.40',
+          scannedAt: '2026-02-16T23:00:00.000Z',
+          openPorts: [
+            { port: 22, protocol: 'tcp', service: 'SSH' },
+            { port: 443, protocol: 'tcp', service: 'HTTPS' },
+          ],
+        },
+      });
+
+    const result = await router.routeScanHostPortsCommand('desk-pc@Lab', {
+      correlationId: 'corr-ports',
+      ports: [443, 22, 22, -1, 70000],
+      timeoutMs: 320.9,
+    });
+
+    expect(executeSpy).toHaveBeenCalledWith(
+      'node-7',
+      expect.objectContaining({
+        type: 'scan-host-ports',
+        data: {
+          hostName: 'desk-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.40',
+          ports: [22, 443],
+          timeoutMs: 320,
+        },
+      }),
+      { idempotencyKey: null, correlationId: 'corr-ports' }
+    );
+    expect(result).toEqual({
+      commandId: 'cmd-port-scan-1',
+      nodeId: 'node-7',
+      message: 'Port scan completed, found 2 open TCP port(s)',
+      hostPortScan: {
+        hostName: 'desk-pc',
+        mac: 'AA:BB:CC:DD:EE:FF',
+        ip: '192.168.1.40',
+        scannedAt: '2026-02-16T23:00:00.000Z',
+        openPorts: [
+          { port: 22, protocol: 'tcp', service: 'SSH' },
+          { port: 443, protocol: 'tcp', service: 'HTTPS' },
+        ],
+      },
+      correlationId: 'corr-ports',
+    });
+    router.cleanup();
+  });
+
   it('routes ping-host command and returns node-agent ping payload', async () => {
     const { router, hostAggregator, nodeManager } = createRouter();
     hostAggregator.getHostByFQN.mockResolvedValue({

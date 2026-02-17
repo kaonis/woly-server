@@ -1,6 +1,13 @@
 type ProtocolDirection = 'inbound' | 'outbound';
 type CommandOutcome = 'acknowledged' | 'failed' | 'timed_out';
-const TRACKED_COMMAND_TYPES = ['wake', 'scan', 'update-host', 'delete-host', 'ping-host'] as const;
+const TRACKED_COMMAND_TYPES = [
+  'wake',
+  'scan',
+  'scan-host-ports',
+  'update-host',
+  'delete-host',
+  'ping-host',
+] as const;
 
 type CommandOutcomeSnapshot = {
   acknowledged: number;

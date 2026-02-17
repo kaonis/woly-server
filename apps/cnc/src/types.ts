@@ -9,6 +9,7 @@ import type {
   HostWakeSchedule as ProtocolHostWakeSchedule,
   Host,
   HostPingResult as ProtocolHostPingResult,
+  HostPortScanResult as ProtocolHostPortScanResult,
   HostPortScanResponse as ProtocolHostPortScanResponse,
   NodeMetadata as ProtocolNodeMetadata,
   ScheduleFrequency as ProtocolScheduleFrequency,
@@ -59,6 +60,7 @@ export interface CommandResult {
   message?: string;
   error?: string;
   hostPing?: ProtocolHostPingResult;
+  hostPortScan?: ProtocolHostPortScanResult;
   timestamp: Date;
   correlationId?: string;
 }

@@ -39,7 +39,7 @@ const capabilityMatrix: CncCapabilitiesResponse['capabilities'] = {
   scan: {
     supported: true,
     routes: ['/api/hosts/ports/:fqn', '/api/hosts/scan-ports/:fqn'],
-    note: 'Compatibility endpoints are available; per-host open-port telemetry remains protocol-limited.',
+    note: 'Per-host open-port telemetry is available through node-side TCP probing.',
   },
   notesTags: {
     supported: true,

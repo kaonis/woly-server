@@ -26,6 +26,14 @@ type PingHostCommandResult = {
   correlationId?: string;
 };
 
+type RoutedHostPortScanResult = {
+  commandId: string;
+  nodeId: string;
+  message?: string;
+  hostPortScan: NonNullable<CommandResult['hostPortScan']>;
+  correlationId?: string;
+};
+
 /**
  * CommandRouter
  * 
@@ -219,6 +227,65 @@ export class CommandRouter extends EventEmitter {
       idempotencyKey: null,
       correlationId: options?.correlationId ?? null,
     });
+  }
+
+  /**
+   * Route a per-host TCP port scan command to the host's managing node.
+   */
+  async routeScanHostPortsCommand(
+    fqn: string,
+    options?: { correlationId?: string | null; ports?: number[] | null; timeoutMs?: number | null }
+  ): Promise<RoutedHostPortScanResult> {
+    logger.info(`Routing scan-host-ports command for ${fqn}`);
+
+    const { location } = this.parseFQN(fqn);
+    const host = await this.hostAggregator.getHostByFQN(fqn);
+    if (!host) {
+      throw new Error(`Host not found: ${fqn}`);
+    }
+
+    const nodeId = host.nodeId;
+    const nodeStatus = await this.nodeManager.getNodeStatus(nodeId);
+    if (nodeStatus !== 'online') {
+      throw new Error(`Node ${nodeId} (${location}) is offline`);
+    }
+
+    const commandId = this.generateCommandId();
+    const commandData: Extract<DispatchCommand, { type: 'scan-host-ports' }>['data'] = {
+      hostName: host.name,
+      mac: host.mac,
+      ip: host.ip,
+    };
+
+    const normalizedPorts = this.normalizePortList(options?.ports ?? null);
+    if (normalizedPorts) {
+      commandData.ports = normalizedPorts;
+    }
+
+    if (typeof options?.timeoutMs === 'number' && Number.isFinite(options.timeoutMs)) {
+      commandData.timeoutMs = Math.trunc(options.timeoutMs);
+    }
+
+    const command: DispatchCommand = {
+      type: 'scan-host-ports',
+      commandId,
+      data: commandData,
+    };
+
+    const correlationId = options?.correlationId ?? null;
+    const result = await this.executeCommand(nodeId, command, {
+      idempotencyKey: null,
+      correlationId,
+    });
+    const scanResult = this.assertHostPortScanResult(result);
+
+    return {
+      commandId: result.commandId,
+      nodeId,
+      message: result.message,
+      hostPortScan: scanResult.hostPortScan,
+      correlationId: scanResult.correlationId ?? correlationId ?? undefined,
+    };
   }
 
   /**
@@ -633,6 +700,32 @@ export class CommandRouter extends EventEmitter {
     return `${commandType}:${trimmed}`;
   }
 
+  private normalizePortList(ports: number[] | null): number[] | null {
+    if (!Array.isArray(ports)) {
+      return null;
+    }
+
+    const unique = new Set<number>();
+    for (const port of ports) {
+      if (!Number.isInteger(port)) {
+        continue;
+      }
+      if (port < 1 || port > 65535) {
+        continue;
+      }
+      unique.add(port);
+      if (unique.size >= 1024) {
+        break;
+      }
+    }
+
+    if (unique.size === 0) {
+      return null;
+    }
+
+    return Array.from(unique).sort((a, b) => a - b);
+  }
+
   /**
    * Calculate exponential backoff delay with jitter
    * 
@@ -688,6 +781,24 @@ export class CommandRouter extends EventEmitter {
 
     return {
       hostPing: result.hostPing,
+      correlationId: result.correlationId,
+    };
+  }
+
+  private assertHostPortScanResult(result: CommandResult): {
+    hostPortScan: NonNullable<CommandResult['hostPortScan']>;
+    correlationId?: string;
+  } {
+    if (!result.success) {
+      throw new Error(result.error ?? 'Port scan command failed');
+    }
+
+    if (!result.hostPortScan) {
+      throw new Error('Port scan command result missing host port payload');
+    }
+
+    return {
+      hostPortScan: result.hostPortScan,
       correlationId: result.correlationId,
     };
   }
