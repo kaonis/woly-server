@@ -1,6 +1,6 @@
 {
   "name": "@kaonis/woly-protocol",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Shared WoLy node <-> C&C protocol types and runtime schemas",
   "license": "Apache-2.0",
   "main": "dist/index.js",
@@ -21,7 +21,8 @@
     "build": "tsc",
     "test": "jest --watchman=false",
     "test:ci": "jest --watchman=false",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:consumer-typecheck": "npm run build && tsc -p fixtures/app-consumer/tsconfig.json"
   },
   "repository": {
     "type": "git",
