@@ -762,6 +762,71 @@ describe('HostAggregator', () => {
     });
   });
 
+  describe('saveHostPortScanSnapshot', () => {
+    it('persists open port snapshot and returns it while fresh', async () => {
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-6',
+        location: 'Remote Site',
+        host: {
+          name: 'port-cache-host',
+          mac: 'AA:BB:CC:DD:EE:41',
+          ip: '192.168.1.141',
+          status: 'awake' as const,
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      const persisted = await hostAggregator.saveHostPortScanSnapshot(
+        'port-cache-host@Remote%20Site-test-node-6',
+        {
+          scannedAt: new Date().toISOString(),
+          openPorts: [{ port: 22, protocol: 'tcp', service: 'SSH' }],
+        }
+      );
+
+      expect(persisted).toBe(true);
+      const host = await hostAggregator.getHostByFQN('port-cache-host@Remote%20Site-test-node-6');
+      expect(host).not.toBeNull();
+      expect(host!.openPorts).toEqual([{ port: 22, protocol: 'tcp', service: 'SSH' }]);
+      expect(host!.portsScannedAt).toEqual(expect.any(String));
+      expect(host!.portsExpireAt).toEqual(expect.any(String));
+    });
+
+    it('hides expired cached snapshots from host payloads', async () => {
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-6',
+        location: 'Remote Site',
+        host: {
+          name: 'expired-port-cache-host',
+          mac: 'AA:BB:CC:DD:EE:42',
+          ip: '192.168.1.142',
+          status: 'awake' as const,
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      const scannedAt = new Date(Date.now() - (5 * 60 * 60 * 1000)).toISOString();
+      const persisted = await hostAggregator.saveHostPortScanSnapshot(
+        'expired-port-cache-host@Remote%20Site-test-node-6',
+        {
+          scannedAt,
+          openPorts: [{ port: 80, protocol: 'tcp', service: 'HTTP' }],
+        }
+      );
+
+      expect(persisted).toBe(true);
+      const host = await hostAggregator.getHostByFQN('expired-port-cache-host@Remote%20Site-test-node-6');
+      expect(host).not.toBeNull();
+      expect(host!.openPorts).toBeUndefined();
+      expect(host!.portsScannedAt).toBeNull();
+      expect(host!.portsExpireAt).toBeNull();
+    });
+  });
+
   describe('getStats', () => {
     it('should return aggregated statistics', async () => {
       const events = [

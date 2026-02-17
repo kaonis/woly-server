@@ -29,6 +29,9 @@ CREATE TABLE IF NOT EXISTS aggregated_hosts (
     ping_responsive INTEGER,
     notes TEXT,
     tags TEXT NOT NULL DEFAULT '[]',
+    open_ports TEXT NOT NULL DEFAULT '[]',
+    ports_scanned_at TIMESTAMP,
+    ports_expire_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE(node_id, name)

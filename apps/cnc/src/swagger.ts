@@ -168,6 +168,42 @@ const options: swaggerJsdoc.Options = {
               },
               example: ['prod', 'database'],
             },
+            openPorts: {
+              type: 'array',
+              description: 'Cached open TCP ports from the most recent per-host scan (when still fresh)',
+              items: {
+                type: 'object',
+                properties: {
+                  port: {
+                    type: 'integer',
+                    example: 22,
+                  },
+                  protocol: {
+                    type: 'string',
+                    enum: ['tcp'],
+                    example: 'tcp',
+                  },
+                  service: {
+                    type: 'string',
+                    example: 'SSH',
+                  },
+                },
+              },
+            },
+            portsScannedAt: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              description: 'Timestamp of the cached per-host port scan snapshot',
+              example: '2026-02-17T00:00:00.000Z',
+            },
+            portsExpireAt: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              description: 'Expiration timestamp for cached open ports',
+              example: '2026-02-17T04:00:00.000Z',
+            },
             nodeId: {
               type: 'string',
               description: 'ID of the node managing this host',

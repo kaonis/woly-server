@@ -29,6 +29,15 @@ interface HostRemovedEvent {
 
 // Internal row type including database ID
 type AggregatedHostRow = AggregatedHost & { id: number };
+type HostPort = NonNullable<Host['openPorts']>[number];
+type AggregatedHostRowRaw = AggregatedHost & {
+  tags?: unknown;
+  openPorts?: unknown;
+  portsScannedAt?: unknown;
+  portsExpireAt?: unknown;
+};
+
+const PORT_SCAN_CACHE_TTL_MS = 4 * 60 * 60 * 1000;
 
 const HOST_SELECT_COLUMNS = `
         ah.node_id as "nodeId",
@@ -39,6 +48,9 @@ const HOST_SELECT_COLUMNS = `
         ah.last_seen as "lastSeen",
         ah.notes,
         ah.tags,
+        ah.open_ports as "openPorts",
+        ah.ports_scanned_at as "portsScannedAt",
+        ah.ports_expire_at as "portsExpireAt",
         ah.location,
         ah.fully_qualified_name as "fullyQualifiedName",
         ah.discovered,
@@ -91,11 +103,112 @@ export class HostAggregator extends EventEmitter {
     return JSON.stringify(tags);
   }
 
-  private normalizeHost(row: AggregatedHost & { tags?: unknown }): AggregatedHost {
+  private parseOpenPorts(value: unknown, hostName: string): HostPort[] {
+    const normalizePortEntries = (entries: unknown[]): HostPort[] =>
+      entries
+        .map((entry) => {
+          if (!entry || typeof entry !== 'object') {
+            return null;
+          }
+
+          const candidate = entry as { port?: unknown; protocol?: unknown; service?: unknown };
+          if (typeof candidate.port !== 'number' || !Number.isInteger(candidate.port)) {
+            return null;
+          }
+
+          const port = candidate.port;
+          if (port < 1 || port > 65535) {
+            return null;
+          }
+          if (candidate.protocol !== 'tcp') {
+            return null;
+          }
+          if (typeof candidate.service !== 'string' || candidate.service.trim().length === 0) {
+            return null;
+          }
+
+          return {
+            port,
+            protocol: 'tcp' as const,
+            service: candidate.service,
+          };
+        })
+        .filter((entry): entry is HostPort => entry !== null);
+
+    if (Array.isArray(value)) {
+      return normalizePortEntries(value);
+    }
+
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (Array.isArray(parsed)) {
+        return normalizePortEntries(parsed);
+      }
+    } catch (error) {
+      logger.warn('Failed to parse aggregated host open ports; defaulting to empty list', {
+        hostName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return [];
+  }
+
+  private serializeOpenPorts(openPorts: HostPort[] | undefined): string {
+    if (!openPorts || openPorts.length === 0) {
+      return '[]';
+    }
+
+    return JSON.stringify(openPorts);
+  }
+
+  private normalizeDateValue(value: unknown): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    if (typeof value === 'string' && value.trim().length === 0) {
+      return null;
+    }
+
+    const parsed = value instanceof Date ? value : new Date(String(value));
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+
+    return parsed.toISOString();
+  }
+
+  private isPortScanStillFresh(portsExpireAt: string | null): boolean {
+    if (!portsExpireAt) {
+      return false;
+    }
+
+    const expiresAt = new Date(portsExpireAt).getTime();
+    if (Number.isNaN(expiresAt)) {
+      return false;
+    }
+
+    return expiresAt > Date.now();
+  }
+
+  private normalizeHost(row: AggregatedHostRowRaw): AggregatedHost {
+    const openPorts = this.parseOpenPorts(row.openPorts, row.name);
+    const portsScannedAt = this.normalizeDateValue(row.portsScannedAt);
+    const portsExpireAt = this.normalizeDateValue(row.portsExpireAt);
+    const hasFreshPortScan = this.isPortScanStillFresh(portsExpireAt);
+
     return {
       ...row,
       notes: row.notes ?? null,
       tags: this.parseTags(row.tags, row.name),
+      openPorts: hasFreshPortScan ? openPorts : undefined,
+      portsScannedAt: hasFreshPortScan ? portsScannedAt : null,
+      portsExpireAt: hasFreshPortScan ? portsExpireAt : null,
     };
   }
 
@@ -129,6 +242,18 @@ export class HostAggregator extends EventEmitter {
     const migrationStatements: Array<{ column: string; statement: string }> = [
       { column: 'notes', statement: 'ALTER TABLE aggregated_hosts ADD COLUMN notes TEXT' },
       { column: 'tags', statement: "ALTER TABLE aggregated_hosts ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'" },
+      {
+        column: 'open_ports',
+        statement: "ALTER TABLE aggregated_hosts ADD COLUMN open_ports TEXT NOT NULL DEFAULT '[]'",
+      },
+      {
+        column: 'ports_scanned_at',
+        statement: 'ALTER TABLE aggregated_hosts ADD COLUMN ports_scanned_at TIMESTAMP',
+      },
+      {
+        column: 'ports_expire_at',
+        statement: 'ALTER TABLE aggregated_hosts ADD COLUMN ports_expire_at TIMESTAMP',
+      },
     ];
 
     for (const migration of migrationStatements) {
@@ -150,6 +275,7 @@ export class HostAggregator extends EventEmitter {
     }
 
     await db.query("UPDATE aggregated_hosts SET tags = '[]' WHERE tags IS NULL");
+    await db.query("UPDATE aggregated_hosts SET open_ports = '[]' WHERE open_ports IS NULL");
   }
 
   private async getExistingHostColumns(): Promise<Set<string>> {
@@ -182,7 +308,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
     );
 
     const row = result.rows[0];
-    return row ? (this.normalizeHost(row as AggregatedHost & { tags?: unknown }) as AggregatedHostRow) : null;
+    return row ? (this.normalizeHost(row as AggregatedHostRowRaw) as AggregatedHostRow) : null;
   }
 
   private async findHostRowByNodeAndMac(
@@ -200,7 +326,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
     );
 
     const row = result.rows[0];
-    return row ? (this.normalizeHost(row as AggregatedHost & { tags?: unknown }) as AggregatedHostRow) : null;
+    return row ? (this.normalizeHost(row as AggregatedHostRowRaw) as AggregatedHostRow) : null;
   }
 
   private async deleteOtherHostsByNodeAndMac(
@@ -523,7 +649,7 @@ ${HOST_SELECT_COLUMNS}
         ORDER BY ah.fully_qualified_name
       `);
 
-      return result.rows.map((row) => this.normalizeHost(row as AggregatedHost & { tags?: unknown }));
+      return result.rows.map((row) => this.normalizeHost(row as AggregatedHostRowRaw));
     } catch (error) {
       logger.error('Failed to get all hosts', {
         error: error instanceof Error ? error.message : String(error),
@@ -547,7 +673,7 @@ ${HOST_SELECT_COLUMNS}
         [nodeId]
       );
 
-      return result.rows.map((row) => this.normalizeHost(row as AggregatedHost & { tags?: unknown }));
+      return result.rows.map((row) => this.normalizeHost(row as AggregatedHostRowRaw));
     } catch (error) {
       logger.error('Failed to get hosts by node', {
         nodeId,
@@ -572,9 +698,42 @@ ${HOST_SELECT_COLUMNS}
       );
 
       const row = result.rows[0];
-      return row ? this.normalizeHost(row as AggregatedHost & { tags?: unknown }) : null;
+      return row ? this.normalizeHost(row as AggregatedHostRowRaw) : null;
     } catch (error) {
       logger.error('Failed to get host by FQN', {
+        fullyQualifiedName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Persist a per-host port scan snapshot with a freshness TTL.
+   * Returns true when a host row was updated.
+   */
+  async saveHostPortScanSnapshot(
+    fullyQualifiedName: string,
+    scan: { scannedAt: string; openPorts: HostPort[] }
+  ): Promise<boolean> {
+    await this.ensureHostMetadataColumns();
+    const scannedAt = this.normalizeDateValue(scan.scannedAt) ?? new Date().toISOString();
+    const expiresAt = new Date(new Date(scannedAt).getTime() + PORT_SCAN_CACHE_TTL_MS).toISOString();
+    const openPorts = this.serializeOpenPorts(scan.openPorts);
+
+    try {
+      const result = await db.query(
+        `UPDATE aggregated_hosts
+         SET open_ports = $1,
+             ports_scanned_at = $2,
+             ports_expire_at = $3
+         WHERE fully_qualified_name = $4`,
+        [openPorts, scannedAt, expiresAt, fullyQualifiedName]
+      );
+
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      logger.error('Failed to persist host port scan snapshot', {
         fullyQualifiedName,
         error: error instanceof Error ? error.message : String(error),
       });

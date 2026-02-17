@@ -164,6 +164,7 @@ describe('Mobile API compatibility smoke checks', () => {
         location: 'Home',
         fullyQualifiedName: 'Office-Mac@Home',
       }),
+      saveHostPortScanSnapshot: jest.fn().mockResolvedValue(true),
     } as unknown as HostAggregator;
 
     const commandRouter = {

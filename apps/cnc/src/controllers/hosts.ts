@@ -136,6 +136,51 @@ export class HostsController {
     private commandRouter: CommandRouter,
   ) {}
 
+  private buildPortScanResponse(
+    target: string,
+    payload: { scannedAt: string; openPorts: Array<{ port: number; protocol: 'tcp'; service: string }> },
+    options?: {
+      commandId?: string;
+      nodeId?: string;
+      message?: string;
+      correlationId?: string;
+    }
+  ): PortScanEndpointResponse {
+    const message = options?.message ?? `Port scan completed; found ${payload.openPorts.length} open TCP port(s).`;
+    const response: PortScanEndpointResponse = {
+      target,
+      scannedAt: payload.scannedAt,
+      openPorts: payload.openPorts,
+      scan: {
+        ...(options?.commandId ? { commandId: options.commandId } : {}),
+        state: 'acknowledged',
+        ...(options?.nodeId ? { nodeId: options.nodeId } : {}),
+        message,
+      },
+      message,
+    };
+
+    if (options?.correlationId) {
+      response.correlationId = options.correlationId;
+    }
+
+    return response;
+  }
+
+  private async persistHostPortScanSnapshot(
+    fqn: string,
+    payload: { scannedAt: string; openPorts: Array<{ port: number; protocol: 'tcp'; service: string }> }
+  ): Promise<void> {
+    try {
+      const persisted = await this.hostAggregator.saveHostPortScanSnapshot(fqn, payload);
+      if (!persisted) {
+        logger.warn('Port scan snapshot not persisted because host row was not found', { fqn });
+      }
+    } catch (error) {
+      logger.warn('Failed to persist host port scan snapshot', { fqn, ...toLogError(error) });
+    }
+  }
+
   /**
    * @swagger
    * /api/hosts:
@@ -469,26 +514,50 @@ export class HostsController {
     try {
       const fqn = req.params.fqn as string;
       const correlationId = req.correlationId ?? null;
-      const result = await this.commandRouter.routeScanHostPortsCommand(fqn, { correlationId });
-
-      const response: PortScanEndpointResponse = {
-        target: fqn,
-        scannedAt: result.hostPortScan.scannedAt,
-        openPorts: result.hostPortScan.openPorts,
-        scan: {
-          commandId: result.commandId,
-          state: 'acknowledged',
-          nodeId: result.nodeId,
-          message: result.message ?? `Port scan completed; found ${result.hostPortScan.openPorts.length} open TCP port(s).`,
-        },
-        message: result.message ?? `Port scan completed; found ${result.hostPortScan.openPorts.length} open TCP port(s).`,
-      };
-      const responseCorrelationId = result.correlationId ?? correlationId ?? undefined;
-      if (responseCorrelationId) {
-        response.correlationId = responseCorrelationId;
+      const host = await this.hostAggregator.getHostByFQN(fqn);
+      if (!host) {
+        throw new Error(`Host not found: ${fqn}`);
       }
 
-      res.json(response);
+      if (Array.isArray(host.openPorts) && host.portsScannedAt) {
+        const response = this.buildPortScanResponse(
+          fqn,
+          {
+            scannedAt: host.portsScannedAt,
+            openPorts: host.openPorts,
+          },
+          {
+            nodeId: host.nodeId,
+            message: 'Returning cached port scan result.',
+            correlationId: correlationId ?? undefined,
+          }
+        );
+        res.json(response);
+        return;
+      }
+
+      const result = await this.commandRouter.routeScanHostPortsCommand(fqn, { correlationId });
+      await this.persistHostPortScanSnapshot(fqn, {
+        scannedAt: result.hostPortScan.scannedAt,
+        openPorts: result.hostPortScan.openPorts,
+      });
+
+      const responseCorrelationId = result.correlationId ?? correlationId ?? undefined;
+      res.json(
+        this.buildPortScanResponse(
+          fqn,
+          {
+            scannedAt: result.hostPortScan.scannedAt,
+            openPorts: result.hostPortScan.openPorts,
+          },
+          {
+            commandId: result.commandId,
+            nodeId: result.nodeId,
+            message: result.message,
+            correlationId: responseCorrelationId,
+          }
+        )
+      );
     } catch (error: unknown) {
       logger.error('Failed to get host ports', { fqn: req.params.fqn, ...toLogError(error) });
 
@@ -545,26 +614,26 @@ export class HostsController {
       const fqn = req.params.fqn as string;
       const correlationId = req.correlationId ?? null;
       const result = await this.commandRouter.routeScanHostPortsCommand(fqn, { correlationId });
-
-      const response: PortScanEndpointResponse = {
-        target: fqn,
+      await this.persistHostPortScanSnapshot(fqn, {
         scannedAt: result.hostPortScan.scannedAt,
         openPorts: result.hostPortScan.openPorts,
-        scan: {
-          commandId: result.commandId,
-          state: 'acknowledged',
-          nodeId: result.nodeId,
-          message: result.message ?? `Port scan completed; found ${result.hostPortScan.openPorts.length} open TCP port(s).`,
-        },
-        message: result.message ?? `Port scan completed; found ${result.hostPortScan.openPorts.length} open TCP port(s).`,
-      };
-
+      });
       const responseCorrelationId = result.correlationId ?? correlationId ?? undefined;
-      if (responseCorrelationId) {
-        response.correlationId = responseCorrelationId;
-      }
-
-      res.json(response);
+      res.json(
+        this.buildPortScanResponse(
+          fqn,
+          {
+            scannedAt: result.hostPortScan.scannedAt,
+            openPorts: result.hostPortScan.openPorts,
+          },
+          {
+            commandId: result.commandId,
+            nodeId: result.nodeId,
+            message: result.message,
+            correlationId: responseCorrelationId,
+          }
+        )
+      );
     } catch (error: unknown) {
       logger.error('Failed to scan host ports', { fqn: req.params.fqn, ...toLogError(error) });
 
