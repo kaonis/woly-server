@@ -125,6 +125,7 @@ export interface ServerConfig {
   port: number;
   nodeEnv: string;
   corsOrigins: string[];
+  trustProxy: boolean | number | string;
   dbType: string;
   databaseUrl: string;
   nodeAuthTokens: string[];

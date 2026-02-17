@@ -37,6 +37,7 @@ class Server {
 
   constructor() {
     this.app = express();
+    this.app.set('trust proxy', config.trustProxy);
     this.httpServer = createServer(this.app);
     this.hostAggregator = new HostAggregator();
     this.nodeManager = new NodeManager(this.hostAggregator);
@@ -202,6 +203,7 @@ class Server {
       this.httpServer.listen(config.port, () => {
         logger.info(`Server listening on port ${config.port}`);
         logger.info(`Environment: ${config.nodeEnv}`);
+        logger.info('Express trust proxy setting', { trustProxy: config.trustProxy });
         logger.info(`WebSocket endpoint: ws://localhost:${config.port}/ws/node`);
       });
 

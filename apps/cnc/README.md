@@ -223,6 +223,7 @@ Environment variables (`.env`):
 | `PORT` | HTTP server port | `8080` |
 | `NODE_ENV` | Environment | `development` |
 | `CORS_ORIGINS` | Comma-separated browser origins allowed in production (e.g. `https://woly.expo.app`) | `''` |
+| `TRUST_PROXY` | Express `trust proxy` setting. Use `1` behind one reverse proxy, or keep `false` when directly exposed | `false` |
 | `DB_TYPE` | Database type: `postgres` or `sqlite` | `postgres` |
 | `DATABASE_URL` | Database connection (PostgreSQL URL or SQLite path) | Required |
 | `NODE_AUTH_TOKENS` | Comma-separated auth tokens | Required |
