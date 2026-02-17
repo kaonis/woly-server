@@ -30,6 +30,7 @@ ws://localhost:8080/ws/node?token=<auth-token>
 ## 🔑 Environment Variables
 ```env
 PORT=8080
+TRUST_PROXY=false
 DATABASE_URL=postgresql://user:pass@host:5432/db
 NODE_AUTH_TOKENS=token1,token2,token3
 NODE_HEARTBEAT_INTERVAL=30000    # 30s

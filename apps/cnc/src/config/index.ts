@@ -49,6 +49,32 @@ function getEnvBoolean(key: string, defaultValue: boolean): boolean {
   return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
 }
 
+function getEnvTrustProxy(
+  key: string,
+  defaultValue: boolean | number | string,
+): boolean | number | string {
+  const value = process.env[key];
+  if (value === undefined || value.trim() === '') {
+    return defaultValue;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (/^\d+$/.test(normalized)) {
+    return Number.parseInt(normalized, 10);
+  }
+
+  if (['true', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+
+  if (['false', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+
+  // Keep string forms supported by Express (for example "loopback" or subnet lists).
+  return value.trim();
+}
+
 export const config: ServerConfig = {
   port: getEnvNumber('PORT', 8080),
   nodeEnv: getEnvVar('NODE_ENV', 'development'),
@@ -56,6 +82,7 @@ export const config: ServerConfig = {
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean),
+  trustProxy: getEnvTrustProxy('TRUST_PROXY', false),
   dbType: getEnvVar('DB_TYPE', 'postgres'),
   databaseUrl: getEnvVar('DATABASE_URL'),
   nodeAuthTokens: getEnvVar('NODE_AUTH_TOKENS', '')

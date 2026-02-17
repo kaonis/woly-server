@@ -57,9 +57,26 @@ describe('config parsing and validation', () => {
     expect(config.corsOrigins).toEqual(['https://a.example', 'https://b.example']);
     expect(config.wsRequireTls).toBe(true);
     expect(config.wsAllowQueryTokenAuth).toBe(false);
+    expect(config.trustProxy).toBe(false);
     expect(config.scheduleWorkerEnabled).toBe(false);
     expect(config.schedulePollIntervalMs).toBe(45000);
     expect(config.scheduleBatchSize).toBe(10);
+  });
+
+  it('parses TRUST_PROXY numeric hop count', async () => {
+    const config = await loadConfig({
+      TRUST_PROXY: '1',
+    });
+
+    expect(config.trustProxy).toBe(1);
+  });
+
+  it('parses TRUST_PROXY named subnet values', async () => {
+    const config = await loadConfig({
+      TRUST_PROXY: 'loopback, linklocal, uniquelocal',
+    });
+
+    expect(config.trustProxy).toBe('loopback, linklocal, uniquelocal');
   });
 
   it('throws when NODE_TIMEOUT is less than 2x NODE_HEARTBEAT_INTERVAL', async () => {
