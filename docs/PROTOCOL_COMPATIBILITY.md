@@ -8,21 +8,21 @@ The WoLy distributed system uses a shared protocol package (`@kaonis/woly-protoc
 
 **Package**: `@kaonis/woly-protocol`  
 **Purpose**: Shared TypeScript types and Zod runtime schemas for node ↔ C&C communication  
-**Current Package Version**: 1.1.1  
-**Current Protocol Version**: 1.1.1 (see `PROTOCOL_VERSION` constant)  
+**Current Package Version**: 1.2.0  
+**Current Protocol Version**: 1.2.0 (see `PROTOCOL_VERSION` constant)  
 **Location**: `packages/protocol/`
 
 ### Exports
 
-- **Types**: `Host`, `HostStatus`, `CommandState`, `NodeMessage`, `CncCommand`, CNC API DTOs (`CncCapabilitiesResponse`, `WakeSchedule`, `HostPortScanResponse`), etc.
-- **Schemas**: `outboundNodeMessageSchema`, `inboundCncCommandSchema`, CNC API schemas (`cncCapabilitiesResponseSchema`, `wakeScheduleSchema`, `hostPortScanResponseSchema`), etc.
+- **Types**: `Host`, `HostStatus`, `CommandState`, `NodeMessage`, `CncCommand`, CNC API DTOs (`CncCapabilitiesResponse`, `HostWakeSchedule`, `HostPortScanResponse`), etc.
+- **Schemas**: `outboundNodeMessageSchema`, `inboundCncCommandSchema`, CNC API schemas (`cncCapabilitiesResponseSchema`, `hostWakeScheduleSchema`, `hostPortScanResponseSchema`), etc.
 - **Constants**: `PROTOCOL_VERSION`, `SUPPORTED_PROTOCOL_VERSIONS`
 
 ### Consumer Migration Notes
 
 - `1.0.x`: Base node ↔ C&C message contracts.
 - `1.1.x`: CNC app/backend API DTOs for capabilities + schedules.
-- Next minor release from this branch: host port scan DTO exports + consumer typecheck fixture.
+- `1.2.x`: host port scan/ping payload enrichments and consumer typecheck fixture parity.
 
 ## Versioning Policy
 
@@ -47,13 +47,13 @@ Protocol package follows strict semantic versioning:
 From monorepo root:
 
 ```bash
-# Bug fix (1.1.0 → 1.1.1)
+# Bug fix (1.2.0 → 1.2.1)
 npm run protocol:version:patch
 
-# New feature (1.1.0 → 1.2.0)
+# New feature (1.2.0 → 1.3.0)
 npm run protocol:version:minor
 
-# Breaking change (1.1.0 → 2.0.0)
+# Breaking change (1.2.0 → 2.0.0)
 npm run protocol:version:major
 ```
 
@@ -63,7 +63,8 @@ npm run protocol:version:major
 
 | Protocol Version | Node Agent | C&C Backend | Status |
 |------------------|------------|-------------|--------|
-| 1.1.1 | ✅ 0.0.1+ | ✅ 1.0.0+ | Current |
+| 1.2.0 | ✅ 0.0.1+ | ✅ 1.0.0+ | Current |
+| 1.1.1 | ✅ 0.0.1+ | ✅ 1.0.0+ | Transitional support |
 | 1.0.0 | ✅ 0.0.1+ | ✅ 1.0.0+ | Transitional support |
 
 ### Runtime Version Negotiation
@@ -75,8 +76,8 @@ npm run protocol:version:major
 
 ```typescript
 // In protocol package
-export const PROTOCOL_VERSION = '1.1.1';
-export const SUPPORTED_PROTOCOL_VERSIONS = ['1.1.1', '1.0.0'];
+export const PROTOCOL_VERSION = '1.2.0';
+export const SUPPORTED_PROTOCOL_VERSIONS = ['1.2.0', '1.1.1', '1.0.0'];
 ```
 
 ## CI Enforcement

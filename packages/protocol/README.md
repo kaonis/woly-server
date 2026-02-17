@@ -11,9 +11,9 @@
 - `HostPayload` — **@deprecated** Alias for `Host`, kept for backwards compatibility
 - `CommandState` — Command lifecycle state: `'queued' | 'sent' | 'acknowledged' | 'failed' | 'timed_out'`
 - `ErrorResponse` — Standardized error response shape with `error`, `message`, optional `code` and `details`
-- `CncCapabilitiesResponse` / `CncFeatureCapabilities` — CNC mode feature negotiation response
+- `CncCapabilitiesResponse` / `CncCapabilityDescriptor` — CNC mode feature negotiation response
 - `HostPort` / `HostPortScanResponse` — CNC host port-scan API DTOs
-- `WakeSchedule`, `CreateWakeScheduleRequest`, `UpdateWakeScheduleRequest`, `ScheduleFrequency` — CNC schedules API DTOs
+- `HostWakeSchedule`, `CreateHostWakeScheduleRequest`, `UpdateHostWakeScheduleRequest`, `ScheduleFrequency` — CNC schedules API DTOs
 - `NodeMetadata` — Agent platform/version/network info
 - `NodeRegistration` — Registration payload sent by nodes
 - `NodeMessage` — Discriminated union of all node → C&C messages
@@ -27,16 +27,16 @@
 - `hostSchema` — Validates `Host` object
 - `commandStateSchema` — Validates `CommandState`
 - `errorResponseSchema` — Validates `ErrorResponse` object
-- `cncCapabilitiesResponseSchema` / `cncFeatureCapabilitiesSchema` — Validates CNC capabilities payload
+- `cncCapabilitiesResponseSchema` / `cncCapabilityDescriptorSchema` — Validates CNC capabilities payload
 - `hostPortSchema` / `hostPortScanResponseSchema` — Validates host port scan payloads
-- `wakeScheduleSchema` / `wakeScheduleListResponseSchema` / `createWakeScheduleRequestSchema` / `updateWakeScheduleRequestSchema` — Validates schedules payloads
+- `hostWakeScheduleSchema` / `hostSchedulesResponseSchema` / `createHostWakeScheduleRequestSchema` / `updateHostWakeScheduleRequestSchema` — Validates schedules payloads
 - `outboundNodeMessageSchema` — Validates `NodeMessage` at runtime
 - `inboundCncCommandSchema` — Validates `CncCommand` at runtime
 
 ### Constants
 
-- `PROTOCOL_VERSION` — Current protocol version (`'1.1.1'`)
-- `SUPPORTED_PROTOCOL_VERSIONS` — Array of supported versions (`['1.1.1', '1.0.0']`)
+- `PROTOCOL_VERSION` — Current protocol version (`'1.2.0'`)
+- `SUPPORTED_PROTOCOL_VERSIONS` — Array of supported versions (`['1.2.0', '1.1.1', '1.0.0']`)
 
 ## Usage
 
@@ -95,6 +95,7 @@ Output goes to `dist/`. Both `main` and `types` in package.json point there.
 
 - `1.0.x`: Base node ↔ C&C message contracts (`Host`, `NodeMessage`, `CncCommand`).
 - `1.1.x`: CNC app/backend API contracts (`CncCapabilitiesResponse`, schedules, host port scan DTOs/schemas) and wire protocol negotiation update.
+- `1.2.x`: Host metadata/scan enrichments (`openPorts`, `portsScannedAt`, `portsExpireAt`), ping/port-scan command/result payloads, and consumer typecheck fixture parity.
 
 ## Testing
 
@@ -122,9 +123,9 @@ From the **monorepo root**, use the provided npm scripts:
 
 ```bash
 # 1. Bump version (patch/minor/major)
-npm run protocol:version:patch   # For bug fixes (1.1.0 → 1.1.1)
-npm run protocol:version:minor   # For new features (1.1.0 → 1.2.0)
-npm run protocol:version:major   # For breaking changes (1.1.0 → 2.0.0)
+npm run protocol:version:patch   # For bug fixes (1.2.0 → 1.2.1)
+npm run protocol:version:minor   # For new features (1.2.0 → 1.3.0)
+npm run protocol:version:major   # For breaking changes (1.2.0 → 2.0.0)
 
 # 2. Publish to npm (builds automatically)
 npm run protocol:publish         # Publish with 'latest' tag
