@@ -12,12 +12,14 @@ import * as networkDiscovery from './networkDiscovery';
 
 type WakeCommand = Extract<CncCommand, { type: 'wake' }>;
 type ScanCommand = Extract<CncCommand, { type: 'scan' }>;
+type ScanHostPortsCommand = Extract<CncCommand, { type: 'scan-host-ports' }>;
 type UpdateHostCommand = Extract<CncCommand, { type: 'update-host' }>;
 type DeleteHostCommand = Extract<CncCommand, { type: 'delete-host' }>;
 type PingHostCommand = Extract<CncCommand, { type: 'ping-host' }>;
 type DispatchableCommand =
   | WakeCommand
   | ScanCommand
+  | ScanHostPortsCommand
   | UpdateHostCommand
   | DeleteHostCommand
   | PingHostCommand;
@@ -28,7 +30,7 @@ type HostEventMessage = Extract<
 type CommandResultMessage = Extract<NodeMessage, { type: 'command-result' }>;
 type CommandResultPayload = Pick<
   CommandResultMessage['data'],
-  'success' | 'message' | 'error' | 'hostPing'
+  'success' | 'message' | 'error' | 'hostPing' | 'hostPortScan'
 >;
 
 type ValidatedUpdateHostData = {
@@ -71,6 +73,12 @@ const COMMAND_EXECUTION_POLICIES: Record<DispatchableCommand['type'], CommandExe
   },
   scan: {
     timeoutMs: 90_000,
+    maxAttempts: 1,
+    retryDelayMs: 0,
+    retryOnFailure: false,
+  },
+  'scan-host-ports': {
+    timeoutMs: 30_000,
     maxAttempts: 1,
     retryDelayMs: 0,
     retryOnFailure: false,
@@ -256,6 +264,10 @@ export class AgentService extends EventEmitter {
 
     cncClient.on('command:scan', async (command: ScanCommand) => {
       await this.handleScanCommand(command);
+    });
+
+    cncClient.on('command:scan-host-ports', async (command: ScanHostPortsCommand) => {
+      await this.handleScanHostPortsCommand(command);
     });
 
     cncClient.on('command:update-host', async (command: UpdateHostCommand) => {
@@ -941,6 +953,64 @@ export class AgentService extends EventEmitter {
       return {
         success: true,
         message: 'Background scan scheduled',
+      };
+    });
+  }
+
+  /**
+   * Handle scan-host-ports command from C&C
+   */
+  private async handleScanHostPortsCommand(command: ScanHostPortsCommand): Promise<void> {
+    const { commandId, data } = command;
+    const { hostName, mac, ip } = data;
+
+    logger.info('Received scan-host-ports command from C&C', {
+      commandId,
+      hostName,
+      ip,
+    });
+
+    await this.executeCommandWithReliability(command, async () => {
+      if (!this.hostDb) {
+        throw new NonRetryableCommandError('Host database not initialized');
+      }
+
+      let host = await this.hostDb.getHost(hostName);
+      if (!host) {
+        host = await this.hostDb.getHostByMAC(mac);
+      }
+
+      const targetHostName = host?.name ?? hostName;
+      const targetMac = host?.mac ?? mac;
+      const targetIp = host?.ip ?? ip;
+
+      if (typeof targetIp !== 'string' || isIP(targetIp) === 0) {
+        throw new NonRetryableCommandError(`Host ${targetHostName} does not have a valid IP address`);
+      }
+
+      const openPorts = await networkDiscovery.scanHostOpenPorts(targetIp, {
+        ports: data.ports,
+        timeoutMs: data.timeoutMs,
+      });
+      const scannedAt = new Date().toISOString();
+
+      logger.info('Host port scan command completed', {
+        commandId,
+        hostName: targetHostName,
+        ip: targetIp,
+        openPortCount: openPorts.length,
+      });
+
+      return {
+        success: true,
+        message: `Port scan completed, found ${openPorts.length} open TCP port(s)`,
+        hostPortScan: {
+          hostName: targetHostName,
+          mac: targetMac,
+          ip: targetIp,
+          scannedAt,
+          openPorts,
+        },
       };
     });
   }

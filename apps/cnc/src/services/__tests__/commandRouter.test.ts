@@ -212,7 +212,13 @@ describe('CommandRouter', () => {
             }>;
             timeout: NodeJS.Timeout;
             correlationId: string | null;
-            commandType: 'wake' | 'scan' | 'update-host' | 'delete-host';
+            commandType:
+              | 'wake'
+              | 'scan'
+              | 'scan-host-ports'
+              | 'update-host'
+              | 'delete-host'
+              | 'ping-host';
           }
         >;
         handleCommandResult: (result: {

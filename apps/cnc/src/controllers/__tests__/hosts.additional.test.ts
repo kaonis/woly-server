@@ -45,7 +45,7 @@ describe('HostsController additional branches', () => {
   let commandRouter: {
     routeWakeCommand: jest.Mock;
     routePingHostCommand: jest.Mock;
-    routeScanCommand: jest.Mock;
+    routeScanHostPortsCommand: jest.Mock;
     routeUpdateHostCommand: jest.Mock;
     routeDeleteHostCommand: jest.Mock;
   };
@@ -62,7 +62,7 @@ describe('HostsController additional branches', () => {
     commandRouter = {
       routeWakeCommand: jest.fn(),
       routePingHostCommand: jest.fn(),
-      routeScanCommand: jest.fn(),
+      routeScanHostPortsCommand: jest.fn(),
       routeUpdateHostCommand: jest.fn(),
       routeDeleteHostCommand: jest.fn(),
     };
@@ -482,13 +482,20 @@ describe('HostsController additional branches', () => {
 
   describe('scanHostPorts', () => {
     it('returns scan payload and prefers router correlation id', async () => {
-      hostAggregator.getHostByFQN.mockResolvedValue({
-        name: 'desktop',
-        nodeId: 'node-1',
-      });
-      commandRouter.routeScanCommand.mockResolvedValue({
-        success: true,
+      commandRouter.routeScanHostPortsCommand.mockResolvedValue({
         commandId: 'scan-command-1',
+        nodeId: 'node-1',
+        message: 'Port scan completed, found 2 open TCP port(s)',
+        hostPortScan: {
+          hostName: 'desktop',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.25',
+          scannedAt: '2026-02-16T00:00:00.000Z',
+          openPorts: [
+            { port: 22, protocol: 'tcp', service: 'SSH' },
+            { port: 443, protocol: 'tcp', service: 'HTTPS' },
+          ],
+        },
         correlationId: 'cid-router',
       });
 
@@ -500,46 +507,50 @@ describe('HostsController additional branches', () => {
 
       await controller.scanHostPorts(req, res);
 
-      expect(commandRouter.routeScanCommand).toHaveBeenCalledWith('node-1', true, {
+      expect(commandRouter.routeScanHostPortsCommand).toHaveBeenCalledWith('desktop@lab', {
         correlationId: 'cid-request',
       });
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           target: 'desktop@lab',
-          openPorts: [],
+          openPorts: [
+            { port: 22, protocol: 'tcp', service: 'SSH' },
+            { port: 443, protocol: 'tcp', service: 'HTTPS' },
+          ],
+          scannedAt: '2026-02-16T00:00:00.000Z',
           scan: expect.objectContaining({
             commandId: 'scan-command-1',
             state: 'acknowledged',
             nodeId: 'node-1',
           }),
-          message: 'Scan command executed successfully',
+          message: 'Port scan completed, found 2 open TCP port(s)',
           correlationId: 'cid-router',
         })
       );
     });
 
     it('returns 404 when scan target host is not found', async () => {
-      hostAggregator.getHostByFQN.mockResolvedValue(null);
+      commandRouter.routeScanHostPortsCommand.mockRejectedValue(
+        new Error('Host not found: missing@lab')
+      );
 
       const req = createMockRequest({ params: { fqn: 'missing@lab' } });
       const res = createMockResponse();
 
       await controller.scanHostPorts(req, res);
 
-      expect(commandRouter.routeScanCommand).not.toHaveBeenCalled();
+      expect(commandRouter.routeScanHostPortsCommand).toHaveBeenCalledWith('missing@lab', {
+        correlationId: null,
+      });
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith({
         error: 'Not Found',
-        message: 'Host missing@lab not found',
+        message: 'Host not found: missing@lab',
       });
     });
 
     it('maps already-in-progress scan errors to 409 and includes correlation id', async () => {
-      hostAggregator.getHostByFQN.mockResolvedValue({
-        name: 'desktop',
-        nodeId: 'node-1',
-      });
-      commandRouter.routeScanCommand.mockRejectedValue(new Error('Scan already in progress'));
+      commandRouter.routeScanHostPortsCommand.mockRejectedValue(new Error('Scan already in progress'));
 
       const req = createMockRequest({
         params: { fqn: 'desktop@lab' },

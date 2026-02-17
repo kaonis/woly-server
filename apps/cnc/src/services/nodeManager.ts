@@ -269,6 +269,10 @@ export class NodeManager extends EventEmitter {
         ws.close(4406, 'Unsupported protocol version');
         return;
       }
+      const negotiatedProtocolVersion =
+        protocolVersion && SUPPORTED_PROTOCOL_VERSIONS.includes(protocolVersion)
+          ? protocolVersion
+          : PROTOCOL_VERSION;
 
       // Register node in database
       const node = await NodeModel.register(registration);
@@ -295,7 +299,7 @@ export class NodeManager extends EventEmitter {
         data: {
           nodeId: node.id,
           heartbeatInterval: config.nodeHeartbeatInterval,
-          protocolVersion: PROTOCOL_VERSION,
+          protocolVersion: negotiatedProtocolVersion,
           // Newer node agents can use this to reconnect with a short-lived token.
           // Older agents will ignore it.
           sessionToken: minted.token,

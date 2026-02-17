@@ -9,7 +9,7 @@ The WoLy distributed system uses a shared protocol package (`@kaonis/woly-protoc
 **Package**: `@kaonis/woly-protocol`  
 **Purpose**: Shared TypeScript types and Zod runtime schemas for node ↔ C&C communication  
 **Current Package Version**: 1.1.1  
-**Current Protocol Version**: 1.0.0 (see `PROTOCOL_VERSION` constant)  
+**Current Protocol Version**: 1.1.1 (see `PROTOCOL_VERSION` constant)  
 **Location**: `packages/protocol/`
 
 ### Exports
@@ -63,19 +63,20 @@ npm run protocol:version:major
 
 | Protocol Version | Node Agent | C&C Backend | Status |
 |------------------|------------|-------------|--------|
-| 1.0.0 | ✅ 0.0.1+ | ✅ 1.0.0+ | Supported |
+| 1.1.1 | ✅ 0.0.1+ | ✅ 1.0.0+ | Current |
+| 1.0.0 | ✅ 0.0.1+ | ✅ 1.0.0+ | Transitional support |
 
 ### Runtime Version Negotiation
 
 1. Node sends `register` message with `metadata.protocolVersion`
 2. C&C validates version against `SUPPORTED_PROTOCOL_VERSIONS`
-3. C&C responds with `registered` command including its `protocolVersion`
+3. C&C responds with `registered` command including the negotiated `protocolVersion`
 4. If versions incompatible, C&C sends `error` command and disconnects
 
 ```typescript
 // In protocol package
-export const PROTOCOL_VERSION = '1.0.0';
-export const SUPPORTED_PROTOCOL_VERSIONS = ['1.0.0'];
+export const PROTOCOL_VERSION = '1.1.1';
+export const SUPPORTED_PROTOCOL_VERSIONS = ['1.1.1', '1.0.0'];
 ```
 
 ## CI Enforcement

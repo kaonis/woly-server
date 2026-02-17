@@ -46,6 +46,7 @@ jest.mock('wake_on_lan', () => ({
 
 jest.mock('../networkDiscovery', () => ({
   isHostAlive: jest.fn(),
+  scanHostOpenPorts: jest.fn(),
 }));
 
 describe('AgentService command handlers', () => {
@@ -110,6 +111,7 @@ describe('AgentService command handlers', () => {
       (_mac: string, callback: (error: Error | null) => void) => callback(null)
     );
     ((networkDiscovery.isHostAlive as unknown) as jest.Mock).mockResolvedValue(true);
+    ((networkDiscovery.scanHostOpenPorts as unknown) as jest.Mock).mockResolvedValue([]);
   });
 
   it('starts and stops agent service lifecycle', async () => {
@@ -856,6 +858,51 @@ describe('AgentService command handlers', () => {
             ip: sampleHost.ip,
             reachable: true,
             status: 'awake',
+          }),
+        }),
+      })
+    );
+  });
+
+  it('handles scan-host-ports command by probing TCP ports from node-agent', async () => {
+    hostDbMock.getHost.mockResolvedValueOnce(sampleHost);
+    ((networkDiscovery.scanHostOpenPorts as unknown) as jest.Mock).mockResolvedValueOnce([
+      { port: 22, protocol: 'tcp', service: 'SSH' },
+      { port: 443, protocol: 'tcp', service: 'HTTPS' },
+    ]);
+
+    await ((service as unknown) as {
+      handleScanHostPortsCommand: (command: unknown) => Promise<void>;
+    }).handleScanHostPortsCommand({
+      type: 'scan-host-ports',
+      commandId: 'cmd-scan-ports',
+      data: {
+        hostName: sampleHost.name,
+        mac: sampleHost.mac,
+        ip: sampleHost.ip,
+        ports: [22, 443],
+        timeoutMs: 250,
+      },
+    });
+
+    expect(networkDiscovery.scanHostOpenPorts).toHaveBeenCalledWith(sampleHost.ip, {
+      ports: [22, 443],
+      timeoutMs: 250,
+    });
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-scan-ports',
+          success: true,
+          hostPortScan: expect.objectContaining({
+            hostName: sampleHost.name,
+            mac: sampleHost.mac,
+            ip: sampleHost.ip,
+            openPorts: [
+              { port: 22, protocol: 'tcp', service: 'SSH' },
+              { port: 443, protocol: 'tcp', service: 'HTTPS' },
+            ],
           }),
         }),
       })

@@ -291,6 +291,39 @@ describe('Cross-repo protocol contract', () => {
           expect(roundTrip.data.data.error).toBe('Host not found');
         }
       });
+
+      it('successfully encodes host port scan command results', () => {
+        const message = {
+          type: 'command-result' as const,
+          data: {
+            nodeId: 'node-1',
+            commandId: 'cmd-port-scan-123',
+            success: true,
+            hostPortScan: {
+              hostName: 'desktop-gaming',
+              mac: 'AA:BB:CC:DD:EE:FF',
+              ip: '192.168.1.100',
+              scannedAt: new Date().toISOString(),
+              openPorts: [
+                { port: 22, protocol: 'tcp' as const, service: 'SSH' },
+                { port: 443, protocol: 'tcp' as const, service: 'HTTPS' },
+              ],
+            },
+            timestamp: new Date().toISOString(),
+          },
+        };
+
+        const result = outboundNodeMessageSchema.safeParse(message);
+        expect(result.success).toBe(true);
+
+        const roundTrip = outboundNodeMessageSchema.safeParse(
+          JSON.parse(JSON.stringify(message)),
+        );
+        expect(roundTrip.success).toBe(true);
+        if (roundTrip.success && roundTrip.data.type === 'command-result') {
+          expect(roundTrip.data.data.hostPortScan?.openPorts).toHaveLength(2);
+        }
+      });
     });
   });
 
@@ -400,6 +433,30 @@ describe('Cross-repo protocol contract', () => {
 
         const result = inboundCncCommandSchema.safeParse(command);
         expect(result.success).toBe(true);
+      });
+    });
+
+    describe('scan-host-ports command', () => {
+      it('successfully encodes per-host port scan commands', () => {
+        const command = {
+          type: 'scan-host-ports' as const,
+          commandId: 'cmd-port-scan-001',
+          data: {
+            hostName: 'desktop-gaming',
+            mac: 'AA:BB:CC:DD:EE:FF',
+            ip: '192.168.1.100',
+            ports: [22, 80, 443],
+            timeoutMs: 300,
+          },
+        };
+
+        const result = inboundCncCommandSchema.safeParse(command);
+        expect(result.success).toBe(true);
+
+        const roundTrip = inboundCncCommandSchema.safeParse(
+          JSON.parse(JSON.stringify(command)),
+        );
+        expect(roundTrip.success).toBe(true);
       });
     });
 
@@ -555,8 +612,6 @@ describe('Cross-repo protocol contract', () => {
         notifyOnWake: true,
         createdAt: '2026-02-15T08:00:00.000Z',
         updatedAt: '2026-02-15T08:00:00.000Z',
-        lastTriggered: null,
-        nextTrigger: null,
       };
 
       expect(hostWakeScheduleSchema.safeParse(schedule).success).toBe(true);

@@ -440,11 +440,10 @@ export class HostsController {
    * @swagger
    * /api/hosts/ports/{fqn}:
    *   get:
-   *     summary: Get cached/synthetic host port-scan payload
+   *     summary: Get latest host port-scan payload
    *     description: |
-   *       Returns a mobile-compatible port-scan payload shape for CNC mode.
-   *       The current protocol does not include per-host open-port telemetry, so
-   *       `openPorts` is returned as an empty list.
+   *       Returns a mobile-compatible host port-scan payload shape for CNC mode.
+   *       If a fresh scan is not available, a node-side probe is executed.
    *     tags: [Hosts]
    *     security:
    *       - bearerAuth: []
@@ -469,30 +468,40 @@ export class HostsController {
   async getHostPorts(req: Request, res: Response): Promise<void> {
     try {
       const fqn = req.params.fqn as string;
-      const host = await this.hostAggregator.getHostByFQN(fqn);
-
-      if (!host) {
-        res.status(404).json({
-          error: 'Not Found',
-          message: `Host ${fqn} not found`,
-        });
-        return;
-      }
+      const correlationId = req.correlationId ?? null;
+      const result = await this.commandRouter.routeScanHostPortsCommand(fqn, { correlationId });
 
       const response: PortScanEndpointResponse = {
         target: fqn,
-        scannedAt: new Date().toISOString(),
-        openPorts: [],
-        message: 'Per-host open-port telemetry is not yet available in CNC protocol.',
+        scannedAt: result.hostPortScan.scannedAt,
+        openPorts: result.hostPortScan.openPorts,
+        scan: {
+          commandId: result.commandId,
+          state: 'acknowledged',
+          nodeId: result.nodeId,
+          message: result.message ?? `Port scan completed; found ${result.hostPortScan.openPorts.length} open TCP port(s).`,
+        },
+        message: result.message ?? `Port scan completed; found ${result.hostPortScan.openPorts.length} open TCP port(s).`,
       };
+      const responseCorrelationId = result.correlationId ?? correlationId ?? undefined;
+      if (responseCorrelationId) {
+        response.correlationId = responseCorrelationId;
+      }
 
       res.json(response);
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error('Failed to get host ports', { fqn: req.params.fqn, ...toLogError(error) });
-      res.status(500).json({
-        error: 'Internal Server Error',
-        message: 'Failed to retrieve host port data',
-      });
+
+      const mapped = mapCommandError(error, 'Failed to retrieve host port data');
+      const errorBody: { error: string; message: string; correlationId?: string } = {
+        error: mapped.errorTitle,
+        message: mapped.message,
+      };
+      if (req.correlationId) {
+        errorBody.correlationId = req.correlationId;
+      }
+
+      res.status(mapped.statusCode).json(errorBody);
     }
   }
 
@@ -502,10 +511,8 @@ export class HostsController {
    *   get:
    *     summary: Trigger host-side scan operation and return compatible port payload
    *     description: |
-   *       Dispatches a node scan command for the host's managing node and returns
-   *       a mobile-compatible port payload shape.
-   *       The current protocol does not provide per-host open-port telemetry, so
-   *       `openPorts` remains an empty list.
+   *       Dispatches a node-side TCP scan for the host's managing node and returns
+   *       a mobile-compatible port payload shape including discovered open TCP ports.
    *     tags: [Hosts]
    *     security:
    *       - bearerAuth: []
@@ -537,52 +544,24 @@ export class HostsController {
     try {
       const fqn = req.params.fqn as string;
       const correlationId = req.correlationId ?? null;
-      const host = await this.hostAggregator.getHostByFQN(fqn);
-
-      if (!host) {
-        res.status(404).json({
-          error: 'Not Found',
-          message: `Host ${fqn} not found`,
-        });
-        return;
-      }
-
-      const routeOptions: { correlationId?: string } = {};
-      if (correlationId) {
-        routeOptions.correlationId = correlationId;
-      }
-
-      const result = await this.commandRouter.routeScanCommand(host.nodeId, true, routeOptions);
+      const result = await this.commandRouter.routeScanHostPortsCommand(fqn, { correlationId });
 
       const response: PortScanEndpointResponse = {
         target: fqn,
-        scannedAt: new Date().toISOString(),
-        openPorts: [],
+        scannedAt: result.hostPortScan.scannedAt,
+        openPorts: result.hostPortScan.openPorts,
         scan: {
           commandId: result.commandId,
-          state: result.success ? 'acknowledged' : 'failed',
-          nodeId: host.nodeId,
-          message: result.success
-            ? 'Node network scan completed; per-host open-port telemetry is not yet available.'
-            : result.error ?? 'Node scan failed',
+          state: 'acknowledged',
+          nodeId: result.nodeId,
+          message: result.message ?? `Port scan completed; found ${result.hostPortScan.openPorts.length} open TCP port(s).`,
         },
-        message: result.success
-          ? 'Scan command executed successfully'
-          : result.error ?? 'Scan command failed',
+        message: result.message ?? `Port scan completed; found ${result.hostPortScan.openPorts.length} open TCP port(s).`,
       };
 
       const responseCorrelationId = result.correlationId ?? correlationId ?? undefined;
       if (responseCorrelationId) {
         response.correlationId = responseCorrelationId;
-      }
-
-      if (!result.success) {
-        res.status(500).json({
-          error: 'Internal Server Error',
-          message: result.error || 'Failed to execute scan command',
-          ...(response.correlationId ? { correlationId: response.correlationId } : {}),
-        });
-        return;
       }
 
       res.json(response);

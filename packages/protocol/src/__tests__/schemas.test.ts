@@ -628,6 +628,29 @@ describe('outboundNodeMessageSchema', () => {
       expect(outboundNodeMessageSchema.safeParse(msg).success).toBe(true);
     });
 
+    it('accepts command result with host port scan payload', () => {
+      const msg = {
+        type: 'command-result' as const,
+        data: {
+          nodeId: 'node-1',
+          commandId: 'cmd-port-scan-1',
+          success: true,
+          hostPortScan: {
+            hostName: 'office-pc',
+            mac: 'AA:BB:CC:DD:EE:FF',
+            ip: '192.168.1.20',
+            scannedAt: new Date().toISOString(),
+            openPorts: [
+              { port: 22, protocol: 'tcp' as const, service: 'SSH' },
+              { port: 443, protocol: 'tcp' as const, service: 'HTTPS' },
+            ],
+          },
+          timestamp: new Date().toISOString(),
+        },
+      };
+      expect(outboundNodeMessageSchema.safeParse(msg).success).toBe(true);
+    });
+
     it('rejects command result without commandId', () => {
       const msg = {
         type: 'command-result' as const,
@@ -731,6 +754,37 @@ describe('inboundCncCommandSchema', () => {
         data: { immediate: false },
       };
       expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
+    });
+  });
+
+  describe('scan-host-ports', () => {
+    it('accepts valid scan-host-ports command', () => {
+      const cmd = {
+        type: 'scan-host-ports' as const,
+        commandId: 'cmd-port-scan-1',
+        data: {
+          hostName: 'office-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.20',
+          ports: [22, 80, 443],
+          timeoutMs: 300,
+        },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
+    });
+
+    it('rejects scan-host-ports command with out-of-range port', () => {
+      const cmd = {
+        type: 'scan-host-ports' as const,
+        commandId: 'cmd-port-scan-2',
+        data: {
+          hostName: 'office-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.20',
+          ports: [0, 22],
+        },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(false);
     });
   });
 

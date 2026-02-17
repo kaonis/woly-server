@@ -3,6 +3,7 @@ import ping from 'ping';
 import { execFile } from 'child_process';
 import { promises as dns } from 'dns';
 import os from 'os';
+import net from 'node:net';
 
 // Mock all external dependencies
 jest.mock('ping');
@@ -358,6 +359,63 @@ describe('networkDiscovery', () => {
       const isAlive = await networkDiscovery.isHostAlive('192.168.1.100');
 
       expect(isAlive).toBe(false);
+    });
+  });
+
+  describe('scanHostOpenPorts', () => {
+    it('returns open TCP ports and omits closed ports', async () => {
+      const server = net.createServer();
+      const probeServer = net.createServer();
+      let openPort = 0;
+      let closedPort = 0;
+
+      try {
+        await new Promise<void>((resolve) => {
+          server.listen(0, '127.0.0.1', () => resolve());
+        });
+        const openAddress = server.address();
+        if (!openAddress || typeof openAddress === 'string') {
+          throw new Error('Failed to resolve open server address');
+        }
+        openPort = openAddress.port;
+
+        await new Promise<void>((resolve) => {
+          probeServer.listen(0, '127.0.0.1', () => resolve());
+        });
+        const closedAddress = probeServer.address();
+        if (!closedAddress || typeof closedAddress === 'string') {
+          throw new Error('Failed to resolve closed server address');
+        }
+        closedPort = closedAddress.port;
+      } finally {
+        if (probeServer.listening) {
+          await new Promise<void>((resolve) => {
+            probeServer.close(() => resolve());
+          });
+        }
+      }
+
+      try {
+        const openPorts = await networkDiscovery.scanHostOpenPorts('127.0.0.1', {
+          ports: [openPort, closedPort],
+          timeoutMs: 100,
+          concurrency: 2,
+        });
+
+        expect(openPorts).toEqual([
+          {
+            port: openPort,
+            protocol: 'tcp',
+            service: 'Unknown',
+          },
+        ]);
+      } finally {
+        if (server.listening) {
+          await new Promise<void>((resolve) => {
+            server.close(() => resolve());
+          });
+        }
+      }
     });
   });
 });

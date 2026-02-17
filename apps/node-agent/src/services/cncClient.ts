@@ -259,6 +259,9 @@ export class CncClient extends EventEmitter {
         case 'scan':
           this.emit('command:scan', message);
           break;
+        case 'scan-host-ports':
+          this.emit('command:scan-host-ports', message);
+          break;
         case 'update-host':
           this.emit('command:update-host', message);
           break;

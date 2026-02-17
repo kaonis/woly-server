@@ -1,7 +1,9 @@
 import { promises as dns } from 'dns';
 import { execFile } from 'child_process';
 import os from 'os';
+import net from 'node:net';
 import ping from 'ping';
+import type { HostPort } from '@kaonis/woly-protocol';
 import { config } from '../config';
 import { logger } from '../utils/logger';
 import { DiscoveredHost } from '../types';
@@ -52,6 +54,80 @@ interface ArpDevice {
   ip: string;
   mac: string;
 }
+
+const DEFAULT_PORT_SCAN_TIMEOUT_MS = 300;
+const DEFAULT_PORT_SCAN_CONCURRENCY = 64;
+const DEFAULT_COMMON_TCP_PORTS = [
+  20, 21, 22, 23, 25, 53, 67, 68, 69, 80, 110, 123, 135, 137, 138, 139, 143, 161, 162, 179,
+  389, 443, 445, 465, 500, 514, 515, 587, 631, 636, 993, 995, 1080, 1433, 1521, 1723, 1883,
+  2049, 2375, 2376, 3000, 3306, 3389, 5000, 5432, 5672, 5900, 5985, 5986, 6379, 7001, 8000,
+  8080, 8081, 8088, 8443, 9000, 9090, 9200, 9300, 11211, 27017,
+] as const;
+
+const KNOWN_TCP_SERVICES: Record<number, string> = {
+  20: 'FTP-Data',
+  21: 'FTP',
+  22: 'SSH',
+  23: 'Telnet',
+  25: 'SMTP',
+  53: 'DNS',
+  67: 'DHCP',
+  68: 'DHCP',
+  69: 'TFTP',
+  80: 'HTTP',
+  110: 'POP3',
+  123: 'NTP',
+  135: 'RPC',
+  137: 'NetBIOS-NS',
+  138: 'NetBIOS-DGM',
+  139: 'NetBIOS-SSN',
+  143: 'IMAP',
+  161: 'SNMP',
+  162: 'SNMPTRAP',
+  179: 'BGP',
+  389: 'LDAP',
+  443: 'HTTPS',
+  445: 'SMB',
+  465: 'SMTPS',
+  500: 'ISAKMP',
+  514: 'Syslog',
+  515: 'LPD',
+  587: 'SMTP-Submission',
+  631: 'IPP',
+  636: 'LDAPS',
+  993: 'IMAPS',
+  995: 'POP3S',
+  1080: 'SOCKS',
+  1433: 'MSSQL',
+  1521: 'Oracle',
+  1723: 'PPTP',
+  1883: 'MQTT',
+  2049: 'NFS',
+  2375: 'Docker',
+  2376: 'Docker-TLS',
+  3000: 'Node.js',
+  3306: 'MySQL',
+  3389: 'RDP',
+  5000: 'HTTP-Alt',
+  5432: 'PostgreSQL',
+  5672: 'AMQP',
+  5900: 'VNC',
+  5985: 'WinRM',
+  5986: 'WinRM-HTTPS',
+  6379: 'Redis',
+  7001: 'WebLogic',
+  8000: 'HTTP-Alt',
+  8080: 'HTTP-Proxy',
+  8081: 'HTTP-Alt',
+  8088: 'HTTP-Alt',
+  8443: 'HTTPS-Alt',
+  9000: 'HTTP-Alt',
+  9090: 'HTTP-Alt',
+  9200: 'Elasticsearch',
+  9300: 'Elasticsearch-Transport',
+  11211: 'Memcached',
+  27017: 'MongoDB',
+};
 
 /**
  * Prime the ARP cache by pinging the subnet broadcast address.
@@ -341,8 +417,100 @@ async function isHostAlive(ip: string): Promise<boolean> {
   }
 }
 
+function normalizeScanPorts(ports?: number[] | null): number[] {
+  if (!Array.isArray(ports) || ports.length === 0) {
+    return [...DEFAULT_COMMON_TCP_PORTS];
+  }
+
+  const unique = new Set<number>();
+  for (const candidate of ports) {
+    if (!Number.isInteger(candidate)) {
+      continue;
+    }
+    if (candidate < 1 || candidate > 65535) {
+      continue;
+    }
+    unique.add(candidate);
+    if (unique.size >= 1024) {
+      break;
+    }
+  }
+
+  if (unique.size === 0) {
+    return [...DEFAULT_COMMON_TCP_PORTS];
+  }
+
+  return Array.from(unique).sort((a, b) => a - b);
+}
+
+function resolveServiceName(port: number): string {
+  return KNOWN_TCP_SERVICES[port] ?? 'Unknown';
+}
+
+async function probeTcpPort(ip: string, port: number, timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+
+    const finalize = (open: boolean) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve(open);
+    };
+
+    socket.once('connect', () => finalize(true));
+    socket.once('timeout', () => finalize(false));
+    socket.once('error', () => finalize(false));
+
+    socket.setTimeout(timeoutMs);
+    socket.connect(port, ip);
+  });
+}
+
+async function scanHostOpenPorts(
+  ip: string,
+  options?: { ports?: number[]; timeoutMs?: number; concurrency?: number }
+): Promise<HostPort[]> {
+  const portsToScan = normalizeScanPorts(options?.ports);
+  const timeoutMs = Number.isFinite(options?.timeoutMs ?? NaN)
+    ? Math.min(Math.max(Math.trunc(options?.timeoutMs ?? DEFAULT_PORT_SCAN_TIMEOUT_MS), 50), 5000)
+    : DEFAULT_PORT_SCAN_TIMEOUT_MS;
+  const concurrency = Number.isFinite(options?.concurrency ?? NaN)
+    ? Math.min(Math.max(Math.trunc(options?.concurrency ?? DEFAULT_PORT_SCAN_CONCURRENCY), 1), 512)
+    : DEFAULT_PORT_SCAN_CONCURRENCY;
+
+  const openPorts: HostPort[] = [];
+  for (let index = 0; index < portsToScan.length; index += concurrency) {
+    const batch = portsToScan.slice(index, index + concurrency);
+    const batchResults = await Promise.all(
+      batch.map(async (port) => ({
+        port,
+        open: await probeTcpPort(ip, port, timeoutMs),
+      }))
+    );
+
+    for (const result of batchResults) {
+      if (!result.open) {
+        continue;
+      }
+      openPorts.push({
+        port: result.port,
+        protocol: 'tcp',
+        service: resolveServiceName(result.port),
+      });
+    }
+  }
+
+  return openPorts.sort((a, b) => a.port - b.port);
+}
+
 export {
   scanNetworkARP,
+  scanHostOpenPorts,
   getMACAddress,
   formatMAC,
   reverseDNSLookup,

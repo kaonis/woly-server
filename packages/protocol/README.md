@@ -35,8 +35,8 @@
 
 ### Constants
 
-- `PROTOCOL_VERSION` — Current protocol version (`'1.0.0'`)
-- `SUPPORTED_PROTOCOL_VERSIONS` — Array of supported versions
+- `PROTOCOL_VERSION` — Current protocol version (`'1.1.1'`)
+- `SUPPORTED_PROTOCOL_VERSIONS` — Array of supported versions (`['1.1.1', '1.0.0']`)
 
 ## Usage
 
@@ -94,8 +94,7 @@ Output goes to `dist/`. Both `main` and `types` in package.json point there.
 ## Consumer Migration Notes
 
 - `1.0.x`: Base node ↔ C&C message contracts (`Host`, `NodeMessage`, `CncCommand`).
-- `1.1.x`: CNC app/backend API contracts (`CncCapabilitiesResponse`, schedule DTOs/schemas).
-- Next minor from this branch: CNC host port scan DTO exports (`HostPortScanResponse`) plus consumer fixture typecheck.
+- `1.1.x`: CNC app/backend API contracts (`CncCapabilitiesResponse`, schedules, host port scan DTOs/schemas) and wire protocol negotiation update.
 
 ## Testing
 
