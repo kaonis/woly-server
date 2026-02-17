@@ -41,6 +41,7 @@ describe('HostsController additional branches', () => {
     getAllHosts: jest.Mock;
     getStats: jest.Mock;
     getHostByFQN: jest.Mock;
+    saveHostPortScanSnapshot: jest.Mock;
   };
   let commandRouter: {
     routeWakeCommand: jest.Mock;
@@ -58,6 +59,7 @@ describe('HostsController additional branches', () => {
       getAllHosts: jest.fn(),
       getStats: jest.fn(),
       getHostByFQN: jest.fn(),
+      saveHostPortScanSnapshot: jest.fn().mockResolvedValue(true),
     };
     commandRouter = {
       routeWakeCommand: jest.fn(),
@@ -510,6 +512,13 @@ describe('HostsController additional branches', () => {
       expect(commandRouter.routeScanHostPortsCommand).toHaveBeenCalledWith('desktop@lab', {
         correlationId: 'cid-request',
       });
+      expect(hostAggregator.saveHostPortScanSnapshot).toHaveBeenCalledWith('desktop@lab', {
+        scannedAt: '2026-02-16T00:00:00.000Z',
+        openPorts: [
+          { port: 22, protocol: 'tcp', service: 'SSH' },
+          { port: 443, protocol: 'tcp', service: 'HTTPS' },
+        ],
+      });
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           target: 'desktop@lab',
@@ -547,6 +556,7 @@ describe('HostsController additional branches', () => {
         error: 'Not Found',
         message: 'Host not found: missing@lab',
       });
+      expect(hostAggregator.saveHostPortScanSnapshot).not.toHaveBeenCalled();
     });
 
     it('maps already-in-progress scan errors to 409 and includes correlation id', async () => {
@@ -566,6 +576,90 @@ describe('HostsController additional branches', () => {
         message: 'Scan already in progress',
         correlationId: 'cid-request',
       });
+      expect(hostAggregator.saveHostPortScanSnapshot).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getHostPorts', () => {
+    it('returns cached host open ports when a fresh snapshot exists', async () => {
+      hostAggregator.getHostByFQN.mockResolvedValue({
+        name: 'desktop',
+        nodeId: 'node-1',
+        openPorts: [
+          { port: 22, protocol: 'tcp', service: 'SSH' },
+          { port: 443, protocol: 'tcp', service: 'HTTPS' },
+        ],
+        portsScannedAt: '2026-02-16T00:00:00.000Z',
+      });
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        correlationId: 'cid-request',
+      });
+      const res = createMockResponse();
+
+      await controller.getHostPorts(req, res);
+
+      expect(commandRouter.routeScanHostPortsCommand).not.toHaveBeenCalled();
+      expect(hostAggregator.saveHostPortScanSnapshot).not.toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          target: 'desktop@lab',
+          scannedAt: '2026-02-16T00:00:00.000Z',
+          openPorts: [
+            { port: 22, protocol: 'tcp', service: 'SSH' },
+            { port: 443, protocol: 'tcp', service: 'HTTPS' },
+          ],
+          message: 'Returning cached port scan result.',
+          correlationId: 'cid-request',
+        })
+      );
+    });
+
+    it('executes a node scan and persists snapshot when no cached payload exists', async () => {
+      hostAggregator.getHostByFQN.mockResolvedValue({
+        name: 'desktop',
+        nodeId: 'node-1',
+        openPorts: undefined,
+        portsScannedAt: null,
+      });
+      commandRouter.routeScanHostPortsCommand.mockResolvedValue({
+        commandId: 'scan-command-fresh',
+        nodeId: 'node-1',
+        message: 'Port scan completed, found 1 open TCP port(s)',
+        hostPortScan: {
+          hostName: 'desktop',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.25',
+          scannedAt: '2026-02-16T03:00:00.000Z',
+          openPorts: [{ port: 22, protocol: 'tcp', service: 'SSH' }],
+        },
+        correlationId: 'cid-router',
+      });
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        correlationId: 'cid-request',
+      });
+      const res = createMockResponse();
+
+      await controller.getHostPorts(req, res);
+
+      expect(commandRouter.routeScanHostPortsCommand).toHaveBeenCalledWith('desktop@lab', {
+        correlationId: 'cid-request',
+      });
+      expect(hostAggregator.saveHostPortScanSnapshot).toHaveBeenCalledWith('desktop@lab', {
+        scannedAt: '2026-02-16T03:00:00.000Z',
+        openPorts: [{ port: 22, protocol: 'tcp', service: 'SSH' }],
+      });
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          target: 'desktop@lab',
+          scannedAt: '2026-02-16T03:00:00.000Z',
+          openPorts: [{ port: 22, protocol: 'tcp', service: 'SSH' }],
+          correlationId: 'cid-router',
+        })
+      );
     });
   });
 

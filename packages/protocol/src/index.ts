@@ -23,6 +23,9 @@ export interface Host {
   pingResponsive?: number | null;
   notes?: string | null;
   tags?: string[];
+  openPorts?: HostPort[];
+  portsScannedAt?: string | null;
+  portsExpireAt?: string | null;
 }
 
 /** @deprecated Use `Host` instead. */
@@ -241,6 +244,11 @@ export type CncCommand =
 export const hostStatusSchema = z.enum(['awake', 'asleep']);
 export const hostNotesSchema = z.string().max(2_000).nullable();
 export const hostTagsSchema = z.array(z.string().min(1).max(64)).max(32);
+export const hostPortSchema: z.ZodType<HostPort> = z.object({
+  port: z.number().int().positive(),
+  protocol: z.literal('tcp'),
+  service: z.string().min(1),
+});
 
 export const hostSchema = z.object({
   name: z.string().min(1),
@@ -252,6 +260,9 @@ export const hostSchema = z.object({
   pingResponsive: z.number().int().nullable().optional(),
   notes: hostNotesSchema.optional(),
   tags: hostTagsSchema.optional(),
+  openPorts: z.array(hostPortSchema).optional(),
+  portsScannedAt: z.string().min(1).nullable().optional(),
+  portsExpireAt: z.string().min(1).nullable().optional(),
 });
 
 export const hostPingResultSchema: z.ZodType<HostPingResult> = z.object({
@@ -299,12 +310,6 @@ export const cncCapabilitiesResponseSchema: z.ZodType<CncCapabilitiesResponse> =
     schedules: cncCapabilityDescriptorSchema,
     commandStatusStreaming: cncCapabilityDescriptorSchema,
   }),
-});
-
-export const hostPortSchema: z.ZodType<HostPort> = z.object({
-  port: z.number().int().positive(),
-  protocol: z.literal('tcp'),
-  service: z.string().min(1),
 });
 
 export const hostPortScanResultSchema: z.ZodType<HostPortScanResult> = z.object({

@@ -90,6 +90,29 @@ describe('hostSchema', () => {
     ).toBe(true);
   });
 
+  it('accepts host with cached open ports metadata', () => {
+    expect(
+      hostSchema.safeParse({
+        ...validHost,
+        openPorts: [
+          { port: 22, protocol: 'tcp', service: 'SSH' },
+          { port: 443, protocol: 'tcp', service: 'HTTPS' },
+        ],
+        portsScannedAt: '2026-02-17T00:00:00.000Z',
+        portsExpireAt: '2026-02-17T04:00:00.000Z',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects host with invalid cached port protocol', () => {
+    expect(
+      hostSchema.safeParse({
+        ...validHost,
+        openPorts: [{ port: 53, protocol: 'udp', service: 'DNS' }],
+      }).success
+    ).toBe(false);
+  });
+
   it('rejects empty name', () => {
     expect(hostSchema.safeParse({ ...validHost, name: '' }).success).toBe(false);
   });
