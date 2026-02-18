@@ -706,6 +706,45 @@ describe('HostAggregator', () => {
       expect(hosts.some(h => h.name === 'test-host-9')).toBe(true);
     });
 
+    it('returns hosts sorted by fully qualified name for deterministic polling snapshots', async () => {
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-4',
+        location: 'Home',
+        host: {
+          name: 'zzz-host',
+          mac: 'AA:BB:CC:DD:EE:39',
+          ip: '192.168.1.139',
+          status: 'awake' as const,
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-4',
+        location: 'Home',
+        host: {
+          name: 'aaa-host',
+          mac: 'AA:BB:CC:DD:EE:38',
+          ip: '192.168.1.138',
+          status: 'awake' as const,
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      const orderedFqns = (await hostAggregator.getAllHosts())
+        .filter((host) => host.nodeId === 'test-node-4' && (host.name === 'aaa-host' || host.name === 'zzz-host'))
+        .map((host) => host.fullyQualifiedName);
+
+      expect(orderedFqns).toEqual([
+        'aaa-host@Home-test-node-4',
+        'zzz-host@Home-test-node-4',
+      ]);
+    });
+
     it('should surface errors while listing all hosts', async () => {
       const querySpy = jest.spyOn(db, 'query').mockRejectedValueOnce(new Error('forced-get-all-failure'));
       try {

@@ -78,3 +78,17 @@ The mobile app now maintains a single shared app-level host stream connection (s
 - Non-mutating event classes: connection lifecycle/keepalive style events (`connected`, `heartbeat`, `keepalive`, `ping`, `pong`) must not trigger host invalidation.
 - Reconnect behavior: clients should reconnect on transient disconnects and then refetch current host state; stream events are not guaranteed replay buffers.
 - Payload model: events are **mixed deltas/summaries** (not authoritative snapshots). Canonical state remains `GET /api/hosts`; stream events are invalidation hints.
+
+## 9. Polling Snapshot Stability (GET /api/hosts)
+
+Backend assessment for polling clients (tracked by `kaonis/woly-server#328`):
+
+- Ordering behavior: `HostAggregator.getAllHosts()` returns rows ordered by `fully_qualified_name`, which provides deterministic host list ordering for unchanged datasets.
+- Cache negotiation: hosts responses emit `ETag`; clients that send `If-None-Match` receive `304` when the payload is unchanged.
+- Identity guidance: clients should key by `fullyQualifiedName` (fallback: `nodeId + mac`) and avoid index-based diffing.
+- Non-guarantees: object reference identity and JSON property insertion order are not part of the backend contract.
+
+Current recommendation:
+
+- No backend payload shape change is required at this time.
+- If stricter snapshot revision semantics become necessary later, track a non-breaking additive field (for example, a monotonic snapshot revision) in a dedicated follow-up issue.
