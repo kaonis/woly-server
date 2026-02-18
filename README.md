@@ -219,6 +219,38 @@ docker build -f apps/node-agent/Dockerfile -t woly-node-agent .
 docker build -f apps/cnc/Dockerfile -t woly-cnc .
 ```
 
+### Full-Stack Development Compose
+
+Use the root-level compose file to boot PostgreSQL + C&C + node-agent in one command:
+
+```bash
+docker compose up --build
+```
+
+Optional second node-agent for multi-site development:
+
+```bash
+docker compose --profile multi-node up --build
+```
+
+What this stack provides:
+
+- Hot reload for C&C and node-agent via `npm run dev` in mounted workspaces
+- Health-gated startup ordering (`postgres` -> `cnc` -> `node-agent`)
+- Idempotent seed service that creates sample hosts (`DEV-DESKTOP-1`, `DEV-NAS-1`)
+
+Useful endpoints:
+
+- C&C health: `http://localhost:8080/health`
+- Node-agent-1 health: `http://localhost:8082/health`
+- Node-agent-2 health (optional profile): `http://localhost:8083/health`
+
+Clean shutdown and volume reset:
+
+```bash
+docker compose down -v
+```
+
 **Important:** The node agent requires `--net host` for ARP scanning to work:
 
 ```bash
