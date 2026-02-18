@@ -20,7 +20,9 @@ import { errorHandler } from './middleware/errorHandler';
 import { reconcileCommandsOnStartup, startCommandPruning, stopCommandPruning } from './services/commandReconciler';
 import { startHostStatusHistoryPruning, stopHostStatusHistoryPruning } from './services/hostStatusHistoryRetention';
 import { startWakeScheduleWorker, stopWakeScheduleWorker } from './services/wakeScheduleWorker';
-import { WebhookDispatcher } from './services/webhookDispatcher';
+import { PluginEventBus } from './services/pluginEventBus';
+import { PluginEventBridge } from './services/pluginEventBridge';
+import { PluginManager } from './services/plugins/pluginManager';
 import { specs } from './swagger';
 import { runtimeMetrics } from './services/runtimeMetrics';
 import { CNC_VERSION } from './utils/cncVersion';
@@ -38,7 +40,9 @@ export class Server {
   private nodeManager: NodeManager;
   private commandRouter: CommandRouter;
   private hostStateStreamBroker: HostStateStreamBroker;
-  private webhookDispatcher: WebhookDispatcher;
+  private pluginEventBus: PluginEventBus;
+  private pluginEventBridge: PluginEventBridge;
+  private pluginManager: PluginManager;
 
   constructor() {
     this.app = express();
@@ -48,7 +52,12 @@ export class Server {
     this.nodeManager = new NodeManager(this.hostAggregator);
     this.commandRouter = new CommandRouter(this.nodeManager, this.hostAggregator);
     this.hostStateStreamBroker = new HostStateStreamBroker(this.hostAggregator);
-    this.webhookDispatcher = new WebhookDispatcher(this.hostAggregator, this.nodeManager);
+    this.pluginEventBus = new PluginEventBus();
+    this.pluginEventBridge = new PluginEventBridge(this.hostAggregator, this.nodeManager, this.pluginEventBus);
+    this.pluginManager = new PluginManager({
+      eventBus: this.pluginEventBus,
+      enabledPlugins: config.enabledPlugins,
+    });
     this.hostStateStreamBroker.subscribeToCommandRouter(this.commandRouter);
     this.setupMiddleware();
     this.setupRoutes();
@@ -213,8 +222,9 @@ export class Server {
         batchSize: config.scheduleBatchSize,
       });
 
-      // Start webhook event subscriptions
-      this.webhookDispatcher.start();
+      // Start plugin subscriptions and plugin runtime
+      await this.pluginManager.start();
+      this.pluginEventBridge.start();
 
       // Start HTTP server
       this.httpServer.listen(config.port, () => {
@@ -252,7 +262,8 @@ export class Server {
       // Shutdown node manager
       this.nodeManager.shutdown();
       this.hostStateStreamBroker.shutdown();
-      this.webhookDispatcher.shutdown();
+      this.pluginEventBridge.shutdown();
+      await this.pluginManager.shutdown();
 
       // Close database
       await db.close();

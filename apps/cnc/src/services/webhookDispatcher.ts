@@ -1,37 +1,8 @@
 import { createHmac } from 'crypto';
-import type { Host, HostStatus, WebhookEventType } from '@kaonis/woly-protocol';
+import type { WebhookEventType } from '@kaonis/woly-protocol';
 import config from '../config';
-import type { HostAggregator } from './hostAggregator';
-import type { NodeManager } from './nodeManager';
 import WebhookModel, { type WebhookTarget } from '../models/Webhook';
 import logger from '../utils/logger';
-
-type HostDiscoveredPayload = {
-  nodeId: string;
-  hostFqn: string;
-  host: Host;
-};
-
-type HostRemovedPayload = {
-  nodeId: string;
-  name: string;
-};
-
-type HostStatusTransitionPayload = {
-  hostFqn: string;
-  oldStatus: HostStatus;
-  newStatus: HostStatus;
-  changedAt: string;
-};
-
-type NodeConnectionPayload = {
-  nodeId: string;
-};
-
-type ScanCompletePayload = {
-  nodeId: string;
-  hostCount: number;
-};
 
 type WebhookEnvelope = {
   event: WebhookEventType;
@@ -48,95 +19,26 @@ export class WebhookDispatcher {
   private readonly retryBaseDelayMs: number;
   private readonly deliveryTimeoutMs: number;
   private readonly pendingTimers = new Set<NodeJS.Timeout>();
-  private started = false;
 
-  constructor(
-    private readonly hostAggregator: HostAggregator,
-    private readonly nodeManager: NodeManager,
-    options?: {
-      fetchImpl?: FetchImpl;
-      retryBaseDelayMs?: number;
-      deliveryTimeoutMs?: number;
-    },
-  ) {
+  constructor(options?: {
+    fetchImpl?: FetchImpl;
+    retryBaseDelayMs?: number;
+    deliveryTimeoutMs?: number;
+  }) {
     this.fetchImpl = options?.fetchImpl ?? fetch;
     this.retryBaseDelayMs = options?.retryBaseDelayMs ?? config.webhookRetryBaseDelayMs;
     this.deliveryTimeoutMs = options?.deliveryTimeoutMs ?? config.webhookDeliveryTimeoutMs;
   }
 
-  private readonly onHostAdded = (payload: HostDiscoveredPayload): void => {
-    const data = {
-      nodeId: payload.nodeId,
-      hostFqn: payload.hostFqn,
-      host: payload.host,
-    };
-
-    void this.dispatch('host.discovered', data);
-  };
-
-  private readonly onHostRemoved = (payload: HostRemovedPayload): void => {
-    void this.dispatch('host.removed', {
-      nodeId: payload.nodeId,
-      name: payload.name,
-    });
-  };
-
-  private readonly onHostStatusTransition = (payload: HostStatusTransitionPayload): void => {
-    const eventType: WebhookEventType = payload.newStatus === 'awake' ? 'host.awake' : 'host.asleep';
-    void this.dispatch(eventType, {
-      hostFqn: payload.hostFqn,
-      oldStatus: payload.oldStatus,
-      newStatus: payload.newStatus,
-      changedAt: payload.changedAt,
-    });
-  };
-
-  private readonly onNodeConnected = (payload: NodeConnectionPayload): void => {
-    void this.dispatch('node.connected', { nodeId: payload.nodeId });
-  };
-
-  private readonly onNodeDisconnected = (payload: NodeConnectionPayload): void => {
-    void this.dispatch('node.disconnected', { nodeId: payload.nodeId });
-  };
-
-  private readonly onScanComplete = (payload: ScanCompletePayload): void => {
-    void this.dispatch('scan.complete', {
-      nodeId: payload.nodeId,
-      hostCount: payload.hostCount,
-    });
-  };
-
-  start(): void {
-    if (this.started) {
-      return;
-    }
-
-    this.started = true;
-    this.hostAggregator.on('host-added', this.onHostAdded);
-    this.hostAggregator.on('host-removed', this.onHostRemoved);
-    this.hostAggregator.on('host-status-transition', this.onHostStatusTransition);
-    this.nodeManager.on('node-connected', this.onNodeConnected);
-    this.nodeManager.on('node-disconnected', this.onNodeDisconnected);
-    this.nodeManager.on('scan-complete', this.onScanComplete);
-  }
-
   shutdown(): void {
-    if (!this.started) {
-      return;
-    }
-
-    this.started = false;
-    this.hostAggregator.off('host-added', this.onHostAdded);
-    this.hostAggregator.off('host-removed', this.onHostRemoved);
-    this.hostAggregator.off('host-status-transition', this.onHostStatusTransition);
-    this.nodeManager.off('node-connected', this.onNodeConnected);
-    this.nodeManager.off('node-disconnected', this.onNodeDisconnected);
-    this.nodeManager.off('scan-complete', this.onScanComplete);
-
     for (const timer of this.pendingTimers) {
       clearTimeout(timer);
     }
     this.pendingTimers.clear();
+  }
+
+  async dispatchEvent(eventType: WebhookEventType, data: Record<string, unknown>): Promise<void> {
+    await this.dispatch(eventType, data);
   }
 
   private createEnvelope(eventType: WebhookEventType, data: Record<string, unknown>): WebhookEnvelope {
