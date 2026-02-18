@@ -47,6 +47,9 @@ gh workflow run eslint10-compat-watchdog.yml --ref master
 # Protocol publish workflow (safe validation mode)
 gh workflow run publish-protocol.yml --ref master -f dry-run=true
 
+# Client publish workflow (safe validation mode)
+gh workflow run publish-client.yml --ref master -f dry-run=true
+
 # Dependency health workflow
 gh workflow run dependency-health.yml --ref master
 

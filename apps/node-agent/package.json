@@ -12,6 +12,7 @@
     "test:unit": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --watchman=false --testPathPatterns='.unit.test.ts'",
     "test:integration": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --watchman=false --testPathPatterns='.integration.test.ts'",
     "build": "tsc",
+    "openapi:export": "ts-node scripts/export-openapi.ts",
     "typecheck": "tsc --noEmit",
     "start": "ts-node src/app.ts",
     "dev": "nodemon --watch src --exec ts-node src/app.ts",

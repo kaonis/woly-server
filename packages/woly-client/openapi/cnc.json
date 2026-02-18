@@ -1,0 +1,1927 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "WoLy C&C API",
+    "version": "1.0.0",
+    "description": "Command & Control backend for distributed Wake-on-LAN management across multiple network nodes",
+    "contact": {
+      "name": "WoLy C&C Backend",
+      "url": "https://github.com/kaonis/woly-server"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Development server"
+    },
+    {
+      "url": "http://{host}:{port}",
+      "description": "Custom server",
+      "variables": {
+        "host": {
+          "default": "localhost",
+          "description": "Server hostname"
+        },
+        "port": {
+          "default": "8080",
+          "description": "Server port"
+        }
+      }
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Service health and status endpoints"
+    },
+    {
+      "name": "Authentication",
+      "description": "JWT token issuance"
+    },
+    {
+      "name": "Nodes",
+      "description": "Node management and monitoring"
+    },
+    {
+      "name": "Hosts",
+      "description": "Aggregated host management across nodes"
+    },
+    {
+      "name": "Meta",
+      "description": "Capability negotiation and metadata endpoints"
+    },
+    {
+      "name": "Admin",
+      "description": "Administrative operations (requires admin role)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token obtained from /api/auth/token endpoint"
+      }
+    },
+    "schemas": {
+      "Node": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique node identifier",
+            "example": "home-network"
+          },
+          "location": {
+            "type": "string",
+            "description": "Physical or logical location of the node",
+            "example": "Home Office"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["online", "offline"],
+            "description": "Current node status",
+            "example": "online"
+          },
+          "lastHeartbeat": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of last heartbeat received",
+            "example": "2026-02-09T13:00:00.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Node registration timestamp",
+            "example": "2026-02-09T12:00:00.000Z"
+          },
+          "connected": {
+            "type": "boolean",
+            "description": "Whether node is currently connected via WebSocket",
+            "example": true
+          }
+        }
+      },
+      "Host": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Hostname",
+            "example": "PHANTOM-MBP"
+          },
+          "mac": {
+            "type": "string",
+            "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
+            "description": "MAC address",
+            "example": "80:6D:97:60:39:08"
+          },
+          "ip": {
+            "type": "string",
+            "format": "ipv4",
+            "description": "IP address",
+            "example": "192.168.1.147"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["awake", "asleep"],
+            "description": "Current host status (based on ARP response)",
+            "example": "awake"
+          },
+          "lastSeen": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last time host was detected online",
+            "example": "2026-02-09T13:00:00.000Z",
+            "nullable": true
+          },
+          "discovered": {
+            "type": "integer",
+            "description": "Whether host was discovered automatically (1) or added manually (0)",
+            "example": 1
+          },
+          "pingResponsive": {
+            "type": "integer",
+            "description": "ICMP ping responsiveness: 1 (responds), 0 (no response), null (not tested)",
+            "example": 1,
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional operator notes for this host",
+            "example": "Patch window Sundays 03:00 UTC",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "description": "Optional host tags for filtering/grouping",
+            "items": {
+              "type": "string"
+            },
+            "example": ["prod", "database"]
+          },
+          "openPorts": {
+            "type": "array",
+            "description": "Cached open TCP ports from the most recent per-host scan (when still fresh)",
+            "items": {
+              "type": "object",
+              "properties": {
+                "port": {
+                  "type": "integer",
+                  "example": 22
+                },
+                "protocol": {
+                  "type": "string",
+                  "enum": ["tcp"],
+                  "example": "tcp"
+                },
+                "service": {
+                  "type": "string",
+                  "example": "SSH"
+                }
+              }
+            }
+          },
+          "portsScannedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp of the cached per-host port scan snapshot",
+            "example": "2026-02-17T00:00:00.000Z"
+          },
+          "portsExpireAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Expiration timestamp for cached open ports",
+            "example": "2026-02-17T04:00:00.000Z"
+          },
+          "nodeId": {
+            "type": "string",
+            "description": "ID of the node managing this host",
+            "example": "home-network"
+          },
+          "location": {
+            "type": "string",
+            "description": "Location inherited from managing node",
+            "example": "Home Office"
+          },
+          "fqn": {
+            "type": "string",
+            "description": "Fully qualified name (hostname@location)",
+            "example": "PHANTOM-MBP@home-network"
+          }
+        }
+      },
+      "HealthCheck": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Overall system status",
+            "example": "healthy"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Current timestamp",
+            "example": "2026-02-09T13:00:00.000Z"
+          },
+          "version": {
+            "type": "string",
+            "description": "API version",
+            "example": "1.0.0"
+          },
+          "metrics": {
+            "type": "object",
+            "description": "Runtime observability snapshot (nodes, commands, protocol validation)"
+          }
+        }
+      },
+      "TokenRequest": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["operator", "admin"],
+            "description": "Requested role (defaults to operator)",
+            "example": "operator"
+          },
+          "sub": {
+            "type": "string",
+            "description": "Optional subject identifier (defaults to generated mobile UUID)",
+            "example": "mobile-app-user-123"
+          }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "JWT bearer token",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Token expiration timestamp",
+            "example": "2026-02-09T14:00:00.000Z"
+          }
+        }
+      },
+      "HostStats": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "description": "Total number of hosts",
+            "example": 42
+          },
+          "awake": {
+            "type": "integer",
+            "description": "Number of hosts currently awake",
+            "example": 15
+          },
+          "asleep": {
+            "type": "integer",
+            "description": "Number of hosts currently asleep",
+            "example": 27
+          }
+        }
+      },
+      "CapabilitiesResponse": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["cnc"],
+            "example": "cnc"
+          },
+          "versions": {
+            "type": "object",
+            "properties": {
+              "cncApi": {
+                "type": "string",
+                "example": "1.0.0"
+              },
+              "protocol": {
+                "type": "string",
+                "example": "1.3.0"
+              }
+            },
+            "required": ["cncApi", "protocol"]
+          },
+          "capabilities": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Capability descriptors keyed by feature name"
+          },
+          "rateLimits": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Optional CNC rate limit descriptors"
+          }
+        },
+        "required": ["mode", "versions", "capabilities"]
+      },
+      "CommandResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the command succeeded",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "Result message",
+            "example": "Wake-on-LAN packet sent successfully"
+          },
+          "commandId": {
+            "type": "string",
+            "description": "Unique command identifier",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "correlationId": {
+            "type": "string",
+            "description": "Request correlation identifier for end-to-end tracing",
+            "example": "corr_2a8f6842-6f8f-4e8f-b6dc-f7dbd9a18e68"
+          }
+        }
+      },
+      "HostWakeSchedule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "schedule-1"
+          },
+          "hostFqn": {
+            "type": "string",
+            "example": "PHANTOM-MBP@home-network"
+          },
+          "hostName": {
+            "type": "string",
+            "example": "PHANTOM-MBP"
+          },
+          "hostMac": {
+            "type": "string",
+            "example": "80:6D:97:60:39:08"
+          },
+          "scheduledTime": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-02-20T10:00:00.000Z"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": ["once", "daily", "weekly", "weekdays", "weekends"],
+            "example": "daily"
+          },
+          "enabled": {
+            "type": "boolean",
+            "example": true
+          },
+          "notifyOnWake": {
+            "type": "boolean",
+            "example": true
+          },
+          "timezone": {
+            "type": "string",
+            "example": "UTC"
+          },
+          "lastTriggered": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-02-20T10:00:03.000Z"
+          },
+          "nextTrigger": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-02-21T10:00:00.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-02-18T00:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-02-18T00:00:00.000Z"
+          }
+        }
+      },
+      "SystemStats": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "example": 3
+              },
+              "online": {
+                "type": "integer",
+                "example": 2
+              },
+              "offline": {
+                "type": "integer",
+                "example": 1
+              }
+            }
+          },
+          "hosts": {
+            "$ref": "#/components/schemas/HostStats"
+          },
+          "websocket": {
+            "type": "object",
+            "properties": {
+              "connectedNodes": {
+                "type": "integer",
+                "example": 2
+              },
+              "protocolValidationFailures": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "observability": {
+            "type": "object",
+            "description": "Runtime observability snapshot used by dashboards and alerts"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-02-09T13:00:00.000Z"
+          }
+        }
+      },
+      "Command": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Command ID",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "wake",
+              "update-host",
+              "delete-host",
+              "scan",
+              "scan-host-ports",
+              "ping-host",
+              "ping"
+            ],
+            "description": "Command type",
+            "example": "wake"
+          },
+          "nodeId": {
+            "type": "string",
+            "description": "Target node ID",
+            "example": "home-network"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "completed", "failed", "timeout"],
+            "description": "Command status",
+            "example": "completed"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-02-09T13:00:00.000Z"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-02-09T13:00:05.000Z"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error type",
+            "example": "Not Found"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message",
+            "example": "Host PHANTOM-MBP@home-network not found"
+          },
+          "code": {
+            "type": "string",
+            "description": "Error code (for authentication errors)",
+            "example": "AUTH_UNAUTHORIZED"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing or invalid authentication",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Authenticated but not authorized for this operation",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Invalid request parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Service unavailable (e.g., node offline)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "GatewayTimeout": {
+        "description": "Command timeout",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/admin/nodes/{id}": {
+      "delete": {
+        "summary": "Deregister a node",
+        "description": "Remove a node from the system (admin only)",
+        "tags": ["Admin"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The node ID to delete",
+            "example": "home-network"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Node deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Node home-network deleted successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/admin/stats": {
+      "get": {
+        "summary": "Get system statistics",
+        "description": "Retrieve comprehensive system statistics including nodes, hosts, and WebSocket connections (admin only)",
+        "tags": ["Admin"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "System statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStats"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/admin/commands": {
+      "get": {
+        "summary": "List recent command outcomes",
+        "description": "Retrieve recent command history with optional filtering (admin only)",
+        "tags": ["Admin"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": "Maximum number of commands to return",
+            "example": 50
+          },
+          {
+            "in": "query",
+            "name": "nodeId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional node ID to filter commands",
+            "example": "home-network"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of recent commands",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "commands": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Command"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/auth/token": {
+      "post": {
+        "summary": "Issue JWT token",
+        "description": "Exchange an operator or admin Bearer token for a JWT token with specified role",
+        "tags": ["Authentication"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JWT token issued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/capabilities": {
+      "get": {
+        "summary": "Get CNC capability flags and version metadata",
+        "description": "Returns a machine-readable capability map so clients can negotiate feature behavior without endpoint probing.",
+        "tags": ["Meta"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Capability descriptor payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilitiesResponse",
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": ["cnc"]
+                    },
+                    "versions": {
+                      "type": "object",
+                      "properties": {
+                        "cncApi": {
+                          "type": "string"
+                        },
+                        "protocol": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "capabilities": {
+                      "type": "object",
+                      "properties": {
+                        "scan": {
+                          "type": "object"
+                        },
+                        "notesTags": {
+                          "type": "object"
+                        },
+                        "schedules": {
+                          "type": "object"
+                        },
+                        "hostStateStreaming": {
+                          "type": "object"
+                        },
+                        "commandStatusStreaming": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/hosts": {
+      "get": {
+        "summary": "Get all aggregated hosts",
+        "description": "Retrieve all hosts from all nodes with optional filtering by node ID",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "nodeId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional node ID to filter hosts",
+            "example": "home-network"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of hosts with statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hosts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Host"
+                      }
+                    },
+                    "stats": {
+                      "$ref": "#/components/schemas/HostStats"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified (If-None-Match matched current ETag)"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/hosts/{fqn}": {
+      "get": {
+        "summary": "Get host by fully qualified name",
+        "description": "Retrieve detailed information about a specific host using its FQN (hostname@location)",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fqn",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Fully qualified name (hostname@location)",
+            "example": "PHANTOM-MBP@home-network"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Host found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Host"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update host information",
+        "description": "Update a host's properties via its managing node",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fqn",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Fully qualified name (hostname@location)",
+            "example": "PHANTOM-MBP@home-network"
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional idempotency key to prevent duplicate commands",
+            "example": "unique-request-id-123"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Host properties to update",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "mac": {
+                    "type": "string"
+                  },
+                  "ip": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["awake", "asleep"]
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Host updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Host updated successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayTimeout"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a host",
+        "description": "Remove a host from its managing node",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fqn",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Fully qualified name (hostname@location)",
+            "example": "PHANTOM-MBP@home-network"
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional idempotency key to prevent duplicate commands",
+            "example": "unique-request-id-123"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Host deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Host deleted successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayTimeout"
+          }
+        }
+      }
+    },
+    "/api/hosts/wakeup/{fqn}": {
+      "post": {
+        "summary": "Wake up a host using Wake-on-LAN",
+        "description": "Send a Wake-on-LAN magic packet to the specified host via its managing node",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fqn",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Fully qualified name (hostname@location)",
+            "example": "PHANTOM-MBP@home-network"
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional idempotency key to prevent duplicate commands",
+            "example": "unique-request-id-123"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Wake command sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayTimeout"
+          }
+        }
+      }
+    },
+    "/api/hosts/ping/{fqn}": {
+      "get": {
+        "summary": "Ping a host via its managing node agent",
+        "description": "Executes ICMP reachability from the node agent (not from the mobile app) and returns a normalized ping result.",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fqn",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Fully qualified name (hostname@location)",
+            "example": "PHANTOM-MBP@home-network"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Host ping command completed"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayTimeout"
+          }
+        }
+      }
+    },
+    "/api/hosts/scan": {
+      "post": {
+        "summary": "Trigger immediate host discovery scan across connected nodes",
+        "description": "Dispatches scan commands to connected nodes and returns a normalized command lifecycle payload.",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scan command dispatched to one or more connected nodes"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "description": "One or more node scans are already in progress"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayTimeout"
+          }
+        }
+      }
+    },
+    "/api/hosts/ports/{fqn}": {
+      "get": {
+        "summary": "Get latest host port-scan payload",
+        "description": "Returns a mobile-compatible host port-scan payload shape for CNC mode.\nIf a fresh scan is not available, a node-side probe is executed.\n",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fqn",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Fully qualified name (hostname@location)",
+            "example": "PHANTOM-MBP@home-network"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Port payload shape returned"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/hosts/scan-ports/{fqn}": {
+      "get": {
+        "summary": "Trigger host-side scan operation and return compatible port payload",
+        "description": "Dispatches a node-side TCP scan for the host's managing node and returns\na mobile-compatible port payload shape including discovered open TCP ports.\n",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fqn",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Fully qualified name (hostname@location)",
+            "example": "PHANTOM-MBP@home-network"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scan dispatched/completed and payload returned"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Scan already in progress on target node"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "504": {
+            "$ref": "#/components/responses/GatewayTimeout"
+          }
+        }
+      }
+    },
+    "/api/hosts/mac-vendor/{mac}": {
+      "get": {
+        "summary": "Get MAC address vendor information",
+        "description": "Look up the manufacturer/vendor of a network device by MAC address.\nResults are cached for 24 hours to minimize external API calls.\nThe external macvendors.com API is rate-limited to one request per second.\n",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mac",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"
+            },
+            "description": "MAC address to look up (case-insensitive, accepts colon or hyphen delimiters)",
+            "example": "80:6D:97:60:39:08"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vendor information retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["mac", "vendor", "source"],
+                  "properties": {
+                    "mac": {
+                      "type": "string",
+                      "description": "MAC address as provided in request",
+                      "example": "80:6D:97:60:39:08"
+                    },
+                    "vendor": {
+                      "type": "string",
+                      "description": "Vendor/manufacturer name (or \"Unknown Vendor\" if not found)",
+                      "example": "Apple, Inc."
+                    },
+                    "source": {
+                      "type": "string",
+                      "description": "Data source (includes \"cached\" suffix for cached results)",
+                      "example": "macvendors.com (cached)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - MAC address missing or invalid format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "MAC address is required"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "description": "Rate limit exceeded - wait before retrying",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Rate limit exceeded, please try again later"
+                    },
+                    "mac": {
+                      "type": "string",
+                      "example": "AA:BB:CC:DD:EE:FF"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/nodes": {
+      "get": {
+        "summary": "List all nodes",
+        "description": "Retrieve a list of all registered nodes with connection status",
+        "tags": ["Nodes"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of nodes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nodes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Node"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/nodes/{id}": {
+      "get": {
+        "summary": "Get node by ID",
+        "description": "Retrieve detailed information about a specific node",
+        "tags": ["Nodes"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The node ID",
+            "example": "home-network"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Node found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Node"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/nodes/{id}/health": {
+      "get": {
+        "summary": "Check node health",
+        "description": "Get detailed health status of a specific node",
+        "tags": ["Nodes"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The node ID",
+            "example": "home-network"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Node health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nodeId": {
+                      "type": "string",
+                      "example": "home-network"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["online", "offline"],
+                      "example": "online"
+                    },
+                    "connected": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "lastHeartbeat": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2026-02-09T13:00:00.000Z"
+                    },
+                    "timeSinceHeartbeat": {
+                      "type": "integer",
+                      "description": "Milliseconds since last heartbeat",
+                      "example": 5000
+                    },
+                    "healthy": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/schedules": {
+      "get": {
+        "summary": "List wake schedules across all hosts",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "enabled",
+            "schema": {
+              "type": "boolean"
+            },
+            "required": false,
+            "description": "Optional filter for enabled/disabled schedules."
+          },
+          {
+            "in": "query",
+            "name": "nodeId",
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "description": "Optional node id filter."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregated schedules list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "schedules": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/HostWakeSchedule"
+                      }
+                    }
+                  }
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Example aggregated schedules response",
+                    "value": {
+                      "schedules": [
+                        {
+                          "id": "schedule-1",
+                          "hostFqn": "office@home",
+                          "hostName": "office",
+                          "hostMac": "AA:BB:CC:DD:EE:FF",
+                          "scheduledTime": "2026-02-20T10:00:00.000Z",
+                          "frequency": "daily",
+                          "enabled": true,
+                          "notifyOnWake": true,
+                          "timezone": "UTC",
+                          "createdAt": "2026-02-18T00:00:00.000Z",
+                          "updatedAt": "2026-02-18T00:00:00.000Z"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified (If-None-Match matched current ETag)"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/schedules/{id}": {
+      "get": {
+        "summary": "Get wake schedule by id",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedule entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostWakeSchedule"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/hosts/{fqn}/schedules": {
+      "get": {
+        "summary": "List wake schedules for a host",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fqn",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Host schedules"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a wake schedule for a host",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fqn",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created schedule"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/hosts/schedules/{id}": {
+      "put": {
+        "summary": "Update wake schedule by id",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated schedule"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete wake schedule by id",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted schedule"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health check endpoint",
+        "description": "Returns the current health status of the C&C service",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthCheck"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root endpoint",
+        "description": "Returns basic information about the C&C service",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "Service information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "example": "WoLy C&C Backend"
+                    },
+                    "version": {
+                      "type": "string",
+                      "example": "1.0.0"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "running"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
