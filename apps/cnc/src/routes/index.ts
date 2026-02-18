@@ -9,6 +9,7 @@ import { HostsController } from '../controllers/hosts';
 import { SchedulesController } from '../controllers/schedules';
 import { AuthController } from '../controllers/auth';
 import { MetaController } from '../controllers/meta';
+import { NotificationsController } from '../controllers/notifications';
 import { WebhooksController } from '../controllers/webhooks';
 import { NodeManager } from '../services/nodeManager';
 import { HostAggregator } from '../services/hostAggregator';
@@ -42,6 +43,7 @@ export function createRoutes(
   const schedulesController = new SchedulesController(hostAggregator);
   const authController = new AuthController();
   const metaController = new MetaController();
+  const notificationsController = new NotificationsController();
   const webhooksController = new WebhooksController();
 
   // Public API routes with rate limiting
@@ -54,6 +56,8 @@ export function createRoutes(
   router.use('/nodes', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/hosts', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/schedules', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
+  router.use('/devices', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
+  router.use('/notifications', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/webhooks', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/admin', apiLimiter, authenticateJwt, authorizeRoles('admin'));
 
@@ -81,6 +85,13 @@ export function createRoutes(
   router.post('/webhooks', (req, res) => webhooksController.createWebhook(req, res));
   router.get('/webhooks/:id/deliveries', (req, res) => webhooksController.getWebhookDeliveries(req, res));
   router.delete('/webhooks/:id', (req, res) => webhooksController.deleteWebhook(req, res));
+
+  // Push notification API routes
+  router.get('/devices', (req, res) => notificationsController.listDevices(req, res));
+  router.post('/devices', (req, res) => notificationsController.registerDevice(req, res));
+  router.delete('/devices/:token', (req, res) => notificationsController.deregisterDevice(req, res));
+  router.get('/notifications/preferences', (req, res) => notificationsController.getPreferences(req, res));
+  router.put('/notifications/preferences', (req, res) => notificationsController.updatePreferences(req, res));
 
   // Host API routes
   // IMPORTANT: mac-vendor must be registered before the :fqn catch-all

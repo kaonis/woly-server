@@ -5,6 +5,10 @@ import {
   cncRateLimitDescriptorSchema,
   cncRateLimitsSchema,
   createHostWakeScheduleRequestSchema,
+  deviceDeregistrationResponseSchema,
+  deviceRegistrationRequestSchema,
+  deviceRegistrationSchema,
+  devicesResponseSchema,
   deleteHostWakeScheduleResponseSchema,
   hostPortScanResponseSchema,
   hostStatusHistoryEntrySchema,
@@ -22,6 +26,11 @@ import {
   HOST_STATE_STREAM_MUTATING_EVENT_TYPES,
   HOST_STATE_STREAM_NON_MUTATING_EVENT_TYPES,
   hostStatusSchema,
+  notificationPreferencesResponseSchema,
+  notificationPreferencesSchema,
+  notificationQuietHoursSchema,
+  pushNotificationEventTypeSchema,
+  pushNotificationPlatformSchema,
   scheduleFrequencySchema,
   commandStateSchema,
   errorResponseSchema,
@@ -942,6 +951,159 @@ describe('webhookDeliveriesResponseSchema', () => {
             createdAt: '2026-02-18T20:00:00.000Z',
           },
         ],
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('pushNotificationEventTypeSchema', () => {
+  it('accepts supported push notification event types', () => {
+    expect(pushNotificationEventTypeSchema.safeParse('host.awake').success).toBe(true);
+    expect(pushNotificationEventTypeSchema.safeParse('node.disconnected').success).toBe(true);
+  });
+
+  it('rejects unsupported push notification event types', () => {
+    expect(pushNotificationEventTypeSchema.safeParse('host.discovered').success).toBe(false);
+  });
+});
+
+describe('pushNotificationPlatformSchema', () => {
+  it('accepts ios/android', () => {
+    expect(pushNotificationPlatformSchema.safeParse('ios').success).toBe(true);
+    expect(pushNotificationPlatformSchema.safeParse('android').success).toBe(true);
+  });
+
+  it('rejects unsupported platform values', () => {
+    expect(pushNotificationPlatformSchema.safeParse('web').success).toBe(false);
+  });
+});
+
+describe('notificationQuietHoursSchema', () => {
+  it('accepts valid quiet-hours payloads', () => {
+    expect(
+      notificationQuietHoursSchema.safeParse({
+        startHour: 22,
+        endHour: 7,
+        timezone: 'America/New_York',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects out-of-range hour values', () => {
+    expect(
+      notificationQuietHoursSchema.safeParse({
+        startHour: -1,
+        endHour: 25,
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('notificationPreferencesSchema', () => {
+  it('accepts valid notification preference payloads', () => {
+    expect(
+      notificationPreferencesSchema.safeParse({
+        enabled: true,
+        events: ['host.awake', 'scan.complete'],
+        quietHours: {
+          startHour: 23,
+          endHour: 6,
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects duplicate event preferences', () => {
+    expect(
+      notificationPreferencesSchema.safeParse({
+        enabled: true,
+        events: ['host.awake', 'host.awake'],
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('deviceRegistrationRequestSchema', () => {
+  it('accepts valid registration payloads with preferences', () => {
+    expect(
+      deviceRegistrationRequestSchema.safeParse({
+        platform: 'android',
+        token: 'token-12345678',
+        preferences: {
+          enabled: true,
+          events: ['host.awake', 'node.disconnected'],
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects invalid registration payloads', () => {
+    expect(
+      deviceRegistrationRequestSchema.safeParse({
+        platform: 'web',
+        token: 'short',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('deviceRegistrationSchema', () => {
+  it('accepts valid persisted device payloads', () => {
+    expect(
+      deviceRegistrationSchema.safeParse({
+        id: 'device-1',
+        userId: 'operator-1',
+        platform: 'ios',
+        token: 'device-token-example-1234',
+        createdAt: '2026-02-18T20:00:00.000Z',
+        updatedAt: '2026-02-18T20:00:00.000Z',
+        lastSeenAt: '2026-02-18T20:00:00.000Z',
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('devicesResponseSchema', () => {
+  it('accepts device list response payloads', () => {
+    expect(
+      devicesResponseSchema.safeParse({
+        devices: [
+          {
+            id: 'device-1',
+            userId: 'operator-1',
+            platform: 'android',
+            token: 'device-token-example-1234',
+            createdAt: '2026-02-18T20:00:00.000Z',
+            updatedAt: '2026-02-18T20:00:00.000Z',
+            lastSeenAt: '2026-02-18T20:00:00.000Z',
+          },
+        ],
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('deviceDeregistrationResponseSchema', () => {
+  it('accepts successful deregistration responses', () => {
+    expect(
+      deviceDeregistrationResponseSchema.safeParse({
+        success: true,
+        token: 'device-token-example-1234',
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('notificationPreferencesResponseSchema', () => {
+  it('accepts preferences response payloads', () => {
+    expect(
+      notificationPreferencesResponseSchema.safeParse({
+        userId: 'operator-1',
+        preferences: {
+          enabled: true,
+          events: ['host.awake', 'scan.complete'],
+          quietHours: null,
+        },
       }).success
     ).toBe(true);
   });
