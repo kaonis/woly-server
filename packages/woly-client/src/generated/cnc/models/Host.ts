@@ -12,6 +12,10 @@ export type Host = {
      */
     mac?: string;
     /**
+     * Additional known MAC addresses for the same logical host
+     */
+    secondaryMacs?: Array<string>;
+    /**
      * IP address
      */
     ip?: string;

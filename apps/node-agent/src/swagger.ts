@@ -78,6 +78,15 @@ const options: swaggerJsdoc.Options = {
               description: 'MAC address',
               example: '80:6D:97:60:39:08',
             },
+            secondaryMacs: {
+              type: 'array',
+              description: 'Additional known MAC addresses for the same logical host',
+              items: {
+                type: 'string',
+                pattern: '^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$',
+              },
+              example: ['11:22:33:44:55:66'],
+            },
             ip: {
               type: 'string',
               format: 'ipv4',

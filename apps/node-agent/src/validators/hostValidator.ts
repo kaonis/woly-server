@@ -57,6 +57,15 @@ export const updateHostSchema = z
         'MAC address must be in format XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX'
       )
       .optional(),
+    secondaryMacs: z
+      .array(
+        z.string().regex(
+          macAddressPattern,
+          'Secondary MAC addresses must be in format XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX'
+        )
+      )
+      .max(32, 'secondaryMacs must not exceed 32 entries')
+      .optional(),
     notes: hostNotesSchema.optional(),
     tags: hostTagsSchema.optional(),
     wolPort: wolPortSchema.optional(),
@@ -65,11 +74,30 @@ export const updateHostSchema = z
       value.name !== undefined ||
       value.ip !== undefined ||
       value.mac !== undefined ||
+      value.secondaryMacs !== undefined ||
       value.notes !== undefined ||
       value.tags !== undefined ||
       value.wolPort !== undefined, {
-    message: 'At least one field is required: name, ip, mac, notes, tags, or wolPort',
+    message: 'At least one field is required: name, ip, mac, secondaryMacs, notes, tags, or wolPort',
   });
+
+/**
+ * Schema for validating host MAC merge body.
+ */
+export const mergeHostMacSchema = z.object({
+  mac: z.string().regex(
+    macAddressPattern,
+    'MAC address must be in format XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX'
+  ),
+  makePrimary: z.boolean().optional(),
+  sourceHostName: z
+    .string()
+    .min(1, 'sourceHostName must be at least 1 character')
+    .max(255, 'sourceHostName must not exceed 255 characters')
+    .trim()
+    .optional(),
+  deleteSourceHost: z.boolean().optional(),
+});
 
 /**
  * Schema for validating wake-up request body
@@ -87,6 +115,17 @@ export const wakeHostSchema = z
  */
 export const hostNameParamSchema = z.object({
   name: z.string().min(1, 'Hostname must be at least 1 character').max(255, 'Hostname must not exceed 255 characters').trim(),
+});
+
+/**
+ * Schema for validating host name + MAC path parameters.
+ */
+export const hostNameAndMacParamSchema = z.object({
+  name: z.string().min(1, 'Hostname must be at least 1 character').max(255, 'Hostname must not exceed 255 characters').trim(),
+  mac: z.string().regex(
+    macAddressPattern,
+    'MAC address must be in format XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX'
+  ),
 });
 
 /**

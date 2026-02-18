@@ -945,6 +945,192 @@ describe('HostsController additional branches', () => {
     });
   });
 
+  describe('merge candidate and merge-mac flows', () => {
+    it('returns merge candidates grouped by same hostname and subnet', async () => {
+      hostAggregator.getAllHosts.mockResolvedValue([
+        {
+          nodeId: 'node-1',
+          name: 'laptop',
+          mac: 'AA:BB:CC:00:00:01',
+          ip: '192.168.10.11',
+          fullyQualifiedName: 'laptop@lab-node-1',
+        },
+        {
+          nodeId: 'node-1',
+          name: 'Laptop',
+          mac: 'AA:BB:CC:00:00:02',
+          ip: '192.168.10.99',
+          fullyQualifiedName: 'Laptop@lab-node-1',
+        },
+        {
+          nodeId: 'node-2',
+          name: 'laptop',
+          mac: 'AA:BB:CC:00:00:03',
+          ip: '192.168.10.55',
+          fullyQualifiedName: 'laptop@office-node-2',
+        },
+      ]);
+
+      const req = createMockRequest({ correlationId: 'cid-request' });
+      const res = createMockResponse();
+
+      await controller.getMergeCandidates(req, res);
+
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          candidates: [
+            expect.objectContaining({
+              targetFqn: 'laptop@lab-node-1',
+              candidateFqn: 'Laptop@lab-node-1',
+              nodeId: 'node-1',
+              reason: 'same_hostname_subnet',
+            }),
+          ],
+          correlationId: 'cid-request',
+        }),
+      );
+    });
+
+    it('returns 500 when listing merge candidates fails', async () => {
+      hostAggregator.getAllHosts.mockRejectedValue(new Error('boom'));
+
+      const req = createMockRequest();
+      const res = createMockResponse();
+
+      await controller.getMergeCandidates(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Internal Server Error',
+        message: 'Failed to list merge candidates',
+        correlationId: undefined,
+      });
+    });
+
+    it('merges a secondary mac and optionally deletes a source host', async () => {
+      hostAggregator.getHostByFQN.mockResolvedValue({
+        nodeId: 'node-1',
+        name: 'desktop',
+        mac: 'AA:BB:CC:00:00:01',
+        secondaryMacs: [],
+      });
+      commandRouter.routeUpdateHostCommand.mockResolvedValue({
+        success: true,
+        commandId: 'cmd-merge-1',
+        state: 'acknowledged',
+        correlationId: 'cid-router',
+      });
+      commandRouter.routeDeleteHostCommand.mockResolvedValue({
+        success: true,
+      });
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        body: {
+          mac: 'aa-bb-cc-00-00-02',
+          sourceFqn: 'desktop-old@lab',
+          deleteSourceHost: true,
+        },
+        correlationId: 'cid-request',
+      });
+      const res = createMockResponse();
+
+      await controller.mergeHostMac(req, res);
+
+      expect(commandRouter.routeUpdateHostCommand).toHaveBeenCalledWith(
+        'desktop@lab',
+        { mac: 'AA:BB:CC:00:00:01', secondaryMacs: ['AA:BB:CC:00:00:02'] },
+        { idempotencyKey: null, correlationId: 'cid-request' },
+      );
+      expect(commandRouter.routeDeleteHostCommand).toHaveBeenCalledWith('desktop-old@lab', {
+        idempotencyKey: null,
+        correlationId: 'cid-request',
+      });
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Host MAC merged successfully',
+        secondaryMacs: ['AA:BB:CC:00:00:02'],
+        primaryMac: 'AA:BB:CC:00:00:01',
+        commandId: 'cmd-merge-1',
+        state: 'acknowledged',
+        correlationId: 'cid-router',
+      });
+    });
+
+    it('returns 400 for invalid merge body', async () => {
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        body: { mac: 'not-a-mac' },
+      });
+      const res = createMockResponse();
+
+      await controller.mergeHostMac(req, res);
+
+      expect(commandRouter.routeUpdateHostCommand).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('returns 400 for invalid unmerge MAC path parameter', async () => {
+      hostAggregator.getHostByFQN.mockResolvedValue({
+        nodeId: 'node-1',
+        name: 'desktop',
+        mac: 'AA:BB:CC:00:00:01',
+        secondaryMacs: ['AA:BB:CC:00:00:02'],
+      });
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab', mac: 'bad-mac' },
+      });
+      const res = createMockResponse();
+
+      await controller.unmergeHostMac(req, res);
+
+      expect(commandRouter.routeUpdateHostCommand).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Bad Request',
+        message: 'Invalid MAC address format',
+        correlationId: undefined,
+      });
+    });
+
+    it('unmerges a secondary MAC and sends update command', async () => {
+      hostAggregator.getHostByFQN.mockResolvedValue({
+        nodeId: 'node-1',
+        name: 'desktop',
+        mac: 'AA:BB:CC:00:00:01',
+        secondaryMacs: ['AA:BB:CC:00:00:02'],
+      });
+      commandRouter.routeUpdateHostCommand.mockResolvedValue({
+        success: true,
+        commandId: 'cmd-unmerge-1',
+        state: 'acknowledged',
+      });
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab', mac: 'AA:BB:CC:00:00:02' },
+      });
+      const res = createMockResponse();
+
+      await controller.unmergeHostMac(req, res);
+
+      expect(commandRouter.routeUpdateHostCommand).toHaveBeenCalledWith(
+        'desktop@lab',
+        { mac: 'AA:BB:CC:00:00:01', secondaryMacs: [] },
+        { idempotencyKey: null, correlationId: null },
+      );
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Host MAC unmerged successfully',
+        secondaryMacs: [],
+        primaryMac: 'AA:BB:CC:00:00:01',
+        commandId: 'cmd-unmerge-1',
+        state: 'acknowledged',
+        correlationId: undefined,
+      });
+    });
+  });
+
   describe('updateHost correlation branch', () => {
     it('prefers router correlationId in success response', async () => {
       commandRouter.routeUpdateHostCommand.mockResolvedValue({

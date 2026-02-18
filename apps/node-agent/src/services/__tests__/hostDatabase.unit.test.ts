@@ -228,6 +228,47 @@ describe('HostDatabase', () => {
       expect(updated?.tags).toEqual(['primary', 'ssh']);
     });
 
+    it('should merge a secondary MAC into a host', async () => {
+      await db.addHost('MergeHost', 'AA:BB:CC:DD:EE:10', '192.168.1.110');
+
+      const updated = await db.mergeHostMac('MergeHost', 'AA:BB:CC:DD:EE:11');
+      expect(updated.mac).toBe('AA:BB:CC:DD:EE:10');
+      expect(updated.secondaryMacs).toEqual(['AA:BB:CC:DD:EE:11']);
+    });
+
+    it('should promote merged MAC to primary when requested', async () => {
+      await db.addHost('MergePrimaryHost', 'AA:BB:CC:DD:EE:20', '192.168.1.120');
+
+      const updated = await db.mergeHostMac('MergePrimaryHost', 'AA:BB:CC:DD:EE:21', {
+        makePrimary: true,
+      });
+      expect(updated.mac).toBe('AA:BB:CC:DD:EE:21');
+      expect(updated.secondaryMacs).toEqual(['AA:BB:CC:DD:EE:20']);
+    });
+
+    it('should unmerge a MAC and promote the first secondary when removing primary', async () => {
+      await db.addHost('UnmergeHost', 'AA:BB:CC:DD:EE:30', '192.168.1.130', {
+        secondaryMacs: ['AA:BB:CC:DD:EE:31', 'AA:BB:CC:DD:EE:32'],
+      });
+
+      const updated = await db.unmergeHostMac('UnmergeHost', 'AA:BB:CC:DD:EE:30');
+      expect(updated.mac).toBe('AA:BB:CC:DD:EE:31');
+      expect(updated.secondaryMacs).toEqual(['AA:BB:CC:DD:EE:32']);
+    });
+
+    it('should detect duplicate host merge candidates by hostname and subnet', async () => {
+      await db.addHost('DUPLICATE-NODE', 'AA:BB:CC:DD:EE:40', '192.168.10.10');
+      await db.addHost('duplicate-node', 'AA:BB:CC:DD:EE:41', '192.168.10.50');
+
+      const candidates = await db.getMergeCandidates();
+      expect(candidates).toHaveLength(1);
+      expect(candidates[0]).toMatchObject({
+        targetName: 'DUPLICATE-NODE',
+        candidateName: 'duplicate-node',
+        reason: 'same_hostname_subnet',
+      });
+    });
+
     it('should normalize MAC addresses on insert so scan updates match', async () => {
       await db.addHost('MacFormatHost', 'aa-bb-cc-dd-ee-ff', '192.168.1.240');
 

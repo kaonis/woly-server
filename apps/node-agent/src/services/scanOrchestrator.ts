@@ -46,6 +46,15 @@ class ScanOrchestrator {
     return this.lastScanTime ? this.lastScanTime.toISOString() : null;
   }
 
+  private sameIpv4Subnet(leftIp: string, rightIp: string): boolean {
+    const left = /^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/.exec(leftIp.trim());
+    const right = /^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/.exec(rightIp.trim());
+    if (!left || !right) {
+      return false;
+    }
+    return left[1] === right[1];
+  }
+
   async syncWithNetwork(): Promise<ScanSyncResult> {
     if (this.scanInProgress) {
       logger.info('Scan already in progress, skipping...');
@@ -137,6 +146,30 @@ class ScanOrchestrator {
         } catch {
           try {
             const hostName = host.hostname ?? `device-${host.ip.replace(/\./g, '-')}`;
+            const existingHosts = await this.hostDb.getAllHosts();
+            const duplicateCandidate = existingHosts.find((existing) => {
+              if (existing.name.trim().toLowerCase() !== hostName.trim().toLowerCase()) {
+                return false;
+              }
+              if (!this.sameIpv4Subnet(existing.ip, host.ip)) {
+                return false;
+              }
+              if (existing.mac === formattedMac) {
+                return false;
+              }
+              return !(existing.secondaryMacs ?? []).includes(formattedMac);
+            });
+
+            if (duplicateCandidate) {
+              logger.info('Potential duplicate host discovered; merge suggestion available', {
+                incomingName: hostName,
+                incomingMac: formattedMac,
+                incomingIp: host.ip,
+                candidateName: duplicateCandidate.name,
+                candidateMac: duplicateCandidate.mac,
+                candidateIp: duplicateCandidate.ip,
+              });
+            }
 
             await this.hostDb.addHost(hostName, formattedMac, host.ip, undefined, {
               emitLifecycleEvent: false,

@@ -32,6 +32,7 @@ type AggregatedHostRow = AggregatedHost & { id: number };
 type HostPort = NonNullable<Host['openPorts']>[number];
 type HostStatus = Host['status'];
 type AggregatedHostRowRaw = AggregatedHost & {
+  secondaryMacs?: unknown;
   tags?: unknown;
   openPorts?: unknown;
   portsScannedAt?: unknown;
@@ -52,6 +53,7 @@ const HOST_SELECT_COLUMNS = `
         ah.node_id as "nodeId",
         ah.name,
         ah.mac,
+        ah.secondary_macs as "secondaryMacs",
         ah.ip,
         ah.status,
         ah.last_seen as "lastSeen",
@@ -110,6 +112,60 @@ export class HostAggregator extends EventEmitter {
     }
 
     return JSON.stringify(tags);
+  }
+
+  private parseSecondaryMacs(value: unknown, hostName: string, primaryMac: string): string[] {
+    if (Array.isArray(value)) {
+      return this.normalizeSecondaryMacs(
+        value.filter((entry): entry is string => typeof entry === 'string'),
+        primaryMac,
+      );
+    }
+
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (Array.isArray(parsed)) {
+        return this.normalizeSecondaryMacs(
+          parsed.filter((entry): entry is string => typeof entry === 'string'),
+          primaryMac,
+        );
+      }
+    } catch (error) {
+      logger.warn('Failed to parse aggregated host secondary MACs; defaulting to empty list', {
+        hostName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return [];
+  }
+
+  private normalizeSecondaryMacs(secondaryMacs: string[] | undefined, primaryMac: string): string[] {
+    if (!secondaryMacs || secondaryMacs.length === 0) {
+      return [];
+    }
+
+    const normalizedPrimary = primaryMac.trim().toUpperCase().replace(/-/g, ':');
+    const deduped = new Set<string>();
+    for (const candidate of secondaryMacs) {
+      if (typeof candidate !== 'string' || candidate.trim().length === 0) {
+        continue;
+      }
+      const normalized = candidate.trim().toUpperCase().replace(/-/g, ':');
+      if (normalized !== normalizedPrimary) {
+        deduped.add(normalized);
+      }
+    }
+
+    return Array.from(deduped);
+  }
+
+  private serializeSecondaryMacs(secondaryMacs: string[] | undefined, primaryMac: string): string {
+    return JSON.stringify(this.normalizeSecondaryMacs(secondaryMacs, primaryMac));
   }
 
   private parseOpenPorts(value: unknown, hostName: string): HostPort[] {
@@ -206,15 +262,18 @@ export class HostAggregator extends EventEmitter {
   }
 
   private normalizeHost(row: AggregatedHostRowRaw): AggregatedHost {
-    const openPorts = this.parseOpenPorts(row.openPorts, row.name);
-    const portsScannedAt = this.normalizeDateValue(row.portsScannedAt);
-    const portsExpireAt = this.normalizeDateValue(row.portsExpireAt);
+    const { secondaryMacs: rawSecondaryMacs, ...base } = row;
+    const openPorts = this.parseOpenPorts(base.openPorts, base.name);
+    const portsScannedAt = this.normalizeDateValue(base.portsScannedAt);
+    const portsExpireAt = this.normalizeDateValue(base.portsExpireAt);
     const hasFreshPortScan = this.isPortScanStillFresh(portsExpireAt);
+    const secondaryMacs = this.parseSecondaryMacs(rawSecondaryMacs, base.name, base.mac);
 
     return {
-      ...row,
-      notes: row.notes ?? null,
-      tags: this.parseTags(row.tags, row.name),
+      ...base,
+      ...(secondaryMacs.length > 0 ? { secondaryMacs } : {}),
+      notes: base.notes ?? null,
+      tags: this.parseTags(base.tags, base.name),
       openPorts: hasFreshPortScan ? openPorts : undefined,
       portsScannedAt: hasFreshPortScan ? portsScannedAt : null,
       portsExpireAt: hasFreshPortScan ? portsExpireAt : null,
@@ -300,6 +359,10 @@ export class HostAggregator extends EventEmitter {
       { column: 'notes', statement: 'ALTER TABLE aggregated_hosts ADD COLUMN notes TEXT' },
       { column: 'tags', statement: "ALTER TABLE aggregated_hosts ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'" },
       {
+        column: 'secondary_macs',
+        statement: "ALTER TABLE aggregated_hosts ADD COLUMN secondary_macs TEXT NOT NULL DEFAULT '[]'",
+      },
+      {
         column: 'open_ports',
         statement: "ALTER TABLE aggregated_hosts ADD COLUMN open_ports TEXT NOT NULL DEFAULT '[]'",
       },
@@ -332,6 +395,7 @@ export class HostAggregator extends EventEmitter {
     }
 
     await db.query("UPDATE aggregated_hosts SET tags = '[]' WHERE tags IS NULL");
+    await db.query("UPDATE aggregated_hosts SET secondary_macs = '[]' WHERE secondary_macs IS NULL");
     await db.query("UPDATE aggregated_hosts SET open_ports = '[]' WHERE open_ports IS NULL");
     await this.ensureHostStatusHistoryTable();
   }
@@ -434,22 +498,43 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
     return row ? (this.normalizeHost(row as AggregatedHostRowRaw) as AggregatedHostRow) : null;
   }
 
-  private async findHostRowByNodeAndMac(
+  private async findHostRowByNodeAndAnyMac(
     nodeId: string,
     mac: string
   ): Promise<AggregatedHostRow | null> {
+    const normalizedMac = mac.trim().toUpperCase().replace(/-/g, ':');
     const result = await db.query<AggregatedHostRow>(
       `SELECT
 ${HOST_SELECT_COLUMNS_WITH_ID}
       FROM aggregated_hosts ah
-      WHERE ah.node_id = $1 AND ah.mac = $2
-      ORDER BY ah.updated_at DESC, ah.id DESC
-      LIMIT 1`,
-      [nodeId, mac]
+      WHERE ah.node_id = $1
+      ORDER BY ah.updated_at DESC, ah.id DESC`,
+      [nodeId]
     );
 
-    const row = result.rows[0];
-    return row ? (this.normalizeHost(row as AggregatedHostRowRaw) as AggregatedHostRow) : null;
+    for (const row of result.rows) {
+      const normalized = this.normalizeHost(row as AggregatedHostRowRaw) as AggregatedHostRow;
+      const knownMacs = new Set<string>([normalized.mac, ...(normalized.secondaryMacs ?? [])]);
+      if (knownMacs.has(normalizedMac)) {
+        return normalized;
+      }
+    }
+
+    return null;
+  }
+
+  private hostsShareAnyMac(
+    first: { mac: string; secondaryMacs?: string[] },
+    second: { mac: string; secondaryMacs?: string[] }
+  ): boolean {
+    const firstKnown = new Set<string>([first.mac, ...(first.secondaryMacs ?? [])]);
+    const secondKnown = new Set<string>([second.mac, ...(second.secondaryMacs ?? [])]);
+    for (const candidate of firstKnown) {
+      if (secondKnown.has(candidate)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private async deleteOtherHostsByNodeAndMac(
@@ -478,6 +563,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
     const pingResponsive = host.pingResponsive ?? null;
     const notes = host.notes ?? null;
     const tags = this.serializeTags(host.tags);
+    const secondaryMacs = this.serializeSecondaryMacs(host.secondaryMacs, host.mac);
 
     // Convert lastSeen to ISO string for SQLite compatibility
     const lastSeen = host.lastSeen
@@ -499,8 +585,9 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
             ping_responsive = $9,
             notes = $10,
             tags = $11,
+            secondary_macs = $12,
             updated_at = ${timestamp}
-        WHERE id = $12 AND node_id = $13`,
+        WHERE id = $13 AND node_id = $14`,
       [
         host.name,
         host.mac,
@@ -513,6 +600,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
         pingResponsive,
         notes,
         tags,
+        secondaryMacs,
         id,
         nodeId,
       ]
@@ -529,6 +617,10 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
     }
 
     if (previous.mac !== next.mac) {
+      return true;
+    }
+
+    if (JSON.stringify(previous.secondaryMacs ?? []) !== JSON.stringify(next.secondaryMacs ?? [])) {
       return true;
     }
 
@@ -573,7 +665,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
     // Reconcile by stable identifier first (MAC). Names can change due to renames or flaky hostname resolution.
     const existingByMac =
       host.mac && typeof host.mac === 'string'
-        ? await this.findHostRowByNodeAndMac(nodeId, host.mac)
+        ? await this.findHostRowByNodeAndAnyMac(nodeId, host.mac)
         : null;
 
     if (existingByMac) {
@@ -582,7 +674,11 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
       const wasRenamed = existingByMac.name !== host.name;
       if (wasRenamed) {
         const existingByName = await this.findHostRowByNodeAndName(nodeId, host.name);
-        if (existingByName && existingByName.mac === host.mac && existingByName.id !== existingByMac.id) {
+        if (
+          existingByName &&
+          this.hostsShareAnyMac(existingByName, host) &&
+          existingByName.id !== existingByMac.id
+        ) {
           await db.query('DELETE FROM aggregated_hosts WHERE id = $1 AND node_id = $2', [
             existingByName.id,
             nodeId,
@@ -1220,6 +1316,7 @@ ${HOST_SELECT_COLUMNS}
     const pingResponsive = host.pingResponsive ?? null;
     const notes = host.notes ?? null;
     const tags = this.serializeTags(host.tags);
+    const secondaryMacs = this.serializeSecondaryMacs(host.secondaryMacs, host.mac);
 
     // Convert lastSeen to ISO string for SQLite compatibility
     const lastSeen = host.lastSeen 
@@ -1228,12 +1325,13 @@ ${HOST_SELECT_COLUMNS}
 
     await db.query(
       `INSERT INTO aggregated_hosts
-        (node_id, name, mac, ip, status, last_seen, location, fully_qualified_name, discovered, ping_responsive, notes, tags)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        (node_id, name, mac, secondary_macs, ip, status, last_seen, location, fully_qualified_name, discovered, ping_responsive, notes, tags)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         nodeId,
         host.name,
         host.mac,
+        secondaryMacs,
         host.ip,
         host.status,
         lastSeen,

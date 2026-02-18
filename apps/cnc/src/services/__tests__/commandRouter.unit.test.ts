@@ -39,6 +39,7 @@ type HostRecord = {
   nodeId: string;
   name: string;
   mac: string;
+  secondaryMacs?: string[];
   ip: string;
   wolPort?: number;
   status: 'awake' | 'asleep';
@@ -188,6 +189,7 @@ describe('CommandRouter unit behavior', () => {
       nodeId: 'node-2',
       name: 'old-name',
       mac: '00:11:22:33:44:55',
+      secondaryMacs: ['00:11:22:33:44:66'],
       ip: '10.0.0.10',
       status: 'asleep',
     });
@@ -210,6 +212,7 @@ describe('CommandRouter unit behavior', () => {
           currentName: 'old-name',
           name: 'new-name',
           mac: '00:11:22:33:44:55',
+          secondaryMacs: ['00:11:22:33:44:66'],
           ip: '10.0.0.10',
           wolPort: undefined,
           status: 'asleep',
@@ -269,6 +272,7 @@ describe('CommandRouter unit behavior', () => {
       nodeId: 'node-2',
       name: 'old-name',
       mac: '00:11:22:33:44:55',
+      secondaryMacs: ['00:11:22:33:44:66'],
       ip: '10.0.0.10',
       status: 'asleep',
       notes: 'legacy note',
@@ -288,6 +292,7 @@ describe('CommandRouter unit behavior', () => {
     await router.routeUpdateHostCommand('old-name@SiteA', {
       notes: null,
       tags: ['prod', 'critical'],
+      secondaryMacs: ['00:11:22:33:44:77'],
     });
 
     expect(executeSpy).toHaveBeenCalledWith(
@@ -295,6 +300,7 @@ describe('CommandRouter unit behavior', () => {
       expect.objectContaining({
         type: 'update-host',
         data: expect.objectContaining({
+          secondaryMacs: ['00:11:22:33:44:77'],
           notes: null,
           tags: ['prod', 'critical'],
         }),

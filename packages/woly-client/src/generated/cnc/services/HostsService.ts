@@ -75,6 +75,7 @@ export class HostsService {
         requestBody: {
             name?: string;
             mac?: string;
+            secondaryMacs?: Array<string>;
             ip?: string;
             wolPort?: number;
             status?: 'awake' | 'asleep';
@@ -338,6 +339,37 @@ export class HostsService {
                 503: `Service unavailable (e.g., node offline)`,
                 504: `Command timeout`,
             },
+        });
+    }
+    /**
+     * List potential duplicate-host merge candidates
+     * @returns any Candidate pairs detected from aggregated host inventory
+     * @throws ApiError
+     */
+    public static getApiHostsMergeCandidates(): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/hosts/merge-candidates',
+        });
+    }
+    /**
+     * Associate an additional MAC address with a host
+     * @throws ApiError
+     */
+    public static putApiHostsMergeMac(): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/api/hosts/{fqn}/merge-mac',
+        });
+    }
+    /**
+     * Remove a merged MAC association from a host (undo)
+     * @throws ApiError
+     */
+    public static deleteApiHostsMergeMac(): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/hosts/{fqn}/merge-mac/{mac}',
         });
     }
     /**

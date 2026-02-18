@@ -7,7 +7,12 @@ import { logger } from '../utils/logger';
 import HostDatabase from '../services/hostDatabase';
 import ScanOrchestrator from '../services/scanOrchestrator';
 import * as networkDiscovery from '../services/networkDiscovery';
-import { Host, MacVendorCacheEntry, WakeVerificationResult } from '../types';
+import {
+  Host,
+  HostMergeCandidatesResponse,
+  MacVendorCacheEntry,
+  WakeVerificationResult,
+} from '../types';
 
 // Database service will be set by app.js
 let hostDb: HostDatabase | null = null;
@@ -734,7 +739,7 @@ const scanNetwork = async (_req: Request, res: Response): Promise<void> => {
  *         $ref: '#/components/responses/InternalError'
  */
 const addHost = async (req: Request, res: Response): Promise<void> => {
-  const { name, mac, ip, notes, tags } = req.body;
+  const { name, mac, ip, notes, tags, secondaryMacs } = req.body;
 
   if (!name || !mac || !ip) {
     res.status(400).json({ error: 'Missing required fields: name, mac, ip' });
@@ -748,6 +753,7 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
   const host = await hostDb.addHost(name, mac, ip, {
     notes,
     tags,
+    secondaryMacs,
   });
   res.status(201).json(host);
 };
@@ -783,6 +789,11 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
  *               mac:
  *                 type: string
  *                 example: 'AA:BB:CC:DD:EE:FF'
+ *               secondaryMacs:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example: ['11:22:33:44:55:66']
  *               ip:
  *                 type: string
  *                 example: 192.168.1.200
@@ -814,7 +825,9 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
  */
 const updateHost = async (req: Request, res: Response): Promise<void> => {
   const currentName = req.params.name as string;
-  const updates = req.body as Partial<Pick<Host, 'name' | 'mac' | 'ip' | 'notes' | 'tags' | 'wolPort'>>;
+  const updates = req.body as Partial<
+    Pick<Host, 'name' | 'mac' | 'secondaryMacs' | 'ip' | 'notes' | 'tags' | 'wolPort'>
+  >;
 
   if (!hostDb) {
     res.status(500).json({ error: 'Database not initialized' });
@@ -895,6 +908,118 @@ const deleteHost = async (req: Request, res: Response): Promise<void> => {
   // Forward to C&C in agent mode (if listeners are registered).
   hostDb.emit('host-removed', name);
   res.status(200).json({ message: 'Host deleted', name });
+};
+
+/**
+ * @swagger
+ * /hosts/merge-candidates:
+ *   get:
+ *     summary: List potential duplicate-host merge candidates
+ *     tags: [Hosts]
+ *     responses:
+ *       200:
+ *         description: Candidate pairs detected from local host inventory
+ */
+const getMergeCandidates = async (_req: Request, res: Response): Promise<void> => {
+  if (!hostDb) {
+    res.status(500).json({ error: 'Database not initialized' });
+    return;
+  }
+
+  const candidates = await hostDb.getMergeCandidates();
+  const payload: HostMergeCandidatesResponse = {
+    candidates,
+    generatedAt: new Date().toISOString(),
+  };
+  res.status(200).json(payload);
+};
+
+/**
+ * @swagger
+ * /hosts/{name}/merge-mac:
+ *   put:
+ *     summary: Associate an additional MAC address with a host
+ *     tags: [Hosts]
+ */
+const mergeHostMac = async (req: Request, res: Response): Promise<void> => {
+  const name = req.params.name as string;
+  const body = req.body as {
+    mac: string;
+    makePrimary?: boolean;
+    sourceHostName?: string;
+    deleteSourceHost?: boolean;
+  };
+
+  if (!hostDb) {
+    res.status(500).json({ error: 'Database not initialized' });
+    return;
+  }
+
+  const existing = await hostDb.getHost(name);
+  if (!existing) {
+    res.status(404).json({ error: 'Not Found', message: `Host '${name}' not found` });
+    return;
+  }
+
+  try {
+    const updated = await hostDb.mergeHostMac(name, body.mac, {
+      makePrimary: body.makePrimary,
+    });
+
+    if (body.deleteSourceHost && body.sourceHostName && body.sourceHostName !== name) {
+      const source = await hostDb.getHost(body.sourceHostName);
+      if (source) {
+        await hostDb.deleteHost(body.sourceHostName);
+      }
+    }
+
+    res.status(200).json(updated);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    if (message.includes('UNIQUE constraint failed')) {
+      res.status(409).json({
+        error: 'Conflict',
+        message: 'Merge conflicts with an existing host record',
+      });
+      return;
+    }
+    throw error;
+  }
+};
+
+/**
+ * @swagger
+ * /hosts/{name}/merge-mac/{mac}:
+ *   delete:
+ *     summary: Remove a merged MAC association from a host (undo)
+ *     tags: [Hosts]
+ */
+const unmergeHostMac = async (req: Request, res: Response): Promise<void> => {
+  const name = req.params.name as string;
+  const mac = req.params.mac as string;
+
+  if (!hostDb) {
+    res.status(500).json({ error: 'Database not initialized' });
+    return;
+  }
+
+  const existing = await hostDb.getHost(name);
+  if (!existing) {
+    res.status(404).json({ error: 'Not Found', message: `Host '${name}' not found` });
+    return;
+  }
+
+  try {
+    const updated = await hostDb.unmergeHostMac(name, mac);
+    res.status(200).json(updated);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    if (message.includes('not associated') || message.includes('no secondary MACs')) {
+      res.status(400).json({ error: 'Bad Request', message });
+      return;
+    }
+    throw error;
+  }
 };
 
 /**
@@ -1057,5 +1182,8 @@ export {
   addHost,
   updateHost,
   deleteHost,
+  getMergeCandidates,
+  mergeHostMac,
+  unmergeHostMac,
   getMacVendor,
 };

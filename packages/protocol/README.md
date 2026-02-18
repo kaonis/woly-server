@@ -7,7 +7,7 @@
 ### Types
 
 - `HostStatus` — `'awake' | 'asleep'`
-- `Host` — Canonical host representation shared across all WoLy apps (replaces `HostPayload`), including optional cached port-scan snapshot fields
+- `Host` — Canonical host representation shared across all WoLy apps (replaces `HostPayload`), including optional multi-MAC (`secondaryMacs`) and cached port-scan snapshot fields
 - `HostPayload` — **@deprecated** Alias for `Host`, kept for backwards compatibility
 - `CommandState` — Command lifecycle state: `'queued' | 'sent' | 'acknowledged' | 'failed' | 'timed_out'`
 - `ErrorResponse` — Standardized error response shape with `error`, `message`, optional `code` and `details`

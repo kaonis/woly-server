@@ -4,12 +4,15 @@ import { mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { logger } from '../utils/logger';
 import * as networkDiscovery from './networkDiscovery';
-import { Host } from '../types';
+import { Host, HostMergeCandidate } from '../types';
 
 /**
  * Database Service
  * Manages host synchronization and updates
  */
+
+const HOST_SELECT_COLUMNS =
+  'name, mac, secondary_macs as secondaryMacs, ip, status, wol_port as wolPort, lastSeen, discovered, pingResponsive, notes, tags';
 
 class HostDatabase extends EventEmitter {
   private db: Database.Database | null = null;
@@ -68,6 +71,68 @@ class HostDatabase extends EventEmitter {
     return JSON.stringify(tags);
   }
 
+  private normalizeSecondaryMacs(
+    secondaryMacs: string[] | undefined,
+    primaryMac: string
+  ): string[] {
+    if (!secondaryMacs || secondaryMacs.length === 0) {
+      return [];
+    }
+
+    const normalizedPrimary = networkDiscovery.formatMAC(primaryMac);
+    const deduped = new Set<string>();
+
+    for (const candidate of secondaryMacs) {
+      if (typeof candidate !== 'string' || candidate.trim().length === 0) {
+        continue;
+      }
+      try {
+        const normalized = networkDiscovery.formatMAC(candidate);
+        if (normalized !== normalizedPrimary) {
+          deduped.add(normalized);
+        }
+      } catch {
+        // Ignore malformed MAC values from stale rows/manual edits.
+      }
+    }
+
+    return Array.from(deduped);
+  }
+
+  private parseSecondaryMacs(value: unknown, hostName: string, primaryMac: string): string[] {
+    if (Array.isArray(value)) {
+      return this.normalizeSecondaryMacs(
+        value.filter((entry): entry is string => typeof entry === 'string'),
+        primaryMac
+      );
+    }
+
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (Array.isArray(parsed)) {
+        return this.normalizeSecondaryMacs(
+          parsed.filter((entry): entry is string => typeof entry === 'string'),
+          primaryMac
+        );
+      }
+    } catch (error) {
+      logger.warn('Failed to parse host secondary MAC metadata; falling back to empty list', {
+        hostName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return [];
+  }
+
+  private serializeSecondaryMacs(secondaryMacs: string[] | undefined, primaryMac: string): string {
+    return JSON.stringify(this.normalizeSecondaryMacs(secondaryMacs, primaryMac));
+  }
+
   private normalizeLastSeen(value: string | null): string | null {
     if (!value) {
       return null;
@@ -111,14 +176,49 @@ class HostDatabase extends EventEmitter {
     return 9;
   }
 
-  private normalizeHostRow(row: Host & { tags?: unknown; wolPort?: unknown }): Host {
+  private normalizeHostRow(
+    row: Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown }
+  ): Host {
+    const {
+      wolPort: rawWolPort,
+      tags: rawTags,
+      secondaryMacs: rawSecondaryMacs,
+      ...base
+    } = row;
+    const secondaryMacs = this.parseSecondaryMacs(rawSecondaryMacs, base.name, base.mac);
+
     return {
-      ...row,
-      lastSeen: this.normalizeLastSeen(row.lastSeen),
-      wolPort: this.normalizeWolPort(row.wolPort),
-      notes: row.notes ?? null,
-      tags: this.parseTags(row.tags, row.name),
+      ...base,
+      ...(secondaryMacs.length > 0 ? { secondaryMacs } : {}),
+      lastSeen: this.normalizeLastSeen(base.lastSeen),
+      wolPort: this.normalizeWolPort(rawWolPort),
+      notes: base.notes ?? null,
+      tags: this.parseTags(rawTags, base.name),
     };
+  }
+
+  private subnetHintForIp(ip: string): string | null {
+    const ipv4Match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/.exec(ip.trim());
+    if (!ipv4Match) {
+      return null;
+    }
+
+    return `${ipv4Match[1]}.${ipv4Match[2]}.${ipv4Match[3]}.x/24`;
+  }
+
+  private hostMacSet(host: Host): Set<string> {
+    return new Set<string>([host.mac, ...(host.secondaryMacs ?? [])]);
+  }
+
+  private hostsShareAnyMac(first: Host, second: Host): boolean {
+    const firstSet = this.hostMacSet(first);
+    const secondSet = this.hostMacSet(second);
+    for (const mac of firstSet) {
+      if (secondSet.has(mac)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private addColumnIfMissing(columnDefinition: string): void {
@@ -188,6 +288,7 @@ class HostDatabase extends EventEmitter {
     db.exec(`CREATE TABLE IF NOT EXISTS hosts(
       name text PRIMARY KEY UNIQUE,
       mac text NOT NULL UNIQUE,
+      secondary_macs text NOT NULL DEFAULT '[]',
       ip text NOT NULL UNIQUE,
       status text NOT NULL,
       wol_port integer NOT NULL DEFAULT 9,
@@ -203,11 +304,18 @@ class HostDatabase extends EventEmitter {
     this.addColumnIfMissing('notes text');
     this.addColumnIfMissing("tags text NOT NULL DEFAULT '[]'");
     this.addColumnIfMissing('wol_port integer NOT NULL DEFAULT 9');
+    this.addColumnIfMissing("secondary_macs text NOT NULL DEFAULT '[]'");
     try {
       db.exec('UPDATE hosts SET wol_port = 9 WHERE wol_port IS NULL');
     } catch (err) {
       const error = err as Error;
       logger.warn('Could not normalize wol_port defaults', { error: error.message });
+    }
+    try {
+      db.exec("UPDATE hosts SET secondary_macs = '[]' WHERE secondary_macs IS NULL");
+    } catch (err) {
+      const error = err as Error;
+      logger.warn('Could not normalize secondary_macs defaults', { error: error.message });
     }
   }
 
@@ -218,10 +326,8 @@ class HostDatabase extends EventEmitter {
     try {
       const db = this.assertReady();
       const rows = db
-        .prepare(
-          'SELECT name, mac, ip, status, wol_port as wolPort, lastSeen, discovered, pingResponsive, notes, tags FROM hosts ORDER BY name'
-        )
-        .all() as Array<Host & { tags?: unknown; wolPort?: unknown }>;
+        .prepare(`SELECT ${HOST_SELECT_COLUMNS} FROM hosts ORDER BY name`)
+        .all() as Array<Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown }>;
 
       return rows.map((row) => this.normalizeHostRow(row));
     } catch (error) {
@@ -238,10 +344,10 @@ class HostDatabase extends EventEmitter {
     try {
       const db = this.assertReady();
       const row = db
-        .prepare(
-          'SELECT name, mac, ip, status, wol_port as wolPort, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE name = ?'
-        )
-        .get(name) as (Host & { tags?: unknown; wolPort?: unknown }) | undefined;
+        .prepare(`SELECT ${HOST_SELECT_COLUMNS} FROM hosts WHERE name = ?`)
+        .get(name) as
+        | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown })
+        | undefined;
 
       return row ? this.normalizeHostRow(row) : undefined;
     } catch (error) {
@@ -259,12 +365,32 @@ class HostDatabase extends EventEmitter {
       const db = this.assertReady();
       const formattedMac = networkDiscovery.formatMAC(mac);
       const row = db
-        .prepare(
-          'SELECT name, mac, ip, status, wol_port as wolPort, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE mac = ?'
-        )
-        .get(formattedMac) as (Host & { tags?: unknown; wolPort?: unknown }) | undefined;
+        .prepare(`SELECT ${HOST_SELECT_COLUMNS} FROM hosts WHERE mac = ?`)
+        .get(formattedMac) as
+        | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown })
+        | undefined;
 
-      return row ? this.normalizeHostRow(row) : undefined;
+      if (row) {
+        return this.normalizeHostRow(row);
+      }
+
+      const secondaryRow = db
+        .prepare(
+          `SELECT ${HOST_SELECT_COLUMNS}
+           FROM hosts
+           WHERE EXISTS (
+             SELECT 1
+             FROM json_each(COALESCE(secondary_macs, '[]'))
+             WHERE value = ?
+           )
+           ORDER BY lastSeen DESC
+           LIMIT 1`
+        )
+        .get(formattedMac) as
+        | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown })
+        | undefined;
+
+      return secondaryRow ? this.normalizeHostRow(secondaryRow) : undefined;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       logger.error(`Failed to get host by MAC ${mac}:`, { error: message });
@@ -279,23 +405,34 @@ class HostDatabase extends EventEmitter {
     name: string,
     mac: string,
     ip: string,
-    metadata?: { notes?: string | null; tags?: string[]; wolPort?: number },
+    metadata?: { notes?: string | null; tags?: string[]; wolPort?: number; secondaryMacs?: string[] },
     options?: { emitLifecycleEvent?: boolean }
   ): Promise<Host> {
     return new Promise((resolve, reject) => {
-      const sql = `INSERT INTO hosts(name, mac, ip, status, wol_port, lastSeen, discovered, pingResponsive, notes, tags)
-                   VALUES(?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 0, NULL, ?, ?)`;
+      const sql = `INSERT INTO hosts(name, mac, secondary_macs, ip, status, wol_port, lastSeen, discovered, pingResponsive, notes, tags)
+                   VALUES(?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 0, NULL, ?, ?)`;
       try {
         const db = this.assertReady();
         const formattedMac = networkDiscovery.formatMAC(mac);
         const notes = metadata?.notes ?? null;
         const tags = this.serializeTags(metadata?.tags);
+        const secondaryMacs = this.normalizeSecondaryMacs(metadata?.secondaryMacs, formattedMac);
         const wolPort = this.normalizeWolPort(metadata?.wolPort);
-        db.prepare(sql).run(name, formattedMac, ip, 'asleep', wolPort, notes, tags);
+        db.prepare(sql).run(
+          name,
+          formattedMac,
+          this.serializeSecondaryMacs(secondaryMacs, formattedMac),
+          ip,
+          'asleep',
+          wolPort,
+          notes,
+          tags
+        );
         logger.info(`Added host: ${name}`);
         const createdHost: Host = {
           name,
           mac: formattedMac,
+          ...(secondaryMacs.length > 0 ? { secondaryMacs } : {}),
           ip,
           status: 'asleep',
           wolPort,
@@ -323,27 +460,49 @@ class HostDatabase extends EventEmitter {
    * Update host's last seen time, status, and mark as discovered
    * Throws error if host not found
    */
-  updateHostSeen(
+  async updateHostSeen(
     mac: string,
     status: 'awake' | 'asleep' = 'awake',
     pingResponsive: number | null = null
   ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const sql = `UPDATE hosts SET lastSeen = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), discovered = 1, status = ?, pingResponsive = ? WHERE mac = ?`;
-      try {
-        const db = this.assertReady();
-        const formattedMac = networkDiscovery.formatMAC(mac);
-        const info = db.prepare(sql).run(status, pingResponsive, formattedMac);
-        if (info.changes === 0) {
-          // No rows were updated - MAC doesn't exist
-          reject(new Error(`Host with MAC ${formattedMac} not found in database`));
-        } else {
-          resolve();
-        }
-      } catch (err) {
-        reject(err);
-      }
-    });
+    const db = this.assertReady();
+    const formattedMac = networkDiscovery.formatMAC(mac);
+    const host = await this.getHostByMAC(formattedMac);
+
+    if (!host) {
+      throw new Error(`Host with MAC ${formattedMac} not found in database`);
+    }
+
+    let primaryMac = host.mac;
+    let secondaryMacs = host.secondaryMacs ?? [];
+    if (host.mac !== formattedMac) {
+      secondaryMacs = secondaryMacs.filter((candidate) => candidate !== formattedMac);
+      secondaryMacs = this.normalizeSecondaryMacs([...secondaryMacs, host.mac], formattedMac);
+      primaryMac = formattedMac;
+    }
+
+    const info = db
+      .prepare(
+        `UPDATE hosts
+         SET mac = ?,
+             secondary_macs = ?,
+             lastSeen = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+             discovered = 1,
+             status = ?,
+             pingResponsive = ?
+         WHERE name = ?`
+      )
+      .run(
+        primaryMac,
+        this.serializeSecondaryMacs(secondaryMacs, primaryMac),
+        status,
+        pingResponsive,
+        host.name
+      );
+
+    if (info.changes === 0) {
+      throw new Error(`Host ${host.name} not found in database`);
+    }
   }
 
   /**
@@ -351,7 +510,7 @@ class HostDatabase extends EventEmitter {
    */
   updateHost(
     name: string,
-    updates: Partial<Pick<Host, 'name' | 'mac' | 'ip' | 'wolPort' | 'status' | 'notes' | 'tags'>>,
+    updates: Partial<Pick<Host, 'name' | 'mac' | 'secondaryMacs' | 'ip' | 'wolPort' | 'status' | 'notes' | 'tags'>>,
     options?: { emitLifecycleEvent?: boolean }
   ): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -362,84 +521,95 @@ class HostDatabase extends EventEmitter {
         reject(err);
         return;
       }
-      const fields: string[] = [];
-      const values: unknown[] = [];
 
-      if (updates.name !== undefined) {
-        fields.push('name = ?');
-        values.push(updates.name);
-      }
-      if (updates.mac !== undefined) {
-        fields.push('mac = ?');
-        values.push(networkDiscovery.formatMAC(updates.mac));
-      }
-      if (updates.ip !== undefined) {
-        fields.push('ip = ?');
-        values.push(updates.ip);
-      }
-      if (updates.wolPort !== undefined) {
-        fields.push('wol_port = ?');
-        values.push(this.normalizeWolPort(updates.wolPort));
-      }
-      if (updates.status !== undefined) {
-        fields.push('status = ?');
-        values.push(updates.status);
-      }
-      if (updates.notes !== undefined) {
-        fields.push('notes = ?');
-        values.push(updates.notes);
-      }
-      if (updates.tags !== undefined) {
-        fields.push('tags = ?');
-        values.push(this.serializeTags(updates.tags));
-      }
-
-      if (fields.length === 0) {
+      const hasRequestedUpdate =
+        updates.name !== undefined ||
+        updates.mac !== undefined ||
+        updates.secondaryMacs !== undefined ||
+        updates.ip !== undefined ||
+        updates.wolPort !== undefined ||
+        updates.status !== undefined ||
+        updates.notes !== undefined ||
+        updates.tags !== undefined;
+      if (!hasRequestedUpdate) {
         resolve();
         return;
       }
 
       const existingRow = db
-        .prepare(
-          'SELECT name, mac, ip, status, wol_port as wolPort, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE name = ?'
-        )
-        .get(name) as (Host & { tags?: unknown; wolPort?: unknown }) | undefined;
+        .prepare(`SELECT ${HOST_SELECT_COLUMNS} FROM hosts WHERE name = ?`)
+        .get(name) as
+        | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown })
+        | undefined;
       if (!existingRow) {
         reject(new Error(`Host ${name} not found`));
         return;
       }
 
       const existing = this.normalizeHostRow(existingRow);
-      const normalizedMac = updates.mac !== undefined ? networkDiscovery.formatMAC(updates.mac) : undefined;
+      const nextName = updates.name ?? existing.name;
+      const nextMac = updates.mac !== undefined ? networkDiscovery.formatMAC(updates.mac) : existing.mac;
+      const nextSecondaryMacs = this.normalizeSecondaryMacs(
+        updates.secondaryMacs ?? existing.secondaryMacs,
+        nextMac
+      );
+      const nextIp = updates.ip ?? existing.ip;
+      const nextWolPort =
+        updates.wolPort !== undefined ? this.normalizeWolPort(updates.wolPort) : (existing.wolPort ?? 9);
+      const nextStatus = updates.status ?? existing.status;
+      const nextNotes = updates.notes !== undefined ? updates.notes : (existing.notes ?? null);
+      const nextTags = updates.tags !== undefined ? updates.tags : (existing.tags ?? []);
+
       const hasMeaningfulChange =
-        (updates.name !== undefined && updates.name !== existing.name) ||
-        (normalizedMac !== undefined && normalizedMac !== existing.mac) ||
-        (updates.ip !== undefined && updates.ip !== existing.ip) ||
-        (updates.wolPort !== undefined && this.normalizeWolPort(updates.wolPort) !== (existing.wolPort ?? 9)) ||
-        (updates.status !== undefined && updates.status !== existing.status) ||
-        (updates.notes !== undefined && updates.notes !== (existing.notes ?? null)) ||
-        (updates.tags !== undefined &&
-          JSON.stringify(updates.tags ?? []) !== JSON.stringify(existing.tags ?? []));
+        nextName !== existing.name ||
+        nextMac !== existing.mac ||
+        nextIp !== existing.ip ||
+        nextWolPort !== (existing.wolPort ?? 9) ||
+        nextStatus !== existing.status ||
+        nextNotes !== (existing.notes ?? null) ||
+        JSON.stringify(nextTags) !== JSON.stringify(existing.tags ?? []) ||
+        JSON.stringify(nextSecondaryMacs) !== JSON.stringify(existing.secondaryMacs ?? []);
 
       if (!hasMeaningfulChange) {
         resolve();
         return;
       }
 
-      values.push(name);
-
-      const sql = `UPDATE hosts SET ${fields.join(', ')} WHERE name = ?`;
       try {
-        const info = db.prepare(sql).run(values);
+        const info = db
+          .prepare(
+            `UPDATE hosts
+             SET name = ?,
+                 mac = ?,
+                 secondary_macs = ?,
+                 ip = ?,
+                 wol_port = ?,
+                 status = ?,
+                 notes = ?,
+                 tags = ?
+             WHERE name = ?`
+          )
+          .run(
+            nextName,
+            nextMac,
+            this.serializeSecondaryMacs(nextSecondaryMacs, nextMac),
+            nextIp,
+            nextWolPort,
+            nextStatus,
+            nextNotes,
+            this.serializeTags(nextTags),
+            name
+          );
+
         if (info.changes === 0) {
           reject(new Error(`Host ${name} not found`));
         } else {
           const resolvedName = updates.name ?? name;
           const updatedRow = db
-            .prepare(
-              'SELECT name, mac, ip, status, wol_port as wolPort, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE name = ?'
-            )
-            .get(resolvedName) as (Host & { tags?: unknown; wolPort?: unknown }) | undefined;
+            .prepare(`SELECT ${HOST_SELECT_COLUMNS} FROM hosts WHERE name = ?`)
+            .get(resolvedName) as
+            | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown })
+            | undefined;
           if (updatedRow && (options?.emitLifecycleEvent ?? true)) {
             this.emit('host-updated', this.normalizeHostRow(updatedRow));
           }
@@ -449,6 +619,133 @@ class HostDatabase extends EventEmitter {
         reject(err);
       }
     });
+  }
+
+  async mergeHostMac(
+    name: string,
+    mac: string,
+    options?: { makePrimary?: boolean }
+  ): Promise<Host> {
+    const db = this.assertReady();
+    const host = await this.getHost(name);
+    if (!host) {
+      throw new Error(`Host ${name} not found`);
+    }
+
+    const formattedMac = networkDiscovery.formatMAC(mac);
+    const makePrimary = options?.makePrimary ?? false;
+    const existingSecondary = host.secondaryMacs ?? [];
+
+    let nextPrimary = host.mac;
+    let nextSecondary: string[];
+
+    if (makePrimary) {
+      nextPrimary = formattedMac;
+      nextSecondary = this.normalizeSecondaryMacs(
+        [...existingSecondary.filter((candidate) => candidate !== formattedMac), host.mac],
+        nextPrimary
+      );
+    } else {
+      nextSecondary = this.normalizeSecondaryMacs([...existingSecondary, formattedMac], host.mac);
+    }
+
+    const info = db
+      .prepare('UPDATE hosts SET mac = ?, secondary_macs = ? WHERE name = ?')
+      .run(nextPrimary, this.serializeSecondaryMacs(nextSecondary, nextPrimary), name);
+
+    if (info.changes === 0) {
+      throw new Error(`Host ${name} not found`);
+    }
+
+    const updated = await this.getHost(name);
+    if (!updated) {
+      throw new Error(`Failed to load host ${name} after merge`);
+    }
+
+    this.emit('host-updated', updated);
+    return updated;
+  }
+
+  async unmergeHostMac(name: string, mac: string): Promise<Host> {
+    const db = this.assertReady();
+    const host = await this.getHost(name);
+    if (!host) {
+      throw new Error(`Host ${name} not found`);
+    }
+
+    const formattedMac = networkDiscovery.formatMAC(mac);
+    const existingSecondary = host.secondaryMacs ?? [];
+
+    let nextPrimary = host.mac;
+    let nextSecondary: string[];
+
+    if (formattedMac === host.mac) {
+      if (existingSecondary.length === 0) {
+        throw new Error(`Host ${name} has no secondary MACs to promote`);
+      }
+      nextPrimary = existingSecondary[0];
+      nextSecondary = existingSecondary.slice(1);
+    } else if (existingSecondary.includes(formattedMac)) {
+      nextSecondary = existingSecondary.filter((candidate) => candidate !== formattedMac);
+    } else {
+      throw new Error(`MAC ${formattedMac} is not associated with host ${name}`);
+    }
+
+    const info = db
+      .prepare('UPDATE hosts SET mac = ?, secondary_macs = ? WHERE name = ?')
+      .run(nextPrimary, this.serializeSecondaryMacs(nextSecondary, nextPrimary), name);
+
+    if (info.changes === 0) {
+      throw new Error(`Host ${name} not found`);
+    }
+
+    const updated = await this.getHost(name);
+    if (!updated) {
+      throw new Error(`Failed to load host ${name} after unmerge`);
+    }
+
+    this.emit('host-updated', updated);
+    return updated;
+  }
+
+  async getMergeCandidates(): Promise<HostMergeCandidate[]> {
+    const hosts = await this.getAllHosts();
+    const candidates: HostMergeCandidate[] = [];
+
+    for (let i = 0; i < hosts.length; i += 1) {
+      for (let j = i + 1; j < hosts.length; j += 1) {
+        const first = hosts[i];
+        const second = hosts[j];
+        if (first.name.trim().toLowerCase() !== second.name.trim().toLowerCase()) {
+          continue;
+        }
+
+        const firstSubnet = this.subnetHintForIp(first.ip);
+        const secondSubnet = this.subnetHintForIp(second.ip);
+        if (!firstSubnet || !secondSubnet || firstSubnet !== secondSubnet) {
+          continue;
+        }
+
+        if (this.hostsShareAnyMac(first, second)) {
+          continue;
+        }
+
+        const target = first;
+        const candidate = second;
+        candidates.push({
+          targetName: target.name,
+          targetMac: target.mac,
+          targetIp: target.ip,
+          candidateName: candidate.name,
+          candidateMac: candidate.mac,
+          candidateIp: candidate.ip,
+          subnetHint: firstSubnet,
+          reason: 'same_hostname_subnet',
+        });
+      }
+    }
+
+    return candidates;
   }
 
   /**
