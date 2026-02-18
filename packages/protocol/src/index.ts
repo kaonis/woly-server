@@ -72,6 +72,26 @@ export interface CncCapabilityDescriptor {
   note?: string;
 }
 
+export type CncRateLimitScope = 'ip' | 'connection' | 'global';
+
+export interface CncRateLimitDescriptor {
+  maxCalls: number;
+  windowMs: number | null;
+  scope: CncRateLimitScope;
+  appliesTo?: string[];
+  note?: string;
+}
+
+export interface CncRateLimits {
+  strictAuth: CncRateLimitDescriptor;
+  auth: CncRateLimitDescriptor;
+  api: CncRateLimitDescriptor;
+  scheduleSync: CncRateLimitDescriptor;
+  wsInboundMessages: CncRateLimitDescriptor;
+  wsConnectionsPerIp: CncRateLimitDescriptor;
+  macVendorLookup: CncRateLimitDescriptor;
+}
+
 export interface CncCapabilitiesResponse {
   mode: 'cnc';
   versions: {
@@ -84,6 +104,7 @@ export interface CncCapabilitiesResponse {
     schedules: CncCapabilityDescriptor;
     commandStatusStreaming: CncCapabilityDescriptor;
   };
+  rateLimits?: CncRateLimits;
 }
 
 export interface HostPort {
@@ -298,6 +319,24 @@ export const cncCapabilityDescriptorSchema: z.ZodType<CncCapabilityDescriptor> =
   note: z.string().min(1).optional(),
 });
 
+export const cncRateLimitDescriptorSchema: z.ZodType<CncRateLimitDescriptor> = z.object({
+  maxCalls: z.number().int().positive(),
+  windowMs: z.number().int().positive().nullable(),
+  scope: z.enum(['ip', 'connection', 'global']),
+  appliesTo: z.array(z.string().min(1)).optional(),
+  note: z.string().min(1).optional(),
+});
+
+export const cncRateLimitsSchema: z.ZodType<CncRateLimits> = z.object({
+  strictAuth: cncRateLimitDescriptorSchema,
+  auth: cncRateLimitDescriptorSchema,
+  api: cncRateLimitDescriptorSchema,
+  scheduleSync: cncRateLimitDescriptorSchema,
+  wsInboundMessages: cncRateLimitDescriptorSchema,
+  wsConnectionsPerIp: cncRateLimitDescriptorSchema,
+  macVendorLookup: cncRateLimitDescriptorSchema,
+});
+
 export const cncCapabilitiesResponseSchema: z.ZodType<CncCapabilitiesResponse> = z.object({
   mode: z.literal('cnc'),
   versions: z.object({
@@ -310,6 +349,7 @@ export const cncCapabilitiesResponseSchema: z.ZodType<CncCapabilitiesResponse> =
     schedules: cncCapabilityDescriptorSchema,
     commandStatusStreaming: cncCapabilityDescriptorSchema,
   }),
+  rateLimits: cncRateLimitsSchema.optional(),
 });
 
 export const hostPortScanResultSchema: z.ZodType<HostPortScanResult> = z.object({

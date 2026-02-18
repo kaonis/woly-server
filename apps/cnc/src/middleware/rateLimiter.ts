@@ -23,28 +23,31 @@ const parsePositiveInt = (
   return parsed;
 };
 
-const AUTH_RATE_LIMIT_WINDOW_MS = parsePositiveInt(
+export const AUTH_RATE_LIMIT_WINDOW_MS = parsePositiveInt(
   process.env.AUTH_RATE_LIMIT_WINDOW_MS,
   900000,
 ); // 15 minutes default
-const AUTH_RATE_LIMIT_MAX = parsePositiveInt(
+export const AUTH_RATE_LIMIT_MAX = parsePositiveInt(
   process.env.AUTH_RATE_LIMIT_MAX,
   5,
 ); // 5 attempts default
 
-const API_RATE_LIMIT_WINDOW_MS = parsePositiveInt(
+export const LEGACY_AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+export const LEGACY_AUTH_RATE_LIMIT_MAX = isDevelopment ? 100 : 10;
+
+export const API_RATE_LIMIT_WINDOW_MS = parsePositiveInt(
   process.env.API_RATE_LIMIT_WINDOW_MS,
   15 * 60 * 1000,
 );
-const API_RATE_LIMIT_MAX = parsePositiveInt(
+export const API_RATE_LIMIT_MAX = parsePositiveInt(
   process.env.API_RATE_LIMIT_MAX,
   isDevelopment ? 10000 : 300,
 );
-const SCHEDULE_RATE_LIMIT_WINDOW_MS = parsePositiveInt(
+export const SCHEDULE_RATE_LIMIT_WINDOW_MS = parsePositiveInt(
   process.env.SCHEDULE_RATE_LIMIT_WINDOW_MS,
   15 * 60 * 1000,
 );
-const SCHEDULE_RATE_LIMIT_MAX = parsePositiveInt(
+export const SCHEDULE_RATE_LIMIT_MAX = parsePositiveInt(
   process.env.SCHEDULE_RATE_LIMIT_MAX,
   isDevelopment ? 20000 : 3000,
 );
@@ -86,8 +89,8 @@ export const strictAuthLimiter = rateLimit({
  * Production: 10 requests per 15 minutes per IP
  */
 export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDevelopment ? 100 : 10, // Higher limit in development
+  windowMs: LEGACY_AUTH_RATE_LIMIT_WINDOW_MS,
+  max: LEGACY_AUTH_RATE_LIMIT_MAX,
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
   skip: (req) => {
