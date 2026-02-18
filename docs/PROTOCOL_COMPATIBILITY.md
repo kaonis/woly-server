@@ -8,14 +8,14 @@ The WoLy distributed system uses a shared protocol package (`@kaonis/woly-protoc
 
 **Package**: `@kaonis/woly-protocol`  
 **Purpose**: Shared TypeScript types and Zod runtime schemas for node ↔ C&C communication  
-**Current Package Version**: 1.2.0  
-**Current Protocol Version**: 1.2.0 (see `PROTOCOL_VERSION` constant)  
+**Current Package Version**: 1.3.0  
+**Current Protocol Version**: 1.3.0 (see `PROTOCOL_VERSION` constant)  
 **Location**: `packages/protocol/`
 
 ### Exports
 
-- **Types**: `Host`, `HostStatus`, `CommandState`, `NodeMessage`, `CncCommand`, CNC API DTOs (`CncCapabilitiesResponse`, `HostWakeSchedule`, `HostPortScanResponse`), etc.
-- **Schemas**: `outboundNodeMessageSchema`, `inboundCncCommandSchema`, CNC API schemas (`cncCapabilitiesResponseSchema`, `hostWakeScheduleSchema`, `hostPortScanResponseSchema`), etc.
+- **Types**: `Host`, `HostStatus`, `CommandState`, `NodeMessage`, `CncCommand`, CNC API DTOs (`CncCapabilitiesResponse`, `CncRateLimits`, `HostWakeSchedule`, `HostPortScanResponse`), etc.
+- **Schemas**: `outboundNodeMessageSchema`, `inboundCncCommandSchema`, CNC API schemas (`cncCapabilitiesResponseSchema`, `cncRateLimitsSchema`, `hostWakeScheduleSchema`, `hostPortScanResponseSchema`), etc.
 - **Constants**: `PROTOCOL_VERSION`, `SUPPORTED_PROTOCOL_VERSIONS`
 
 ### Consumer Migration Notes
@@ -23,6 +23,7 @@ The WoLy distributed system uses a shared protocol package (`@kaonis/woly-protoc
 - `1.0.x`: Base node ↔ C&C message contracts.
 - `1.1.x`: CNC app/backend API DTOs for capabilities + schedules.
 - `1.2.x`: host port scan/ping payload enrichments and consumer typecheck fixture parity.
+- `1.3.x`: capability-map enrichments (`hostStateStreaming`, optional `rateLimits`) and exported CNC rate-limit schemas.
 
 ## Versioning Policy
 
@@ -47,13 +48,13 @@ Protocol package follows strict semantic versioning:
 From monorepo root:
 
 ```bash
-# Bug fix (1.2.0 → 1.2.1)
+# Bug fix (1.3.0 → 1.3.1)
 npm run protocol:version:patch
 
-# New feature (1.2.0 → 1.3.0)
+# New feature (1.3.0 → 1.4.0)
 npm run protocol:version:minor
 
-# Breaking change (1.2.0 → 2.0.0)
+# Breaking change (1.3.0 → 2.0.0)
 npm run protocol:version:major
 ```
 
@@ -63,7 +64,8 @@ npm run protocol:version:major
 
 | Protocol Version | Node Agent | C&C Backend | Status |
 |------------------|------------|-------------|--------|
-| 1.2.0 | ✅ 0.0.1+ | ✅ 1.0.0+ | Current |
+| 1.3.0 | ✅ 0.0.1+ | ✅ 1.0.0+ | Current |
+| 1.2.0 | ✅ 0.0.1+ | ✅ 1.0.0+ | Transitional support |
 | 1.1.1 | ✅ 0.0.1+ | ✅ 1.0.0+ | Transitional support |
 | 1.0.0 | ✅ 0.0.1+ | ✅ 1.0.0+ | Transitional support |
 
@@ -76,8 +78,8 @@ npm run protocol:version:major
 
 ```typescript
 // In protocol package
-export const PROTOCOL_VERSION = '1.2.0';
-export const SUPPORTED_PROTOCOL_VERSIONS = ['1.2.0', '1.1.1', '1.0.0'];
+export const PROTOCOL_VERSION = '1.3.0';
+export const SUPPORTED_PROTOCOL_VERSIONS = ['1.3.0', '1.2.0', '1.1.1', '1.0.0'];
 ```
 
 ## CI Enforcement
