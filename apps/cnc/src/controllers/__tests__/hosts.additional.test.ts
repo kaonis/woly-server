@@ -47,6 +47,7 @@ describe('HostsController additional branches', () => {
   };
   let commandRouter: {
     routeWakeCommand: jest.Mock;
+    routeScanHostsCommand: jest.Mock;
     routePingHostCommand: jest.Mock;
     routeScanHostPortsCommand: jest.Mock;
     routeUpdateHostCommand: jest.Mock;
@@ -65,6 +66,7 @@ describe('HostsController additional branches', () => {
     };
     commandRouter = {
       routeWakeCommand: jest.fn(),
+      routeScanHostsCommand: jest.fn(),
       routePingHostCommand: jest.fn(),
       routeScanHostPortsCommand: jest.fn(),
       routeUpdateHostCommand: jest.fn(),
@@ -504,6 +506,58 @@ describe('HostsController additional branches', () => {
       expect(res.json).toHaveBeenCalledWith({
         error: 'Internal Server Error',
         message: 'Failed to delete host',
+        correlationId: 'cid-request',
+      });
+    });
+  });
+
+  describe('scanHosts', () => {
+    it('returns scan lifecycle payload from command router', async () => {
+      commandRouter.routeScanHostsCommand.mockResolvedValue({
+        state: 'acknowledged',
+        commandId: 'scan-command-1',
+        queuedAt: '2026-02-16T04:00:00.000Z',
+        startedAt: '2026-02-16T04:00:00.000Z',
+        completedAt: '2026-02-16T04:00:01.000Z',
+        lastScanAt: '2026-02-16T04:00:01.000Z',
+        message: 'Scan command dispatched to 2 connected node(s).',
+        correlationId: 'cid-router',
+      });
+
+      const req = createMockRequest({ correlationId: 'cid-request' });
+      const res = createMockResponse();
+
+      await controller.scanHosts(req, res);
+
+      expect(commandRouter.routeScanHostsCommand).toHaveBeenCalledWith({
+        correlationId: 'cid-request',
+      });
+      expect(res.json).toHaveBeenCalledWith({
+        state: 'acknowledged',
+        commandId: 'scan-command-1',
+        queuedAt: '2026-02-16T04:00:00.000Z',
+        startedAt: '2026-02-16T04:00:00.000Z',
+        completedAt: '2026-02-16T04:00:01.000Z',
+        lastScanAt: '2026-02-16T04:00:01.000Z',
+        message: 'Scan command dispatched to 2 connected node(s).',
+        correlationId: 'cid-router',
+      });
+    });
+
+    it('maps offline scan dispatch errors to 503 and includes correlation id', async () => {
+      commandRouter.routeScanHostsCommand.mockRejectedValue(
+        new Error('All nodes are offline; no connected nodes available for scan'),
+      );
+
+      const req = createMockRequest({ correlationId: 'cid-request' });
+      const res = createMockResponse();
+
+      await controller.scanHosts(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Service Unavailable',
+        message: 'All nodes are offline; no connected nodes available for scan',
         correlationId: 'cid-request',
       });
     });

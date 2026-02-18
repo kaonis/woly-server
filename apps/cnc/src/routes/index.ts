@@ -82,6 +82,7 @@ export function createRoutes(
   router.get('/hosts/ping/:fqn', (req, res) => hostsController.pingHost(req, res));
   router.get('/hosts/ports/:fqn', (req, res) => hostsController.getHostPorts(req, res));
   router.get('/hosts/scan-ports/:fqn', (req, res) => hostsController.scanHostPorts(req, res));
+  router.post('/hosts/scan', (req, res) => hostsController.scanHosts(req, res));
   // IMPORTANT: schedule routes must be registered before the :fqn catch-all
   router.get('/hosts/:fqn/schedules', scheduleSyncLimiter, (req, res) =>
     schedulesController.listHostSchedules(req, res),

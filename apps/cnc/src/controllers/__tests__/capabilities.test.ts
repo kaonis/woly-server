@@ -38,6 +38,11 @@ describe('CapabilitiesController', () => {
       cncApi: '1.2.3',
       protocol: '2.0.0',
     });
+    expect(response.capabilities.scan.routes).toEqual([
+      '/api/hosts/scan',
+      '/api/hosts/ports/:fqn',
+      '/api/hosts/scan-ports/:fqn',
+    ]);
     expect(response.capabilities.schedules.routes).toEqual(['/api/schedules', '/api/schedules/:id']);
     expect(response.capabilities.hostStateStreaming).toEqual({
       supported: true,

@@ -34,6 +34,24 @@ type RoutedHostPortScanResult = {
   correlationId?: string;
 };
 
+type RoutedHostScanDispatchResult = {
+  state: 'acknowledged';
+  queuedAt: string;
+  startedAt: string;
+  completedAt: string;
+  lastScanAt: string;
+  commandId?: string;
+  message: string;
+  correlationId?: string;
+  nodeResults: Array<{
+    nodeId: string;
+    commandId?: string;
+    state: 'acknowledged' | 'failed';
+    message?: string;
+    error?: string;
+  }>;
+};
+
 /**
  * CommandRouter
  * 
@@ -263,6 +281,100 @@ export class CommandRouter extends EventEmitter {
       idempotencyKey: null,
       correlationId: options?.correlationId ?? null,
     });
+  }
+
+  /**
+   * Route a scan command to all currently connected nodes.
+   */
+  async routeScanHostsCommand(
+    options?: { correlationId?: string | null }
+  ): Promise<RoutedHostScanDispatchResult> {
+    const connectedNodes = this.nodeManager.getConnectedNodes();
+    if (connectedNodes.length === 0) {
+      throw new Error('All nodes are offline; no connected nodes available for scan');
+    }
+
+    logger.info('Routing scan command across connected nodes', {
+      nodeCount: connectedNodes.length,
+    });
+
+    const queuedAt = new Date().toISOString();
+    const correlationId = options?.correlationId ?? null;
+
+    const settled = await Promise.all(
+      connectedNodes.map(async (nodeId) => {
+        try {
+          const result = await this.routeScanCommand(nodeId, true, { correlationId });
+          return {
+            nodeId,
+            success: true as const,
+            result,
+          };
+        } catch (error) {
+          return {
+            nodeId,
+            success: false as const,
+            error,
+          };
+        }
+      })
+    );
+
+    const successful = settled.filter(
+      (entry): entry is { nodeId: string; success: true; result: CommandResult } => entry.success,
+    );
+    if (successful.length === 0) {
+      const failed = settled.find(
+        (entry): entry is { nodeId: string; success: false; error: unknown } => !entry.success,
+      );
+      const message = failed
+        ? failed.error instanceof Error
+          ? failed.error.message
+          : String(failed.error)
+        : 'Failed to dispatch scan command';
+      throw new Error(message);
+    }
+
+    const completedAt = new Date().toISOString();
+    const failedCount = settled.length - successful.length;
+    const message =
+      failedCount === 0
+        ? `Scan command dispatched to ${successful.length} connected node(s).`
+        : `Scan command dispatched to ${successful.length} node(s); ${failedCount} node(s) failed to accept the command.`;
+
+    const responseCorrelationId =
+      successful.find(
+        (entry) => typeof entry.result.correlationId === 'string' && entry.result.correlationId.trim().length > 0,
+      )?.result.correlationId ??
+      correlationId ??
+      undefined;
+
+    return {
+      state: 'acknowledged',
+      queuedAt,
+      startedAt: queuedAt,
+      completedAt,
+      lastScanAt: completedAt,
+      commandId: successful[0]?.result.commandId,
+      message,
+      ...(responseCorrelationId ? { correlationId: responseCorrelationId } : {}),
+      nodeResults: settled.map((entry) => {
+        if (entry.success) {
+          return {
+            nodeId: entry.nodeId,
+            commandId: entry.result.commandId,
+            state: 'acknowledged' as const,
+            message: entry.result.message,
+          };
+        }
+
+        return {
+          nodeId: entry.nodeId,
+          state: 'failed' as const,
+          error: entry.error instanceof Error ? entry.error.message : String(entry.error),
+        };
+      }),
+    };
   }
 
   /**

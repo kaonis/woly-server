@@ -92,7 +92,10 @@ describe('Capabilities Routes', () => {
           protocol: PROTOCOL_VERSION,
         },
         capabilities: {
-          scan: expect.objectContaining({ supported: true }),
+          scan: expect.objectContaining({
+            supported: true,
+            routes: ['/api/hosts/scan', '/api/hosts/ports/:fqn', '/api/hosts/scan-ports/:fqn'],
+          }),
           notesTags: expect.objectContaining({ supported: true, persistence: 'backend' }),
           schedules: expect.objectContaining({ supported: true, persistence: 'backend' }),
           hostStateStreaming: expect.objectContaining({

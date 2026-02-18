@@ -200,6 +200,15 @@ describe('Mobile API compatibility smoke checks', () => {
     } as unknown as HostAggregator;
 
     const commandRouter = {
+      routeScanHostsCommand: jest.fn().mockResolvedValue({
+        state: 'acknowledged',
+        commandId: 'scan-all-command-1',
+        queuedAt: '2026-02-15T00:00:00.000Z',
+        startedAt: '2026-02-15T00:00:00.000Z',
+        completedAt: '2026-02-15T00:00:01.000Z',
+        lastScanAt: '2026-02-15T00:00:01.000Z',
+        message: 'Scan command dispatched to 1 connected node(s).',
+      }),
       routeScanHostPortsCommand: jest.fn().mockResolvedValue({
         commandId: 'scan-command-1',
         nodeId: 'node-1',
@@ -298,6 +307,44 @@ describe('Mobile API compatibility smoke checks', () => {
 
     it('returns auth error envelope when JWT is missing', async () => {
       const response = await request(app).get('/api/hosts');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+  });
+
+  describe('POST /api/hosts/scan', () => {
+    const operatorJwt = createToken({
+      sub: 'mobile-client',
+      role: 'operator',
+      iss: 'test-issuer',
+      aud: 'test-audience',
+      exp: now + 3600,
+      nbf: now - 10,
+    });
+
+    it('returns scan lifecycle payload compatible with woly scan parser', async () => {
+      const response = await request(app)
+        .post('/api/hosts/scan')
+        .set('Authorization', `Bearer ${operatorJwt}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        state: 'acknowledged',
+        commandId: 'scan-all-command-1',
+        message: 'Scan command dispatched to 1 connected node(s).',
+      });
+      expect(typeof response.body.queuedAt).toBe('string');
+      expect(typeof response.body.completedAt).toBe('string');
+      expect(new Date(response.body.queuedAt).toString()).not.toBe('Invalid Date');
+      expect(new Date(response.body.completedAt).toString()).not.toBe('Invalid Date');
+    });
+
+    it('returns auth error envelope when JWT is missing', async () => {
+      const response = await request(app).post('/api/hosts/scan');
 
       expect(response.status).toBe(401);
       expect(response.body).toMatchObject({
@@ -478,7 +525,10 @@ describe('Mobile API compatibility smoke checks', () => {
           protocol: PROTOCOL_VERSION,
         },
         capabilities: {
-          scan: { supported: true },
+          scan: {
+            supported: true,
+            routes: ['/api/hosts/scan', '/api/hosts/ports/:fqn', '/api/hosts/scan-ports/:fqn'],
+          },
           notesTags: { supported: true, persistence: 'backend' },
           schedules: { supported: true, persistence: 'backend' },
           hostStateStreaming: {
