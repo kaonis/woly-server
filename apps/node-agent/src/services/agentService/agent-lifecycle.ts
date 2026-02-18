@@ -159,6 +159,7 @@ export class AgentService extends EventEmitter {
   private readonly pendingHostUpdates: Map<string, Host> = new Map();
   private readonly commandExecutions: Map<string, CommandExecutionRecord> = new Map();
   private readonly bufferedCommandResults: Map<string, CommandResultMessage> = new Map();
+  private readonly suppressCncResultForCommandIds: Set<string> = new Set();
   private hostUpdateDebounceTimer: NodeJS.Timeout | null = null;
   private hostEventFlushTimer: NodeJS.Timeout | null = null;
   private readonly activeWakeVerifications: Map<string, { timer: NodeJS.Timeout }> = new Map();
@@ -252,6 +253,30 @@ export class AgentService extends EventEmitter {
   }
 
   /**
+   * Executes a command received via the tunnel HTTP endpoint and returns the
+   * command-result payload directly to the caller.
+   */
+  public async dispatchTunnelCommand(command: DispatchableCommand): Promise<CommandResultPayload> {
+    if (!this.isRunning) {
+      throw new Error('Agent service is not running');
+    }
+
+    this.suppressCncResultForCommandIds.add(command.commandId);
+
+    try {
+      await this.dispatchInboundCommand(command);
+      const record = this.commandExecutions.get(command.commandId);
+      if (!record?.result) {
+        throw new Error(`No command result recorded for ${command.commandId}`);
+      }
+
+      return record.result;
+    } finally {
+      this.suppressCncResultForCommandIds.delete(command.commandId);
+    }
+  }
+
+  /**
    * Setup event handlers for C&C client and network discovery
    */
   private setupEventHandlers(): void {
@@ -288,37 +313,74 @@ export class AgentService extends EventEmitter {
     });
 
     // C&C command handlers
-    cncClient.on('command:wake', async (command: WakeCommand) => {
-      await this.handleWakeCommand(command);
+    cncClient.on('command:wake', (command: WakeCommand) => {
+      void this.dispatchInboundCommand(command);
     });
 
-    cncClient.on('command:scan', async (command: ScanCommand) => {
-      await this.handleScanCommand(command);
+    cncClient.on('command:scan', (command: ScanCommand) => {
+      void this.dispatchInboundCommand(command);
     });
 
-    cncClient.on('command:scan-host-ports', async (command: ScanHostPortsCommand) => {
-      await this.handleScanHostPortsCommand(command);
+    cncClient.on('command:scan-host-ports', (command: ScanHostPortsCommand) => {
+      void this.dispatchInboundCommand(command);
     });
 
-    cncClient.on('command:update-host', async (command: UpdateHostCommand) => {
-      await this.handleUpdateHostCommand(command);
+    cncClient.on('command:update-host', (command: UpdateHostCommand) => {
+      void this.dispatchInboundCommand(command);
     });
 
-    cncClient.on('command:delete-host', async (command: DeleteHostCommand) => {
-      await this.handleDeleteHostCommand(command);
+    cncClient.on('command:delete-host', (command: DeleteHostCommand) => {
+      void this.dispatchInboundCommand(command);
     });
 
-    cncClient.on('command:ping-host', async (command: PingHostCommand) => {
-      await this.handlePingHostCommand(command);
+    cncClient.on('command:ping-host', (command: PingHostCommand) => {
+      void this.dispatchInboundCommand(command);
     });
 
-    cncClient.on('command:sleep-host', async (command: SleepHostCommand) => {
-      await this.handleSleepHostCommand(command);
+    cncClient.on('command:sleep-host', (command: SleepHostCommand) => {
+      void this.dispatchInboundCommand(command);
     });
 
-    cncClient.on('command:shutdown-host', async (command: ShutdownHostCommand) => {
-      await this.handleShutdownHostCommand(command);
+    cncClient.on('command:shutdown-host', (command: ShutdownHostCommand) => {
+      void this.dispatchInboundCommand(command);
     });
+  }
+
+  private async dispatchInboundCommand(command: DispatchableCommand): Promise<void> {
+    try {
+      switch (command.type) {
+        case 'wake':
+          await this.handleWakeCommand(command);
+          return;
+        case 'scan':
+          await this.handleScanCommand(command);
+          return;
+        case 'scan-host-ports':
+          await this.handleScanHostPortsCommand(command);
+          return;
+        case 'update-host':
+          await this.handleUpdateHostCommand(command);
+          return;
+        case 'delete-host':
+          await this.handleDeleteHostCommand(command);
+          return;
+        case 'ping-host':
+          await this.handlePingHostCommand(command);
+          return;
+        case 'sleep-host':
+          await this.handleSleepHostCommand(command);
+          return;
+        case 'shutdown-host':
+          await this.handleShutdownHostCommand(command);
+          return;
+      }
+    } catch (error) {
+      logger.error('Failed to dispatch inbound C&C command', {
+        commandId: command.commandId,
+        commandType: command.type,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   /**
@@ -626,6 +688,14 @@ export class AgentService extends EventEmitter {
     payload: CommandResultPayload,
     options?: { startedAtMs?: number; replay?: boolean }
   ): void {
+    if (this.suppressCncResultForCommandIds.delete(commandId)) {
+      logger.debug('Suppressed websocket command-result for tunnel-dispatched command', {
+        commandId,
+        commandType,
+      });
+      return;
+    }
+
     if (!options?.replay) {
       runtimeTelemetry.recordCommandResult(
         commandType,

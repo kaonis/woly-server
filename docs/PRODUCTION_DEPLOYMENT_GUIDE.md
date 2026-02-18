@@ -59,6 +59,10 @@ Minimum required secrets/config:
   - `NODE_ID`
   - `NODE_LOCATION`
   - `NODE_AUTH_TOKEN`
+  - optional tunnel mode:
+    - `TUNNEL_MODE=cloudflare`
+    - `CLOUDFLARE_TUNNEL_URL=https://...`
+    - `CLOUDFLARE_TUNNEL_TOKEN=...`
   - optional hardening: `NODE_API_KEY`
 
 Rotation guidance:
@@ -68,7 +72,24 @@ Rotation guidance:
 3. Validate reconnect/auth behavior after each rotation.
 
 Related runbook:
+
 - `apps/cnc/docs/runbooks/ws-session-token-rotation.md`
+
+### 3.1 Cloudflare Tunnel Mode (Zero Port-Forwarding)
+
+Use this for remote node-agent access without router port-forwarding:
+
+1. Deploy `cloudflared` near the node-agent.
+2. Route the tunnel hostname to node-agent (`http://localhost:8082`).
+3. Set:
+   - `TUNNEL_MODE=cloudflare`
+   - `CLOUDFLARE_TUNNEL_URL=https://<tunnel-hostname>`
+   - `CLOUDFLARE_TUNNEL_TOKEN=<token>`
+4. Keep `NODE_AUTH_TOKEN` synchronized with C&C `NODE_AUTH_TOKENS`.
+5. Validate in C&C:
+   - node registration includes `publicUrl`
+   - command routing succeeds via tunnel endpoint
+   - if tunnel is unavailable, command routing falls back to direct WebSocket transport.
 
 ## 4. Production Security Defaults
 

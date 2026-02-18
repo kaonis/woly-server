@@ -19,6 +19,9 @@ const mockedAgentConfig = {
   location: 'lab',
   authToken: 'bootstrap-token',
   publicUrl: '',
+  tunnelMode: 'direct' as const,
+  cloudflareTunnelUrl: '',
+  cloudflareTunnelToken: '',
   sessionTokenUrl: '',
   sessionTokenRequestTimeoutMs: 5000,
   sessionTokenRefreshBufferSeconds: 60,
@@ -109,6 +112,10 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     mockSockets.length = 0;
     mockedAgentConfig.sessionTokenUrl = '';
     mockedAgentConfig.wsAllowQueryTokenFallback = false;
+    mockedAgentConfig.publicUrl = '';
+    mockedAgentConfig.tunnelMode = 'direct';
+    mockedAgentConfig.cloudflareTunnelUrl = '';
+    mockedAgentConfig.cloudflareTunnelToken = '';
     mockedAgentConfig.reconnectInterval = 1000;
     mockedAgentConfig.maxReconnectAttempts = 3;
     client = new CncClient();
@@ -141,6 +148,17 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     expect(registrationMessage.data.metadata.version).toBe(nodeAgentPackage.version);
     expect(registrationMessage.data.metadata.networkInfo.subnet).toEqual(expect.any(String));
     expect(registrationMessage.data.metadata.networkInfo.gateway).toEqual(expect.any(String));
+  });
+
+  it('includes publicUrl in registration payload when tunnel URL is configured', async () => {
+    mockedAgentConfig.publicUrl = 'https://node-1.example.trycloudflare.com';
+
+    await client.connect();
+    mockSockets[0].emit('open');
+
+    const registrationMessage = JSON.parse(mockSockets[0].sentMessages[0]);
+    expect(registrationMessage.type).toBe('register');
+    expect(registrationMessage.data.publicUrl).toBe('https://node-1.example.trycloudflare.com');
   });
 
   it('derives subnet and gateway metadata from active network interface', async () => {

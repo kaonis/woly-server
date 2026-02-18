@@ -54,20 +54,28 @@ function createHostAggregatorMock() {
 
 const mockedNodeModel = NodeModel as jest.Mocked<typeof NodeModel>;
 const mockedLogger = logger as jest.Mocked<typeof logger>;
+const originalFetch = global.fetch;
 
 describe('NodeManager unit branches', () => {
   let hostAggregator: ReturnType<typeof createHostAggregatorMock>;
   let nodeManager: NodeManager;
+  let fetchMock: jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
     hostAggregator = createHostAggregatorMock();
     nodeManager = new NodeManager(hostAggregator as unknown as never);
+    fetchMock = jest.fn();
+    (global as unknown as { fetch: jest.Mock }).fetch = fetchMock;
   });
 
   afterEach(() => {
     nodeManager.shutdown();
+  });
+
+  afterAll(() => {
+    (global as unknown as { fetch: typeof fetch }).fetch = originalFetch;
   });
 
   it('rejects malformed auth contexts before websocket handlers are attached', async () => {
@@ -131,7 +139,7 @@ describe('NodeManager unit branches', () => {
     });
   });
 
-  it('rejects invalid outbound command payloads', () => {
+  it('rejects invalid outbound command payloads', async () => {
     (nodeManager as unknown as {
       connections: Map<string, { ws: WebSocket; nodeId: string; location: string; registeredAt: Date }>;
     }).connections.set('node-1', {
@@ -141,13 +149,113 @@ describe('NodeManager unit branches', () => {
       registeredAt: new Date(),
     });
 
-    expect(() =>
+    await expect(
       nodeManager.sendCommand('node-1', {
         type: 'wake',
         commandId: 'cmd-invalid',
         data: { hostName: 'desktop' },
       } as unknown as never)
-    ).toThrow('Invalid outbound command payload: wake');
+    ).rejects.toThrow('Invalid outbound command payload: wake');
+  });
+
+  it('routes commands through node tunnel endpoint when publicUrl is available', async () => {
+    const { ws, mock } = createMockWs();
+    (nodeManager as unknown as {
+      connections: Map<
+        string,
+        {
+          ws: WebSocket;
+          nodeId: string;
+          location: string;
+          registeredAt: Date;
+          publicUrl?: string;
+          authTokenHint?: string;
+        }
+      >;
+    }).connections.set('node-1', {
+      nodeId: 'node-1',
+      ws,
+      location: 'Lab',
+      registeredAt: new Date(),
+      publicUrl: 'https://node-1.example.trycloudflare.com',
+      authTokenHint: 'dev-token-home',
+    });
+
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        type: 'command-result',
+        data: {
+          nodeId: 'node-1',
+          commandId: 'cmd-tunnel-1',
+          success: true,
+          message: 'Wake completed',
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    });
+
+    const commandResultListener = jest.fn();
+    nodeManager.on('command-result', commandResultListener);
+
+    await nodeManager.sendCommand('node-1', {
+      type: 'wake',
+      commandId: 'cmd-tunnel-1',
+      data: { hostName: 'desktop', mac: 'AA:BB:CC:DD:EE:FF' },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://node-1.example.trycloudflare.com/agent/commands',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
+    expect(mock.send).not.toHaveBeenCalled();
+    expect(commandResultListener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodeId: 'node-1',
+        commandId: 'cmd-tunnel-1',
+        success: true,
+      }),
+    );
+  });
+
+  it('falls back to websocket transport when tunnel dispatch fails', async () => {
+    const { ws, mock } = createMockWs();
+    (nodeManager as unknown as {
+      connections: Map<
+        string,
+        {
+          ws: WebSocket;
+          nodeId: string;
+          location: string;
+          registeredAt: Date;
+          publicUrl?: string;
+          authTokenHint?: string;
+        }
+      >;
+    }).connections.set('node-1', {
+      nodeId: 'node-1',
+      ws,
+      location: 'Lab',
+      registeredAt: new Date(),
+      publicUrl: 'https://node-1.example.trycloudflare.com',
+      authTokenHint: 'dev-token-home',
+    });
+
+    fetchMock.mockRejectedValueOnce(new Error('tunnel unavailable'));
+
+    await nodeManager.sendCommand('node-1', {
+      type: 'wake',
+      commandId: 'cmd-ws-fallback',
+      data: { hostName: 'desktop', mac: 'AA:BB:CC:DD:EE:FF' },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(mock.send).toHaveBeenCalledWith(
+      expect.stringContaining('cmd-ws-fallback'),
+    );
   });
 
   it('handles unknown node host events and aggregator failures gracefully', async () => {

@@ -487,14 +487,14 @@ describe('NodeManager', () => {
         },
       };
 
-      nodeManager.sendCommand('test-ws-node-4', command);
+      await nodeManager.sendCommand('test-ws-node-4', command);
 
       expect(mockWs.send).toHaveBeenCalledWith(
         expect.stringContaining('test-cmd-1')
       );
     });
 
-    it('should throw error when node not connected', () => {
+    it('should throw error when node not connected', async () => {
       const command = {
         type: 'wake' as const,
         commandId: 'test-cmd-2',
@@ -504,9 +504,7 @@ describe('NodeManager', () => {
         },
       };
 
-      expect(() => {
-        nodeManager.sendCommand('non-existent-node', command);
-      }).toThrow('not connected');
+      await expect(nodeManager.sendCommand('non-existent-node', command)).rejects.toThrow('not connected');
     });
   });
 
