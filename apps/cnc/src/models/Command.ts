@@ -249,8 +249,18 @@ export class CommandModel {
     return result.rows.map(rowToRecord);
   }
 
+  static async listQueuedByNode(nodeId: string, params?: { limit?: number }): Promise<CommandRecord[]> {
+    const limit = params?.limit ?? 200;
+    const result = await db.query<CommandRow>(
+      'SELECT * FROM commands WHERE node_id = $1 AND state = $2 ORDER BY created_at ASC LIMIT $3',
+      [nodeId, 'queued', limit]
+    );
+    return result.rows.map(rowToRecord);
+  }
+
   static async reconcileStaleInFlight(timeoutMs: number): Promise<number> {
-    // Any command still in queued/sent beyond timeout is timed out.
+    // Any command still in sent beyond timeout is timed out.
+    // Queued commands are intentionally excluded because offline queueing uses a separate TTL.
     // We treat created_at as the baseline so behavior is deterministic across state changes.
     if (timeoutMs <= 0) {
       return 0;
@@ -262,7 +272,7 @@ export class CommandModel {
         SET state = 'timed_out',
             error = COALESCE(error, 'Reconciled as timed_out after restart'),
             completed_at = CURRENT_TIMESTAMP
-        WHERE state IN ('queued', 'sent')
+        WHERE state IN ('sent')
           AND datetime(created_at) < datetime('now', '-' || $1 || ' seconds')
       `
       : `
@@ -270,7 +280,7 @@ export class CommandModel {
         SET state = 'timed_out',
             error = COALESCE(error, 'Reconciled as timed_out after restart'),
             completed_at = NOW()
-        WHERE state IN ('queued', 'sent')
+        WHERE state IN ('sent')
           AND created_at < NOW() - ($1 || ' seconds')::INTERVAL
       `;
 

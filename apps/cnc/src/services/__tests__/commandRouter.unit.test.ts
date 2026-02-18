@@ -14,6 +14,7 @@ interface PendingCommandEntry {
   resolvers: CommandResolver[];
   timeout: NodeJS.Timeout;
   correlationId: string | null;
+  commandType: 'wake' | 'scan' | 'scan-host-ports' | 'update-host' | 'delete-host' | 'ping-host';
 }
 
 interface CommandRouterInternals {
@@ -29,6 +30,7 @@ interface CommandRouterInternals {
 
 class NodeManagerMock extends EventEmitter {
   getNodeStatus = jest.fn<Promise<'online' | 'offline'>, [string]>();
+  isNodeConnected = jest.fn<boolean, [string]>();
   getConnectedNodes = jest.fn<string[], []>();
   sendCommand = jest.fn<void, [string, unknown]>();
 }
@@ -64,6 +66,7 @@ function createRouter(): {
     nodeManager as unknown as never,
     hostAggregator as unknown as never
   );
+  nodeManager.isNodeConnected.mockReturnValue(true);
 
   return {
     router,
@@ -145,6 +148,7 @@ describe('CommandRouter unit behavior', () => {
       message: 'Wake-on-LAN packet sent to desk-pc@Home%20Office',
       nodeId: 'node-1',
       location: 'Home Office',
+      commandId: 'cmd-1',
       correlationId: 'corr-123',
     });
     router.cleanup();
@@ -490,8 +494,8 @@ describe('CommandRouter unit behavior', () => {
     router.cleanup();
   });
 
-  it('throws when update-host routing node is offline', async () => {
-    const { router, hostAggregator, nodeManager } = createRouter();
+  it('queues update-host command when node is offline', async () => {
+    const { router, hostAggregator } = createRouter();
     hostAggregator.getHostByFQN.mockResolvedValue({
       nodeId: 'node-offline',
       name: 'host-a',
@@ -499,11 +503,26 @@ describe('CommandRouter unit behavior', () => {
       ip: '10.0.0.8',
       status: 'asleep',
     });
-    nodeManager.getNodeStatus.mockResolvedValue('offline');
+    const executeSpy = jest.spyOn(
+      router as unknown as CommandRouterInternals,
+      'executeCommand'
+    ).mockResolvedValue({
+      commandId: 'cmd-update-offline',
+      success: true,
+      state: 'queued',
+      message: 'Command queued (node offline)',
+      timestamp: new Date(),
+    });
 
-    await expect(router.routeUpdateHostCommand('host-a@lab', {})).rejects.toThrow(
-      'Node node-offline is offline'
+    const result = await router.routeUpdateHostCommand('host-a@lab', {});
+    expect(result).toEqual(
+      expect.objectContaining({
+        commandId: 'cmd-update-offline',
+        success: true,
+        state: 'queued',
+      })
     );
+    expect(executeSpy).toHaveBeenCalled();
     router.cleanup();
   });
 
@@ -522,6 +541,7 @@ describe('CommandRouter unit behavior', () => {
       .mockResolvedValue({
         commandId: 'cmd-del-1',
         success: true,
+        state: 'acknowledged',
         timestamp: new Date(),
       });
 
@@ -550,6 +570,30 @@ describe('CommandRouter unit behavior', () => {
         commandId: 'cmd-del-2',
         success: false,
         error: 'rejected by node',
+        timestamp: new Date(),
+      });
+
+    await router.routeDeleteHostCommand('office-pc@Lab');
+    expect(hostAggregator.onHostRemoved).not.toHaveBeenCalled();
+    router.cleanup();
+  });
+
+  it('keeps host when delete command is queued for offline delivery', async () => {
+    const { router, hostAggregator, nodeManager } = createRouter();
+    hostAggregator.getHostByFQN.mockResolvedValue({
+      nodeId: 'node-4',
+      name: 'office-pc',
+      mac: '11:22:33:44:55:66',
+      ip: '10.0.0.30',
+      status: 'awake',
+    });
+    nodeManager.getNodeStatus.mockResolvedValue('offline');
+    jest.spyOn(router as unknown as CommandRouterInternals, 'executeCommand')
+      .mockResolvedValue({
+        commandId: 'cmd-del-queued',
+        success: true,
+        state: 'queued',
+        message: 'Command queued (node offline)',
         timestamp: new Date(),
       });
 
@@ -587,6 +631,7 @@ describe('CommandRouter unit behavior', () => {
     expect(result).toEqual({
       commandId: 'cmd-ack-1',
       success: true,
+      state: 'acknowledged',
       timestamp: now,
       correlationId: 'corr-cache',
     });
@@ -630,6 +675,108 @@ describe('CommandRouter unit behavior', () => {
         idempotencyKey: 'wake:idem-shared',
       })
     );
+    router.cleanup();
+  });
+
+  it('returns queued result when node is offline instead of failing immediately', async () => {
+    const { internals, nodeManager, router } = createRouter();
+    nodeManager.isNodeConnected.mockReturnValue(false);
+    const queued = createQueuedRecord('cmd-queued-offline', {
+      type: 'scan',
+      commandId: 'cmd-queued-offline',
+      data: { immediate: true },
+    });
+    jest.spyOn(CommandModel, 'enqueue').mockResolvedValue(queued);
+
+    const result = await internals.executeCommand(
+      'node-1',
+      { type: 'scan', commandId: 'cmd-queued-offline', data: { immediate: true } },
+      { idempotencyKey: null, correlationId: 'corr-offline' }
+    );
+
+    expect(result).toEqual({
+      commandId: 'cmd-queued-offline',
+      success: true,
+      state: 'queued',
+      message: 'Command queued (node offline)',
+      timestamp: queued.updatedAt,
+      correlationId: 'corr-offline',
+    });
+    expect(nodeManager.sendCommand).not.toHaveBeenCalled();
+    router.cleanup();
+  });
+
+  it('flushes queued commands in FIFO order when node reconnects', async () => {
+    const { router, nodeManager } = createRouter();
+    const now = Date.now();
+    const queuedOne = {
+      ...createQueuedRecord('cmd-fifo-1', {
+        type: 'scan',
+        commandId: 'cmd-fifo-1',
+        data: { immediate: true },
+      }),
+      createdAt: new Date(now - 2000),
+    };
+    const queuedTwo = {
+      ...createQueuedRecord('cmd-fifo-2', {
+        type: 'scan',
+        commandId: 'cmd-fifo-2',
+        data: { immediate: true },
+      }),
+      createdAt: new Date(now - 1000),
+    };
+
+    jest.spyOn(CommandModel, 'listQueuedByNode').mockResolvedValue([queuedOne, queuedTwo]);
+    jest.spyOn(CommandModel, 'markSent').mockResolvedValue(undefined);
+    jest.spyOn(CommandModel, 'markFailed').mockResolvedValue(undefined);
+    nodeManager.sendCommand.mockImplementation(() => undefined);
+
+    nodeManager.emit('node-connected', { nodeId: 'node-1' });
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(CommandModel.listQueuedByNode).toHaveBeenCalledWith('node-1', { limit: 500 });
+    expect(nodeManager.sendCommand).toHaveBeenNthCalledWith(
+      1,
+      'node-1',
+      expect.objectContaining({ commandId: 'cmd-fifo-1' })
+    );
+    expect(nodeManager.sendCommand).toHaveBeenNthCalledWith(
+      2,
+      'node-1',
+      expect.objectContaining({ commandId: 'cmd-fifo-2' })
+    );
+    router.cleanup();
+  });
+
+  it('expires stale queued commands during reconnect flush using offline ttl', async () => {
+    const { router, nodeManager } = createRouter();
+    const mutableRouter = router as unknown as { offlineCommandTtlMs: number };
+    mutableRouter.offlineCommandTtlMs = 100;
+
+    const staleQueued = {
+      ...createQueuedRecord('cmd-expired-1', {
+        type: 'scan',
+        commandId: 'cmd-expired-1',
+        data: { immediate: true },
+      }),
+      createdAt: new Date(Date.now() - 1_000),
+    };
+
+    jest.spyOn(CommandModel, 'listQueuedByNode').mockResolvedValue([staleQueued]);
+    const markFailedSpy = jest.spyOn(CommandModel, 'markFailed').mockResolvedValue(undefined);
+    jest.spyOn(CommandModel, 'markSent').mockResolvedValue(undefined);
+    nodeManager.sendCommand.mockImplementation(() => undefined);
+
+    nodeManager.emit('node-connected', { nodeId: 'node-1' });
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(markFailedSpy).toHaveBeenCalledWith(
+      'cmd-expired-1',
+      expect.stringContaining('Command expired in offline queue')
+    );
+    expect(nodeManager.sendCommand).not.toHaveBeenCalled();
     router.cleanup();
   });
 
@@ -687,6 +834,7 @@ describe('CommandRouter unit behavior', () => {
     expect(failed).toEqual({
       commandId: 'cmd-failed',
       success: false,
+      state: 'failed',
       error: 'Command failed',
       timestamp: now,
       correlationId: 'corr-failed',
@@ -714,6 +862,7 @@ describe('CommandRouter unit behavior', () => {
     expect(timedOut).toEqual({
       commandId: 'cmd-timeout',
       success: false,
+      state: 'timed_out',
       error: 'timed out previously',
       timestamp: now,
       correlationId: undefined,
@@ -1001,10 +1150,12 @@ describe('CommandRouter unit behavior', () => {
     router.cleanup();
   });
 
-  it('unsubscribes command-result listener from node manager on cleanup', () => {
+  it('unsubscribes node-manager listeners on cleanup', () => {
     const { router, nodeManager } = createRouter();
     expect(nodeManager.listenerCount('command-result')).toBe(1);
+    expect(nodeManager.listenerCount('node-connected')).toBe(1);
     router.cleanup();
     expect(nodeManager.listenerCount('command-result')).toBe(0);
+    expect(nodeManager.listenerCount('node-connected')).toBe(0);
   });
 });

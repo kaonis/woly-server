@@ -830,10 +830,25 @@ export class HostsController {
         return;
       }
 
-      const responseBody: { success: boolean; message: string; correlationId?: string } = {
+      const responseBody: {
+        success: boolean;
+        message: string;
+        commandId?: string;
+        state?: string;
+        correlationId?: string;
+      } = {
         success: true,
-        message: 'Host updated successfully',
+        message:
+          result.state === 'queued'
+            ? 'Update command queued (node offline)'
+            : 'Host updated successfully',
       };
+      if (result.commandId) {
+        responseBody.commandId = result.commandId;
+      }
+      if (result.state) {
+        responseBody.state = result.state;
+      }
       const responseCorrelationId = result.correlationId ?? correlationId ?? undefined;
       if (responseCorrelationId) {
         responseBody.correlationId = responseCorrelationId;
@@ -970,10 +985,25 @@ export class HostsController {
         return;
       }
 
-      const responseBody: { success: boolean; message: string; correlationId?: string } = {
+      const responseBody: {
+        success: boolean;
+        message: string;
+        commandId?: string;
+        state?: string;
+        correlationId?: string;
+      } = {
         success: true,
-        message: 'Host deleted successfully',
+        message:
+          result.state === 'queued'
+            ? 'Delete command queued (node offline)'
+            : 'Host deleted successfully',
       };
+      if (result.commandId) {
+        responseBody.commandId = result.commandId;
+      }
+      if (result.state) {
+        responseBody.state = result.state;
+      }
       const responseCorrelationId = result.correlationId ?? correlationId ?? undefined;
       if (responseCorrelationId) {
         responseBody.correlationId = responseCorrelationId;

@@ -197,6 +197,19 @@ describe('CommandModel (PostgreSQL paths)', () => {
     expect(mockDb.query.mock.calls[1][0]).toContain('SELECT * FROM commands ORDER BY created_at DESC');
   });
 
+  it('listQueuedByNode returns queued records in FIFO order', async () => {
+    const CommandModel = await loadCommandModel();
+    mockDb.query.mockResolvedValueOnce({ rows: [createRow(), createRow({ id: 'cmd-2' })], rowCount: 2 });
+
+    const queued = await CommandModel.listQueuedByNode('node-1', { limit: 10 });
+
+    expect(queued).toHaveLength(2);
+    expect(mockDb.query).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE node_id = $1 AND state = $2 ORDER BY created_at ASC'),
+      ['node-1', 'queued', 10]
+    );
+  });
+
   it('reconcileStaleInFlight returns 0 for non-positive timeout and rowCount otherwise', async () => {
     const CommandModel = await loadCommandModel();
     mockDb.query.mockResolvedValueOnce({ rows: [], rowCount: 3 });
@@ -207,7 +220,7 @@ describe('CommandModel (PostgreSQL paths)', () => {
     expect(noOp).toBe(0);
     expect(reconciled).toBe(3);
     expect(mockDb.query).toHaveBeenCalledTimes(1);
-    expect(mockDb.query).toHaveBeenCalledWith(expect.stringContaining("state IN ('queued', 'sent')"), [5]);
+    expect(mockDb.query).toHaveBeenCalledWith(expect.stringContaining("state IN ('sent')"), [5]);
   });
 
   it('pruneOldCommands returns 0 for non-positive retention and rowCount otherwise', async () => {

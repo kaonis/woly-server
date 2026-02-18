@@ -8,6 +8,7 @@ import { CommandModel } from '../models/Command';
 import config from '../config';
 import type { HostStatus, WakeVerifyOptions } from '@kaonis/woly-protocol';
 import { runtimeMetrics } from './runtimeMetrics';
+import type { CommandRecord } from '../types';
 
 type DispatchCommand = Extract<CncCommand, { commandId: string }>;
 
@@ -60,15 +61,16 @@ type RoutedHostScanDispatchResult = {
  * 
  * Flow:
  * 1. Parse FQN to determine owning node (via location)
- * 2. Verify node is online
- * 3. Send command to node via NodeManager
- * 4. Wait for command result (with timeout)
- * 5. Return result to API caller
+ * 2. Queue command in durable storage
+ * 3. If node is online, send command via NodeManager; otherwise keep queued
+ * 4. Wait for command result (with timeout) when dispatched synchronously
+ * 5. Return immediate queued response or execution result
  */
 export class CommandRouter extends EventEmitter {
   private nodeManager: NodeManager;
   private hostAggregator: HostAggregator;
   private readonly boundHandleCommandResult: (result: CommandResult) => void;
+  private readonly boundHandleNodeConnected: (event: { nodeId: string }) => void;
   private pendingCommands: Map<string, {
     resolvers: Array<{
       resolve: (result: CommandResult) => void;
@@ -87,6 +89,8 @@ export class CommandRouter extends EventEmitter {
   readonly commandTimeout: number;
   readonly maxRetries: number;
   readonly retryBaseDelayMs: number;
+  readonly offlineCommandTtlMs: number;
+  private readonly flushingNodes = new Set<string>();
 
   constructor(nodeManager: NodeManager, hostAggregator: HostAggregator) {
     super();
@@ -96,10 +100,13 @@ export class CommandRouter extends EventEmitter {
     this.commandTimeout = config.commandTimeout;
     this.maxRetries = config.commandMaxRetries;
     this.retryBaseDelayMs = config.commandRetryBaseDelayMs;
+    this.offlineCommandTtlMs = config.offlineCommandTtlMs;
 
     // Listen for command results from nodes
     this.boundHandleCommandResult = this.handleCommandResult.bind(this);
     this.nodeManager.on('command-result', this.boundHandleCommandResult);
+    this.boundHandleNodeConnected = this.handleNodeConnected.bind(this);
+    this.nodeManager.on('node-connected', this.boundHandleNodeConnected);
   }
 
   async reconcileStaleInFlight(): Promise<number> {
@@ -131,12 +138,7 @@ export class CommandRouter extends EventEmitter {
       throw new Error(`Host not found: ${fqn}`);
     }
 
-    // Check if node is online
     const nodeId = host.nodeId;
-    const nodeStatus = await this.nodeManager.getNodeStatus(nodeId);
-    if (nodeStatus !== 'online') {
-      throw new Error(`Node ${nodeId} (${location}) is offline`);
-    }
 
     // Create command — include verify options if requested
     const commandId = this.generateCommandId();
@@ -169,11 +171,18 @@ export class CommandRouter extends EventEmitter {
 
     const response: WakeupResponse = {
       success: true,
-      message: `Wake-on-LAN packet sent to ${fqn}`,
+      message:
+        result.state === 'queued'
+          ? `Wake command queued for ${fqn} (node offline)`
+          : `Wake-on-LAN packet sent to ${fqn}`,
       nodeId,
       location,
+      commandId: result.commandId,
       correlationId: result.correlationId ?? correlationId ?? undefined,
     };
+    if (result.state) {
+      response.state = result.state;
+    }
 
     if (verify) {
       response.wakeVerification = {
@@ -262,7 +271,7 @@ export class CommandRouter extends EventEmitter {
   ): Promise<CommandResult> {
     logger.info(`Routing scan command to node ${nodeId}`);
 
-    // Check if node is online
+    // Scan remains immediate-only. If the node is offline, fail fast.
     const nodeStatus = await this.nodeManager.getNodeStatus(nodeId);
     if (nodeStatus !== 'online') {
       throw new Error(`Node ${nodeId} is offline`);
@@ -456,13 +465,7 @@ export class CommandRouter extends EventEmitter {
       throw new Error(`Host not found: ${fqn}`);
     }
 
-    // Check if node is online
     const nodeId = host.nodeId;
-    const nodeStatus = await this.nodeManager.getNodeStatus(nodeId);
-    if (nodeStatus !== 'online') {
-      throw new Error(`Node ${nodeId} is offline`);
-    }
-
     // Create command
     const commandId = this.generateCommandId();
     const command: DispatchCommand = {
@@ -507,13 +510,7 @@ export class CommandRouter extends EventEmitter {
       throw new Error(`Host not found: ${fqn}`);
     }
 
-    // Check if node is online
     const nodeId = host.nodeId;
-    const nodeStatus = await this.nodeManager.getNodeStatus(nodeId);
-    if (nodeStatus !== 'online') {
-      throw new Error(`Node ${nodeId} is offline`);
-    }
-
     // Create command
     const commandId = this.generateCommandId();
     const command: DispatchCommand = {
@@ -528,8 +525,8 @@ export class CommandRouter extends EventEmitter {
       correlationId: options?.correlationId ?? null,
     });
 
-    // If successful, also remove from aggregated database
-    if (result.success) {
+    // Remove from aggregated database only when the command is acknowledged.
+    if (result.success && result.state === 'acknowledged') {
       await this.hostAggregator.onHostRemoved({
         nodeId,
         name: hostname
@@ -571,6 +568,7 @@ export class CommandRouter extends EventEmitter {
       return {
         commandId: effectiveCommandId,
         success: true,
+        state: 'acknowledged',
         timestamp: record.completedAt ?? record.updatedAt,
         correlationId: options.correlationId ?? undefined,
       };
@@ -586,8 +584,25 @@ export class CommandRouter extends EventEmitter {
       return {
         commandId: effectiveCommandId,
         success: false,
+        state: record.state,
         error: record.error ?? 'Command failed',
         timestamp: record.completedAt ?? record.updatedAt,
+        correlationId: options.correlationId ?? undefined,
+      };
+    }
+
+    if (record.state === 'queued' && !this.nodeManager.isNodeConnected(nodeId)) {
+      logger.info('Queued command for offline node', {
+        commandId: effectiveCommandId,
+        nodeId,
+        type: command.type,
+      });
+      return {
+        commandId: effectiveCommandId,
+        success: true,
+        state: 'queued',
+        message: this.buildQueuedMessage(),
+        timestamp: record.updatedAt,
         correlationId: options.correlationId ?? undefined,
       };
     }
@@ -633,68 +648,91 @@ export class CommandRouter extends EventEmitter {
         commandType: command.type,
       });
 
-      void (async () => {
-        try {
-          if (record.state === 'queued') {
-            // Apply exponential backoff for retries
-            // retryCount represents the number of previous send attempts
-            // 0 = first attempt (no delay), 1 = first retry (base delay), 2 = second retry (2x delay), etc.
-            if (record.retryCount > 0) {
-              const attemptNumber = record.retryCount; // This will be the Nth retry
-              const backoffDelay = this.calculateBackoffDelay(attemptNumber - 1);
-              logger.info('Applying exponential backoff before retry', {
-                commandId: effectiveCommandId,
-                attemptNumber,
-                backoffDelayMs: Math.round(backoffDelay),
-              });
-              await new Promise((resolve) => setTimeout(resolve, backoffDelay));
-            }
+      if (record.state !== 'queued') {
+        logger.debug(`Command ${effectiveCommandId} already ${record.state}; not resending`);
+        return;
+      }
 
-            this.nodeManager.sendCommand(nodeId, payloadToSend);
-            runtimeMetrics.recordCommandDispatched(
-              effectiveCommandId,
-              command.type,
-              options.correlationId
-            );
-            await CommandModel.markSent(effectiveCommandId);
-            
-            // Log after markSent to show the correct count (markSent increments it)
-            logger.debug('Sent command to node', {
-              commandId: effectiveCommandId,
-              nodeId,
-              attemptNumber: record.retryCount + 1, // Will be incremented by markSent
-              type: command.type,
-            });
-          } else {
-            logger.debug(`Command ${effectiveCommandId} already ${record.state}; not resending`);
-          }
-        } catch (error) {
-          const pending = this.pendingCommands.get(effectiveCommandId);
-          clearTimeout(timeout);
-          this.pendingCommands.delete(effectiveCommandId);
-          
-          const message = error instanceof Error ? error.message : String(error);
-          const err = error instanceof Error ? error : new Error(message);
-          
-          await CommandModel.markFailed(effectiveCommandId, message);
-          runtimeMetrics.recordCommandResult(effectiveCommandId, false, Date.now(), command.type);
-          
-          logger.error('Failed to send command', {
-            commandId: effectiveCommandId,
-            nodeId,
-            attemptNumber: record.retryCount + 1, // Attempt that failed
-            error: message,
-          });
-          
-          // Reject all pending resolvers on send failure
-          if (pending) {
-            for (const resolver of pending.resolvers) {
-              resolver.reject(err);
-            }
-          }
-        }
-      })();
+      void this.dispatchPersistedCommand({
+        nodeId,
+        commandId: effectiveCommandId,
+        commandType: command.type,
+        payload: payloadToSend,
+        retryCount: record.retryCount,
+        timeout,
+        correlationId: options.correlationId,
+        applyBackoff: record.state === 'queued',
+      });
     });
+  }
+
+  private async dispatchPersistedCommand(params: {
+    nodeId: string;
+    commandId: string;
+    commandType: DispatchCommand['type'];
+    payload: DispatchCommand;
+    retryCount: number;
+    timeout: NodeJS.Timeout;
+    correlationId: string | null;
+    applyBackoff: boolean;
+  }): Promise<void> {
+    const {
+      nodeId,
+      commandId,
+      commandType,
+      payload,
+      retryCount,
+      timeout,
+      correlationId,
+      applyBackoff,
+    } = params;
+
+    try {
+      if (applyBackoff && retryCount > 0) {
+        const attemptNumber = retryCount;
+        const backoffDelay = this.calculateBackoffDelay(attemptNumber - 1);
+        logger.info('Applying exponential backoff before retry', {
+          commandId,
+          attemptNumber,
+          backoffDelayMs: Math.round(backoffDelay),
+        });
+        await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+      }
+
+      this.nodeManager.sendCommand(nodeId, payload);
+      runtimeMetrics.recordCommandDispatched(commandId, commandType, correlationId);
+      await CommandModel.markSent(commandId);
+
+      logger.debug('Sent command to node', {
+        commandId,
+        nodeId,
+        attemptNumber: retryCount + 1,
+        type: commandType,
+      });
+    } catch (error) {
+      const pending = this.pendingCommands.get(commandId);
+      clearTimeout(timeout);
+      this.pendingCommands.delete(commandId);
+
+      const message = error instanceof Error ? error.message : String(error);
+      const err = error instanceof Error ? error : new Error(message);
+
+      await CommandModel.markFailed(commandId, message);
+      runtimeMetrics.recordCommandResult(commandId, false, Date.now(), commandType);
+
+      logger.error('Failed to send command', {
+        commandId,
+        nodeId,
+        attemptNumber: retryCount + 1,
+        error: message,
+      });
+
+      if (pending) {
+        for (const resolver of pending.resolvers) {
+          resolver.reject(err);
+        }
+      }
+    }
   }
 
   /**
@@ -708,8 +746,8 @@ export class CommandRouter extends EventEmitter {
 
   private async applyCommandResult(result: CommandResult): Promise<void> {
     const pending = this.pendingCommands.get(result.commandId);
-    const metricCommandType =
-      pending?.commandType ?? (await this.resolvePersistedCommandType(result.commandId));
+    const persistedCommand = pending ? null : await this.resolvePersistedCommand(result.commandId);
+    const metricCommandType = pending?.commandType ?? persistedCommand?.type ?? null;
     runtimeMetrics.recordCommandResult(
       result.commandId,
       result.success,
@@ -774,6 +812,14 @@ export class CommandRouter extends EventEmitter {
         return;
       }
 
+      if (persistedCommand) {
+        logger.debug('Processed async command result without active HTTP waiter', {
+          commandId: result.commandId,
+          state: persistedCommand.state,
+        });
+        return;
+      }
+
       logger.warn(`Received result for unknown command: ${result.commandId}`);
       return;
     }
@@ -784,7 +830,7 @@ export class CommandRouter extends EventEmitter {
 
     if (result.success) {
       for (const resolver of pending.resolvers) {
-        resolver.resolve({ ...result, correlationId });
+        resolver.resolve({ ...result, correlationId, state: 'acknowledged' });
       }
       return;
     }
@@ -794,17 +840,127 @@ export class CommandRouter extends EventEmitter {
     }
   }
 
-  private async resolvePersistedCommandType(commandId: string): Promise<string | null> {
+  private async resolvePersistedCommand(commandId: string): Promise<CommandRecord | null> {
     try {
-      const record = await CommandModel.findById(commandId);
-      return record?.type ?? null;
+      return await CommandModel.findById(commandId);
     } catch (error) {
-      logger.warn('Failed to resolve persisted command type for result attribution', {
+      logger.warn('Failed to resolve persisted command for result attribution', {
         commandId,
         error: error instanceof Error ? error.message : String(error),
       });
       return null;
     }
+  }
+
+  private handleNodeConnected(event: { nodeId: string }): void {
+    const { nodeId } = event;
+    if (this.flushingNodes.has(nodeId)) {
+      return;
+    }
+
+    this.flushingNodes.add(nodeId);
+    void this.flushQueuedCommandsForNode(nodeId).finally(() => {
+      this.flushingNodes.delete(nodeId);
+    });
+  }
+
+  private async flushQueuedCommandsForNode(nodeId: string): Promise<void> {
+    const queued = await CommandModel.listQueuedByNode(nodeId, { limit: 500 });
+    if (queued.length === 0) {
+      return;
+    }
+
+    logger.info('Flushing queued commands for reconnected node', {
+      nodeId,
+      queuedCount: queued.length,
+    });
+
+    for (const record of queued) {
+      if (this.isQueuedCommandExpired(record)) {
+        await CommandModel.markFailed(record.id, this.buildQueueExpiryMessage());
+        continue;
+      }
+
+      const payload = this.asDispatchCommand(record.payload);
+      if (!payload) {
+        await CommandModel.markFailed(record.id, 'Queued command payload is invalid');
+        continue;
+      }
+
+      const existingPending = this.pendingCommands.get(record.id);
+      if (existingPending) {
+        continue;
+      }
+
+      const timeout = setTimeout(() => {
+        const pending = this.pendingCommands.get(record.id);
+        this.pendingCommands.delete(record.id);
+        runtimeMetrics.recordCommandTimeout(record.id, Date.now(), payload.type);
+
+        const attemptNumber = record.retryCount + 1;
+        const error = new Error(
+          `Command ${record.id} timed out after ${this.commandTimeout}ms (attempt ${attemptNumber}/${this.maxRetries})`
+        );
+
+        CommandModel.markTimedOut(record.id, error.message).catch((err) => {
+          logger.error('Failed to mark command as timed out', {
+            commandId: record.id,
+            attemptNumber,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+
+        if (pending) {
+          for (const resolver of pending.resolvers) {
+            resolver.reject(error);
+          }
+        }
+      }, this.commandTimeout);
+
+      this.pendingCommands.set(record.id, {
+        resolvers: [],
+        timeout,
+        correlationId: null,
+        commandType: payload.type,
+      });
+
+      await this.dispatchPersistedCommand({
+        nodeId,
+        commandId: record.id,
+        commandType: payload.type,
+        payload,
+        retryCount: record.retryCount,
+        timeout,
+        correlationId: null,
+        applyBackoff: true,
+      });
+    }
+  }
+
+  private asDispatchCommand(payload: unknown): DispatchCommand | null {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+
+    const candidate = payload as Partial<DispatchCommand>;
+    if (typeof candidate.type !== 'string' || typeof candidate.commandId !== 'string') {
+      return null;
+    }
+
+    return candidate as DispatchCommand;
+  }
+
+  private isQueuedCommandExpired(record: Pick<CommandRecord, 'createdAt'>): boolean {
+    const ageMs = Date.now() - record.createdAt.getTime();
+    return ageMs >= this.offlineCommandTtlMs;
+  }
+
+  private buildQueuedMessage(): string {
+    return 'Command queued (node offline)';
+  }
+
+  private buildQueueExpiryMessage(): string {
+    return `Command expired in offline queue after ${this.offlineCommandTtlMs}ms`;
   }
 
   /**
@@ -934,7 +1090,9 @@ export class CommandRouter extends EventEmitter {
     }
     this.pendingCommands.clear();
     this.wakeVerificationCommands.clear();
+    this.flushingNodes.clear();
     this.nodeManager.off('command-result', this.boundHandleCommandResult);
+    this.nodeManager.off('node-connected', this.boundHandleNodeConnected);
     this.removeAllListeners();
   }
 

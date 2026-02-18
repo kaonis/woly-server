@@ -431,6 +431,26 @@ describe('HostsController additional branches', () => {
       });
     });
 
+    it('returns queued delete response when router reports queued state', async () => {
+      commandRouter.routeDeleteHostCommand.mockResolvedValue({
+        success: true,
+        commandId: 'cmd-delete-queued',
+        state: 'queued',
+      });
+
+      const req = createMockRequest({ params: { fqn: 'desktop@lab' } });
+      const res = createMockResponse();
+
+      await controller.deleteHost(req, res);
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Delete command queued (node offline)',
+        commandId: 'cmd-delete-queued',
+        state: 'queued',
+      });
+    });
+
     it('maps not-found errors to 404', async () => {
       commandRouter.routeDeleteHostCommand.mockRejectedValue(new Error('Host not found: desktop@lab'));
 
@@ -764,6 +784,29 @@ describe('HostsController additional branches', () => {
         success: true,
         message: 'Host updated successfully',
         correlationId: 'cid-router',
+      });
+    });
+
+    it('returns queued update response when router reports queued state', async () => {
+      commandRouter.routeUpdateHostCommand.mockResolvedValue({
+        success: true,
+        commandId: 'cmd-update-queued',
+        state: 'queued',
+      });
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        body: { name: 'new-name' },
+      });
+      const res = createMockResponse();
+
+      await controller.updateHost(req, res);
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Update command queued (node offline)',
+        commandId: 'cmd-update-queued',
+        state: 'queued',
       });
     });
 
