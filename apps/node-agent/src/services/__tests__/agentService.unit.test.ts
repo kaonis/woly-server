@@ -1248,4 +1248,237 @@ describe('AgentService command handlers', () => {
       })
     );
   });
+
+  it('handles cnc lifecycle events, including reconnect-failed stop behavior', async () => {
+    const stopSpy = jest.spyOn(service, 'stop');
+    ((service as unknown) as { hostDb: unknown }).hostDb = null;
+    await service.start();
+
+    mockCncClient.emit('connected');
+    await flushAsyncTasks();
+    mockCncClient.emit('disconnected');
+    mockCncClient.emit('error', new Error('socket closed'));
+    mockCncClient.emit('auth-expired');
+    mockCncClient.emit('auth-revoked');
+    mockCncClient.emit('auth-unavailable');
+    mockCncClient.emit('reconnect-failed');
+
+    expect(stopSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('confirms wake verification via host database state', async () => {
+    const startedAt = new Date().toISOString();
+    const sendCommandResultSpy = jest
+      .spyOn((service as unknown) as {
+        sendCommandResult: (
+          commandType: string,
+          commandId: string,
+          payload: { success: boolean; wakeVerification?: { status: string; source?: string } }
+        ) => void;
+      }, 'sendCommandResult')
+      .mockImplementation(() => undefined);
+    hostDbMock.getHost.mockResolvedValueOnce({ ...sampleHost, status: 'awake' });
+
+    await ((service as unknown) as {
+      runWakeVerificationLoop: (
+        commandId: string,
+        hostName: string,
+        hostIp: string | null,
+        opts: { timeoutMs: number; pollIntervalMs: number; startedAt: string }
+      ) => Promise<void>;
+    }).runWakeVerificationLoop('cmd-verify-db', sampleHost.name, null, {
+      timeoutMs: 200,
+      pollIntervalMs: 50,
+      startedAt,
+    });
+
+    expect(networkDiscovery.isHostAlive).not.toHaveBeenCalled();
+    expect(sendCommandResultSpy).toHaveBeenCalledWith(
+      'wake',
+      'cmd-verify-db',
+      expect.objectContaining({
+        success: true,
+        wakeVerification: expect.objectContaining({
+          status: 'confirmed',
+          source: 'arp',
+        }),
+      }),
+    );
+  });
+
+  it('confirms wake verification via ping and learns host ip from database', async () => {
+    const startedAt = new Date().toISOString();
+    const sendCommandResultSpy = jest
+      .spyOn((service as unknown) as {
+        sendCommandResult: (
+          commandType: string,
+          commandId: string,
+          payload: { success: boolean; wakeVerification?: { status: string; source?: string } }
+        ) => void;
+      }, 'sendCommandResult')
+      .mockImplementation(() => undefined);
+    hostDbMock.getHost.mockResolvedValueOnce({
+      ...sampleHost,
+      status: 'asleep',
+      ip: sampleHost.ip,
+    });
+    ((networkDiscovery.isHostAlive as unknown) as jest.Mock).mockResolvedValueOnce(true);
+
+    await ((service as unknown) as {
+      runWakeVerificationLoop: (
+        commandId: string,
+        hostName: string,
+        hostIp: string | null,
+        opts: { timeoutMs: number; pollIntervalMs: number; startedAt: string }
+      ) => Promise<void>;
+    }).runWakeVerificationLoop('cmd-verify-ping', sampleHost.name, null, {
+      timeoutMs: 200,
+      pollIntervalMs: 50,
+      startedAt,
+    });
+
+    expect(networkDiscovery.isHostAlive).toHaveBeenCalledWith(sampleHost.ip);
+    expect(sendCommandResultSpy).toHaveBeenCalledWith(
+      'wake',
+      'cmd-verify-ping',
+      expect.objectContaining({
+        success: true,
+        wakeVerification: expect.objectContaining({
+          status: 'confirmed',
+          source: 'ping',
+        }),
+      }),
+    );
+  });
+
+  it('handles wake verification poll errors and emits timeout result', async () => {
+    jest.useFakeTimers();
+    const startedAt = new Date().toISOString();
+    const sendCommandResultSpy = jest
+      .spyOn((service as unknown) as {
+        sendCommandResult: (
+          commandType: string,
+          commandId: string,
+          payload: { success: boolean; wakeVerification?: { status: string } }
+        ) => void;
+      }, 'sendCommandResult')
+      .mockImplementation(() => undefined);
+    hostDbMock.getHost
+      .mockRejectedValueOnce('db temporarily unavailable')
+      .mockRejectedValueOnce(new Error('db unavailable'))
+      .mockResolvedValue({ ...sampleHost, status: 'asleep', ip: sampleHost.ip });
+    ((networkDiscovery.isHostAlive as unknown) as jest.Mock).mockResolvedValue(false);
+
+    const verificationPromise = ((service as unknown) as {
+      runWakeVerificationLoop: (
+        commandId: string,
+        hostName: string,
+        hostIp: string | null,
+        opts: { timeoutMs: number; pollIntervalMs: number; startedAt: string }
+      ) => Promise<void>;
+    }).runWakeVerificationLoop('cmd-verify-timeout', sampleHost.name, sampleHost.ip, {
+      timeoutMs: 60,
+      pollIntervalMs: 20,
+      startedAt,
+    });
+
+    await jest.advanceTimersByTimeAsync(250);
+    await verificationPromise;
+
+    expect(sendCommandResultSpy).toHaveBeenCalledWith(
+      'wake',
+      'cmd-verify-timeout',
+      expect.objectContaining({
+        success: false,
+        wakeVerification: expect.objectContaining({
+          status: 'timeout',
+        }),
+      }),
+    );
+  });
+
+  it('does not schedule duplicate wake verification for the same command id', () => {
+    jest.useFakeTimers();
+    const runWakeVerificationLoopSpy = jest
+      .spyOn((service as unknown) as {
+        runWakeVerificationLoop: (...args: unknown[]) => Promise<void>;
+      }, 'runWakeVerificationLoop')
+      .mockResolvedValue(undefined);
+    const existingTimer = setTimeout(() => undefined, 1_000);
+    ((service as unknown) as { activeWakeVerifications: Map<string, { timer: NodeJS.Timeout }> })
+      .activeWakeVerifications
+      .set('cmd-verify-dup', { timer: existingTimer });
+
+    ((service as unknown) as {
+      scheduleWakeVerification: (
+        commandId: string,
+        hostName: string,
+        hostIp: string | null,
+        options: { timeoutMs: number; pollIntervalMs: number },
+        startedAt: string
+      ) => void;
+    }).scheduleWakeVerification(
+      'cmd-verify-dup',
+      sampleHost.name,
+      sampleHost.ip,
+      { timeoutMs: 1_500, pollIntervalMs: 500 },
+      new Date().toISOString(),
+    );
+
+    expect(runWakeVerificationLoopSpy).not.toHaveBeenCalled();
+    clearTimeout(existingTimer);
+    ((service as unknown) as { activeWakeVerifications: Map<string, { timer: NodeJS.Timeout }> })
+      .activeWakeVerifications
+      .clear();
+  });
+
+  it('cleans up active wake verification registry after loop completion', async () => {
+    jest.useFakeTimers();
+    const runWakeVerificationLoopSpy = jest
+      .spyOn((service as unknown) as {
+        runWakeVerificationLoop: (...args: unknown[]) => Promise<void>;
+      }, 'runWakeVerificationLoop')
+      .mockResolvedValue(undefined);
+
+    ((service as unknown) as {
+      scheduleWakeVerification: (
+        commandId: string,
+        hostName: string,
+        hostIp: string | null,
+        options: { timeoutMs: number; pollIntervalMs: number },
+        startedAt: string
+      ) => void;
+    }).scheduleWakeVerification(
+      'cmd-verify-cleanup',
+      sampleHost.name,
+      sampleHost.ip,
+      { timeoutMs: 1_500, pollIntervalMs: 500 },
+      new Date().toISOString(),
+    );
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(runWakeVerificationLoopSpy).toHaveBeenCalledTimes(1);
+    expect(
+      ((service as unknown) as { activeWakeVerifications: Map<string, { timer: NodeJS.Timeout }> })
+        .activeWakeVerifications
+        .has('cmd-verify-cleanup'),
+    ).toBe(false);
+  });
+
+  it('cancels all active wake verification timers on shutdown helper', () => {
+    const firstTimer = setTimeout(() => undefined, 1_000);
+    const secondTimer = setTimeout(() => undefined, 1_000);
+    const activeWakeVerifications = ((service as unknown) as {
+      activeWakeVerifications: Map<string, { timer: NodeJS.Timeout }>;
+    }).activeWakeVerifications;
+
+    activeWakeVerifications.set('cmd-one', { timer: firstTimer });
+    activeWakeVerifications.set('cmd-two', { timer: secondTimer });
+
+    service.cancelAllWakeVerifications();
+
+    expect(activeWakeVerifications.size).toBe(0);
+  });
 });
