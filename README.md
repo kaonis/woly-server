@@ -81,26 +81,55 @@ npm run test -w apps/node-agent
 npm run build -w packages/protocol
 ```
 
+## Contribution Workflow (Worktree-First)
+
+Before editing files or creating an implementation branch, start from a fresh worktree based on `origin/master`:
+
+```bash
+git fetch origin
+git worktree add ../woly-server-<topic> -b codex/<issue>-<topic> origin/master
+cd ../woly-server-<topic>
+```
+
+Use that worktree for all edits, commits, and PR preparation. This keeps feature work isolated and ensures branch bases are current.
+For Codex-created branches, keep the `codex/` prefix; for manually created contributor branches, use your normal branch prefix.
+
+Before merge, run a required review pass for every change (peer review preferred; self-review required at minimum):
+
+```bash
+git diff --stat origin/master...HEAD
+git diff origin/master...HEAD
+gh pr view --comments
+```
+
+Address every review comment/thread with follow-up commits or an explicit rationale, then re-run the review pass on the updated diff.
+
+After merge, clean up the temporary worktree:
+
+```bash
+git worktree remove ../woly-server-<topic>
+```
+
 ## Commands
 
-| Command | Description |
-|---|---|
-| `npm run build` | Build all workspaces (protocol → apps) |
-| `npm run test` | Run all tests |
-| `npm run test:ci` | CI mode with coverage |
-| `npm run test:e2e:smoke` | Run cross-service C&C <-> node-agent E2E smoke suite |
-| `npm run validate:standard` | Run standard repo validation gate (`lint`, `typecheck`, `test:ci`, `build`, smoke) |
-| `npm run typecheck` | Type-check all workspaces |
-| `npm run lint` | Lint all workspaces |
-| `npm run dev:node-agent` | Start node agent in dev mode |
-| `npm run dev:cnc` | Start C&C backend in dev mode |
-| `npm run format` | Format all files with Prettier |
-| `npm run protocol:build` | Build the protocol package |
-| `npm run protocol:publish` | Build and publish protocol to npm (latest tag) |
-| `npm run protocol:publish:next` | Build and publish protocol to npm (next tag) |
-| `npm run protocol:version:patch` | Bump protocol version (patch) |
-| `npm run protocol:version:minor` | Bump protocol version (minor) |
-| `npm run protocol:version:major` | Bump protocol version (major) |
+| Command                          | Description                                                                        |
+| -------------------------------- | ---------------------------------------------------------------------------------- |
+| `npm run build`                  | Build all workspaces (protocol → apps)                                             |
+| `npm run test`                   | Run all tests                                                                      |
+| `npm run test:ci`                | CI mode with coverage                                                              |
+| `npm run test:e2e:smoke`         | Run cross-service C&C <-> node-agent E2E smoke suite                               |
+| `npm run validate:standard`      | Run standard repo validation gate (`lint`, `typecheck`, `test:ci`, `build`, smoke) |
+| `npm run typecheck`              | Type-check all workspaces                                                          |
+| `npm run lint`                   | Lint all workspaces                                                                |
+| `npm run dev:node-agent`         | Start node agent in dev mode                                                       |
+| `npm run dev:cnc`                | Start C&C backend in dev mode                                                      |
+| `npm run format`                 | Format all files with Prettier                                                     |
+| `npm run protocol:build`         | Build the protocol package                                                         |
+| `npm run protocol:publish`       | Build and publish protocol to npm (latest tag)                                     |
+| `npm run protocol:publish:next`  | Build and publish protocol to npm (next tag)                                       |
+| `npm run protocol:version:patch` | Bump protocol version (patch)                                                      |
+| `npm run protocol:version:minor` | Bump protocol version (minor)                                                      |
+| `npm run protocol:version:major` | Bump protocol version (major)                                                      |
 
 ## Node Agent
 
@@ -139,17 +168,20 @@ Runs on port 8080 by default. See [apps/cnc/README.md](apps/cnc/README.md) for f
 Both apps consume it via npm workspace link. It's also published to npm for the mobile app. See [packages/protocol/README.md](packages/protocol/README.md).
 
 Upgrade sequencing and compatibility requirements are documented in:
+
 - [docs/compatibility.md](docs/compatibility.md)
 - [docs/PROTOCOL_COMPATIBILITY.md](docs/PROTOCOL_COMPATIBILITY.md)
 
 ## CNC Sync Policy (Budget Mode)
 
 This repo and the mobile app (`kaonis/woly`) follow a shared CNC sync process:
+
 1. Protocol contract
 2. Backend endpoint/command
 3. Frontend integration
 
 Policy docs:
+
 - [docs/CNC_SYNC_POLICY.md](docs/CNC_SYNC_POLICY.md)
 - [docs/ROADMAP_CNC_SYNC_V1.md](docs/ROADMAP_CNC_SYNC_V1.md)
 - [woly/docs/CNC_SYNC_POLICY.md](https://github.com/kaonis/woly/blob/master/docs/CNC_SYNC_POLICY.md)
@@ -192,12 +224,14 @@ docker run -d --net host \
 ```
 
 For full production rollout guidance (topology, secrets, TLS, backup/restore, and rollback):
+
 - [docs/PRODUCTION_DEPLOYMENT_GUIDE.md](docs/PRODUCTION_DEPLOYMENT_GUIDE.md)
 - [docs/COMMAND_OUTCOME_METRICS.md](docs/COMMAND_OUTCOME_METRICS.md)
 
 ## CI
 
 GitHub Actions is budget-scoped:
+
 - Heavy validation workflow (`.github/workflows/ci.yml`) runs manual-only.
 - Lightweight policy workflow (`.github/workflows/cnc-sync-policy.yml`) runs automatically on PR updates.
 
@@ -209,6 +243,7 @@ Current validation flow:
 4. Upload coverage reports as artifacts when `ci.yml` is manually dispatched
 
 Required local gate before PR merge:
+
 - `npm ci`
 - `npm run build -w packages/protocol`
 - `npm run test -w packages/protocol -- contract.cross-repo`
@@ -216,14 +251,17 @@ Required local gate before PR merge:
 - `npm run validate:standard`
 
 Manual operations and rollback criteria are documented in:
+
 - [docs/CI_MANUAL_OPERATIONS.md](docs/CI_MANUAL_OPERATIONS.md)
 - [docs/CI_MANUAL_REVIEW_LOG.md](docs/CI_MANUAL_REVIEW_LOG.md)
 - [docs/CROSS_SERVICE_E2E_SMOKE.md](docs/CROSS_SERVICE_E2E_SMOKE.md)
 
 Main workflow definition:
+
 - [.github/workflows/ci.yml](.github/workflows/ci.yml)
 
 Dependency update review cadence and decision rules are documented in:
+
 - [docs/DEPENDENCY_TRIAGE_WORKFLOW.md](docs/DEPENDENCY_TRIAGE_WORKFLOW.md)
 - [docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md](docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md)
 
@@ -231,15 +269,15 @@ Dependency update review cadence and decision rules are documented in:
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Runtime | Node.js 24, TypeScript 5.9 |
-| Framework | Express 5 |
-| Databases | SQLite (better-sqlite3), PostgreSQL |
-| Testing | Jest 30, Supertest |
-| Validation | Zod, Joi |
-| Build | Turborepo, tsc |
-| CI | GitHub Actions |
+| Layer      | Technology                          |
+| ---------- | ----------------------------------- |
+| Runtime    | Node.js 24, TypeScript 5.9          |
+| Framework  | Express 5                           |
+| Databases  | SQLite (better-sqlite3), PostgreSQL |
+| Testing    | Jest 30, Supertest                  |
+| Validation | Zod, Joi                            |
+| Build      | Turborepo, tsc                      |
+| CI         | GitHub Actions                      |
 
 ## Contributing
 

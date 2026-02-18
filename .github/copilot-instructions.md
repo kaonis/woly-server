@@ -4,13 +4,19 @@
 
 Monorepo for the WoLy distributed Wake-on-LAN system. Contains two backend services and a shared protocol package, managed with npm workspaces and Turborepo.
 
-| Workspace | Description | Port | Database |
-|---|---|---|---|
-| `apps/node-agent` | Per-LAN WoL agent — ARP scanning, host discovery, magic packets | 8082 | SQLite (better-sqlite3) |
-| `apps/cnc` | C&C aggregator — multi-node management, command routing, JWT auth | 8080 | PostgreSQL or SQLite |
-| `packages/protocol` | Shared types & Zod schemas (`@kaonis/woly-protocol`) | — | — |
+| Workspace           | Description                                                       | Port | Database                |
+| ------------------- | ----------------------------------------------------------------- | ---- | ----------------------- |
+| `apps/node-agent`   | Per-LAN WoL agent — ARP scanning, host discovery, magic packets   | 8082 | SQLite (better-sqlite3) |
+| `apps/cnc`          | C&C aggregator — multi-node management, command routing, JWT auth | 8080 | PostgreSQL or SQLite    |
+| `packages/protocol` | Shared types & Zod schemas (`@kaonis/woly-protocol`)              | —    | —                       |
 
 **Stack:** Node.js 24, TypeScript 5.9 (strict), Express 5, Jest 30, Zod, Turborepo.
+
+## Mandatory Workflow Gates
+
+- Start work from a fresh worktree based on `origin/master` before any modifications or branch creation.
+- Complete a final review pass for every change before merge (peer review preferred; self-review required at minimum).
+- Address all review comments/threads with follow-up commits or explicit rationale, then re-review the updated diff.
 
 ## Workspace Layout
 
@@ -155,12 +161,12 @@ ws://  /ws/node                  WebSocket for node connections
 
 Each app has `.env.example` with all available options. Key differences:
 
-| Variable | Node Agent | C&C |
-|---|---|---|
-| Port | `PORT=8082` | `PORT=8080` |
-| Database | `DB_PATH=./db/woly.db` (SQLite) | `DB_TYPE=sqlite\|postgres`, `DATABASE_URL` |
-| Auth | `NODE_AUTH_TOKEN` (for agent mode) | `NODE_AUTH_TOKENS`, `JWT_SECRET` |
-| Network | `SCAN_INTERVAL`, `PING_TIMEOUT` | `NODE_HEARTBEAT_INTERVAL`, `NODE_TIMEOUT` |
+| Variable | Node Agent                         | C&C                                        |
+| -------- | ---------------------------------- | ------------------------------------------ |
+| Port     | `PORT=8082`                        | `PORT=8080`                                |
+| Database | `DB_PATH=./db/woly.db` (SQLite)    | `DB_TYPE=sqlite\|postgres`, `DATABASE_URL` |
+| Auth     | `NODE_AUTH_TOKEN` (for agent mode) | `NODE_AUTH_TOKENS`, `JWT_SECRET`           |
+| Network  | `SCAN_INTERVAL`, `PING_TIMEOUT`    | `NODE_HEARTBEAT_INTERVAL`, `NODE_TIMEOUT`  |
 
 ## Docker
 
