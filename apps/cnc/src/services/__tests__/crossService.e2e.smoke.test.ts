@@ -264,7 +264,7 @@ describe('Cross-service E2E smoke', () => {
 
       const wsNodeAuthToken = 'smoke-node-token';
       const operatorToken = 'smoke-operator-token';
-      const adminToken = 'smoke-admin-token';
+      const adminToken = 'smoke-admin';
 
       const cncService = startService({
         name: 'cnc',
