@@ -75,6 +75,9 @@
 - Cross-repo compatibility tests cover success and error envelope.
 - Migration notes are added for any behavior changes.
 
+## Decision Log Updates
+- 2026-02-18 (issue #323): Classified app-local LAN Wake-on-LAN fallback (`kaonis/woly`) as a protocol no-op with no CNC contract delta; capability negotiation and protocol request/response shapes remain unchanged.
+
 ## Rolling Manual-CI Progress
 - 2026-02-18: Completed weekly manual-first operations review for issue #280 using `npm run ci:audit:manual -- --since 2026-02-16T18:35:12Z --fail-on-unexpected` (PASS) and `npm run ci:policy:check` (PASS).
 - 2026-02-18: Logged review decision in `docs/CI_MANUAL_REVIEW_LOG.md` and checkpoint updates in `docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md`.
