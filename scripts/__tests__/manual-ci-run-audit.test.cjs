@@ -7,12 +7,23 @@ const {
   isAllowlistedNonManualRun,
 } = require('../manual-ci-run-audit.cjs');
 
-test('allowlist includes CNC Mobile Contract Gate pull_request runs', () => {
-  assert.equal(ALLOWLISTED_NON_MANUAL_RUNS.length, 1);
-  assert.equal(ALLOWLISTED_NON_MANUAL_RUNS[0].event, 'pull_request');
-  assert.equal(
-    ALLOWLISTED_NON_MANUAL_RUNS[0].workflowName,
-    'CNC Mobile Contract Gate'
+test('allowlist includes approved minimal automation exceptions', () => {
+  assert.equal(ALLOWLISTED_NON_MANUAL_RUNS.length, 2);
+  assert.deepEqual(
+    ALLOWLISTED_NON_MANUAL_RUNS.map((rule) => ({
+      event: rule.event,
+      workflowName: rule.workflowName,
+    })),
+    [
+      {
+        event: 'pull_request',
+        workflowName: 'CNC Sync Policy',
+      },
+      {
+        event: 'schedule',
+        workflowName: 'Dependency Health',
+      },
+    ]
   );
 });
 
@@ -29,13 +40,21 @@ test('buildSummary counts allowlisted and unexpected non-manual runs separately'
     {
       databaseId: 2,
       event: 'pull_request',
-      workflowName: 'CNC Mobile Contract Gate',
+      workflowName: 'CNC Sync Policy',
       createdAt: '2026-02-16T18:01:00Z',
       headBranch: 'feature/a',
       conclusion: 'success',
     },
     {
       databaseId: 3,
+      event: 'schedule',
+      workflowName: 'Dependency Health',
+      createdAt: '2026-02-16T18:01:30Z',
+      headBranch: 'master',
+      conclusion: 'success',
+    },
+    {
+      databaseId: 4,
       event: 'pull_request',
       workflowName: 'Other Workflow',
       createdAt: '2026-02-16T18:02:00Z',
@@ -46,12 +65,13 @@ test('buildSummary counts allowlisted and unexpected non-manual runs separately'
 
   const summary = buildSummary(runs, '2026-02-16T17:59:00Z');
 
-  assert.equal(summary.totalRuns, 3);
-  assert.equal(summary.nonManualRunCount, 2);
-  assert.equal(summary.allowlistedNonManualRunCount, 1);
+  assert.equal(summary.totalRuns, 4);
+  assert.equal(summary.nonManualRunCount, 3);
+  assert.equal(summary.allowlistedNonManualRunCount, 2);
   assert.equal(summary.unexpectedRunCount, 1);
   assert.equal(summary.allowlistedNonManualRuns[0].databaseId, 2);
-  assert.equal(summary.unexpectedRuns[0].databaseId, 3);
+  assert.equal(summary.allowlistedNonManualRuns[1].databaseId, 3);
+  assert.equal(summary.unexpectedRuns[0].databaseId, 4);
 });
 
 test('isAllowlistedNonManualRun returns false for non-matching workflow', () => {

@@ -215,3 +215,13 @@ Period reviewed: post-merge cycle (#248 to #250)
 - Budget and throughput assessment: Scoped audit (`ci:audit:latest -- --fail-on-unexpected`) using checkpoint `2026-02-15T21:31:02Z` analyzed 0 runs and observed no unexpected events.
 - Decision: Continue manual-only
 - Follow-up actions: Execute the next weekly review cycle under issue #251.
+
+Date: 2026-02-18
+Reviewer: Codex autonomous loop
+Period reviewed: post-merge cycle (#277 to #280)
+
+- Unexpected automatic workflow runs observed: No
+- Local gate policy followed: Yes
+- Budget and throughput assessment: Scoped audit (`ci:audit:manual -- --since 2026-02-16T18:35:12Z --fail-on-unexpected`) passed after aligning audit allowlisted automation exceptions with the active policy (`pull_request` for `CNC Sync Policy`, `schedule` for `Dependency Health`).
+- Decision: Continue manual-only
+- Follow-up actions: Continue weekly scoped audits using the latest reviewed checkpoint.

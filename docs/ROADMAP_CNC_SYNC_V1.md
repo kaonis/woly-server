@@ -74,3 +74,7 @@
 - Frontend uses CNC-only path for that feature.
 - Cross-repo compatibility tests cover success and error envelope.
 - Migration notes are added for any behavior changes.
+
+## Rolling Manual-CI Progress
+- 2026-02-18: Completed weekly manual-first operations review for issue #280 using `npm run ci:audit:manual -- --since 2026-02-16T18:35:12Z --fail-on-unexpected` (PASS) and `npm run ci:policy:check` (PASS).
+- 2026-02-18: Logged review decision in `docs/CI_MANUAL_REVIEW_LOG.md` and checkpoint updates in `docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md`.
