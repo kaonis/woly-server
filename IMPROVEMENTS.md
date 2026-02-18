@@ -583,7 +583,7 @@ New features to improve functionality.
 
 | Priority | LOW |
 |----------|-----|
-| **Status** | Partial (CnC only) |
+| **Status** | Implemented (`#339`) |
 
 **Problem:** C&C has docker-compose.yml but no unified dev environment.
 
@@ -601,6 +601,9 @@ New features to improve functionality.
 - Easy onboarding
 - Consistent dev environment
 - Testing multi-node scenarios
+
+**Tracking Issue:**
+- https://github.com/kaonis/woly-server/issues/339
 
 ---
 

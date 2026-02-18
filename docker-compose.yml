@@ -1,0 +1,172 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: woly-dev-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-woly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-woly_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-woly_cnc}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-woly} -d ${POSTGRES_DB:-woly_cnc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  cnc:
+    image: node:24-alpine
+    container_name: woly-dev-cnc
+    working_dir: /workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 8080
+      DB_TYPE: postgres
+      DATABASE_URL: postgresql://${POSTGRES_USER:-woly}:${POSTGRES_PASSWORD:-woly_dev_password}@postgres:5432/${POSTGRES_DB:-woly_cnc}
+      NODE_AUTH_TOKENS: ${NODE_AUTH_TOKENS:-dev-node-token}
+      OPERATOR_TOKENS: ${OPERATOR_TOKENS:-dev-operator-token}
+      ADMIN_TOKENS: ${ADMIN_TOKENS:-dev-admin-token}
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret}
+      JWT_ISSUER: ${JWT_ISSUER:-woly-cnc-dev}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-woly-api-dev}
+      WS_REQUIRE_TLS: "false"
+      WS_ALLOW_QUERY_TOKEN_AUTH: "true"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${CNC_PORT:-8080}:8080"
+    volumes:
+      - ./:/workspace
+      - cnc_node_modules:/workspace/node_modules
+      - protocol_dist:/workspace/packages/protocol/dist
+      - cnc_logs:/workspace/apps/cnc/logs
+    command: >
+      sh -c "npm ci --workspace=@woly-server/cnc --workspace=@kaonis/woly-protocol
+      && npm run build --workspace=@kaonis/woly-protocol
+      && npm run dev --workspace=@woly-server/cnc"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:8080/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  node-agent-1:
+    image: node:24-alpine
+    container_name: woly-dev-node-agent-1
+    working_dir: /workspace
+    depends_on:
+      cnc:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      NODE_MODE: agent
+      PORT: 8082
+      HOST: 0.0.0.0
+      DB_PATH: /workspace/apps/node-agent/db/woly-node-agent-1.db
+      CNC_URL: ws://cnc:8080
+      NODE_ID: dev-node-1
+      NODE_LOCATION: dev-lab-1
+      NODE_AUTH_TOKEN: ${NODE_AUTH_TOKENS:-dev-node-token}
+      SCAN_INTERVAL: 3600000
+      SCAN_DELAY: 5000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${NODE_AGENT_1_PORT:-8082}:8082"
+    volumes:
+      - ./:/workspace
+      - node_agent_1_node_modules:/workspace/node_modules
+      - protocol_dist:/workspace/packages/protocol/dist
+      - node_agent_1_db:/workspace/apps/node-agent/db
+      - node_agent_1_logs:/workspace/apps/node-agent/logs
+    command: >
+      sh -c "npm ci --workspace=@woly-server/node-agent --workspace=@kaonis/woly-protocol
+      && npm run build --workspace=@kaonis/woly-protocol
+      && npm run dev --workspace=@woly-server/node-agent"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:8082/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  node-agent-2:
+    image: node:24-alpine
+    container_name: woly-dev-node-agent-2
+    profiles: ["multi-node"]
+    working_dir: /workspace
+    depends_on:
+      cnc:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      NODE_MODE: agent
+      PORT: 8083
+      HOST: 0.0.0.0
+      DB_PATH: /workspace/apps/node-agent/db/woly-node-agent-2.db
+      CNC_URL: ws://cnc:8080
+      NODE_ID: dev-node-2
+      NODE_LOCATION: dev-lab-2
+      NODE_AUTH_TOKEN: ${NODE_AUTH_TOKENS:-dev-node-token}
+      SCAN_INTERVAL: 3600000
+      SCAN_DELAY: 5000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${NODE_AGENT_2_PORT:-8083}:8083"
+    volumes:
+      - ./:/workspace
+      - node_agent_2_node_modules:/workspace/node_modules
+      - protocol_dist:/workspace/packages/protocol/dist
+      - node_agent_2_db:/workspace/apps/node-agent/db
+      - node_agent_2_logs:/workspace/apps/node-agent/logs
+    command: >
+      sh -c "npm ci --workspace=@woly-server/node-agent --workspace=@kaonis/woly-protocol
+      && npm run build --workspace=@kaonis/woly-protocol
+      && npm run dev --workspace=@woly-server/node-agent"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:8083/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  seed-hosts:
+    image: curlimages/curl:8.12.1
+    container_name: woly-dev-seed-hosts
+    depends_on:
+      node-agent-1:
+        condition: service_healthy
+    environment:
+      NODE_AGENT_BASE_URL: http://node-agent-1:8082
+    volumes:
+      - ./scripts:/workspace/scripts:ro
+    command: ["sh", "/workspace/scripts/dev-seed-hosts.sh"]
+    restart: "no"
+
+volumes:
+  postgres_data:
+  cnc_node_modules:
+  node_agent_1_node_modules:
+  node_agent_2_node_modules:
+  protocol_dist:
+  cnc_logs:
+  node_agent_1_logs:
+  node_agent_2_logs:
+  node_agent_1_db:
+  node_agent_2_db:
