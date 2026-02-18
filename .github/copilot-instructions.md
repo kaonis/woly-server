@@ -17,6 +17,7 @@ Monorepo for the WoLy distributed Wake-on-LAN system. Contains two backend servi
 - Start work from a fresh worktree based on `origin/master` before any modifications or branch creation.
 - Complete a final review pass for every change before merge (peer review preferred; self-review required at minimum).
 - Address all review comments/threads with follow-up commits or explicit rationale, then re-review the updated diff.
+- After merge/completion, remove temporary worktrees to avoid stale local clones (for example: `git worktree remove ../woly-server-<topic>`).
 
 ## Workspace Layout
 
