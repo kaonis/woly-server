@@ -31,6 +31,8 @@ interface NodeConnection {
   ws: WebSocket;
   registeredAt: Date;
   location: string;
+  publicUrl?: string;
+  authTokenHint?: string;
 }
 
 type DispatchCommand = Extract<CncCommand, { commandId: string }>;
@@ -38,6 +40,9 @@ type MessageRateWindow = {
   windowStartMs: number;
   count: number;
 };
+
+const TUNNEL_DISPATCH_ROUTE = '/agent/commands';
+const TUNNEL_DISPATCH_TIMEOUT_MS = 8000;
 
 export class NodeManager extends EventEmitter {
   private connections: Map<string, NodeConnection> = new Map();
@@ -284,6 +289,8 @@ export class NodeManager extends EventEmitter {
         ws,
         registeredAt: new Date(),
         location: node.location,
+        publicUrl: node.publicUrl,
+        authTokenHint: upgradeAuth.kind === 'static-token' ? upgradeAuth.token : undefined,
       });
       runtimeMetrics.setConnectedNodeCount(this.connections.size);
       this.emit('node-connected', { nodeId: node.id });
@@ -394,7 +401,7 @@ export class NodeManager extends EventEmitter {
    * @param command Command to send (must include commandId)
    * @throws Error if node is not connected
    */
-  sendCommand(nodeId: string, command: DispatchCommand): void {
+  async sendCommand(nodeId: string, command: DispatchCommand): Promise<void> {
     const connection = this.connections.get(nodeId);
     
     if (!connection) {
@@ -412,9 +419,164 @@ export class NodeManager extends EventEmitter {
       throw new Error(`Invalid outbound command payload: ${command.type}`);
     }
 
-    // Send command to node
+    const tunnelDispatched = await this.tryDispatchCommandViaTunnel(nodeId, connection, command);
+    if (tunnelDispatched) {
+      return;
+    }
+
+    // Fall back to direct websocket transport.
     connection.ws.send(JSON.stringify(command));
-    logger.debug('Sent command to node', { nodeId, commandId: command.commandId, type: command.type });
+    logger.debug('Sent command to node over websocket', {
+      nodeId,
+      commandId: command.commandId,
+      type: command.type,
+    });
+  }
+
+  private resolveTunnelCommandEndpoint(publicUrl: string): string | null {
+    try {
+      const parsed = new URL(publicUrl);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return null;
+      }
+
+      const basePath = parsed.pathname.replace(/\/+$/, '');
+      parsed.pathname = `${basePath}${TUNNEL_DISPATCH_ROUTE}`.replace(/\/{2,}/g, '/');
+      parsed.search = '';
+      parsed.hash = '';
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  private resolveTunnelAuthTokens(connection: NodeConnection): string[] {
+    const ordered = new Set<string>();
+    if (connection.authTokenHint) {
+      ordered.add(connection.authTokenHint);
+    }
+
+    for (const token of config.nodeAuthTokens) {
+      ordered.add(token);
+    }
+
+    return Array.from(ordered.values()).filter((token) => token.length > 0);
+  }
+
+  private async tryDispatchCommandViaTunnel(
+    nodeId: string,
+    connection: NodeConnection,
+    command: DispatchCommand,
+  ): Promise<boolean> {
+    if (!connection.publicUrl || connection.publicUrl.trim().length === 0) {
+      return false;
+    }
+
+    const endpoint = this.resolveTunnelCommandEndpoint(connection.publicUrl);
+    if (!endpoint) {
+      logger.warn('Skipping tunnel dispatch due to invalid node publicUrl', {
+        nodeId,
+        publicUrl: connection.publicUrl,
+      });
+      return false;
+    }
+
+    const tunnelTokens = this.resolveTunnelAuthTokens(connection);
+    if (tunnelTokens.length === 0) {
+      logger.warn('Skipping tunnel dispatch: no auth token candidates available', { nodeId });
+      return false;
+    }
+
+    for (const authToken of tunnelTokens) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), TUNNEL_DISPATCH_TIMEOUT_MS);
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(command),
+          signal: controller.signal,
+        });
+
+        if (response.status === 401 || response.status === 403) {
+          logger.warn('Tunnel dispatch token rejected by node agent', {
+            nodeId,
+            commandId: command.commandId,
+            type: command.type,
+            endpoint,
+            status: response.status,
+          });
+          continue;
+        }
+
+        if (!response.ok) {
+          logger.warn('Tunnel dispatch failed with non-success response', {
+            nodeId,
+            commandId: command.commandId,
+            type: command.type,
+            endpoint,
+            status: response.status,
+          });
+          return false;
+        }
+
+        const payload = (await response.json()) as unknown;
+        const parsedResult = outboundNodeMessageSchema.safeParse(payload);
+        if (!parsedResult.success || parsedResult.data.type !== 'command-result') {
+          logger.warn('Tunnel dispatch returned invalid response payload', {
+            nodeId,
+            commandId: command.commandId,
+            type: command.type,
+          });
+          return false;
+        }
+
+        const commandResult = parsedResult.data.data;
+        if (commandResult.commandId !== command.commandId) {
+          logger.warn('Tunnel dispatch returned mismatched commandId', {
+            nodeId,
+            expectedCommandId: command.commandId,
+            receivedCommandId: commandResult.commandId,
+          });
+          return false;
+        }
+
+        this.emit('command-result', {
+          ...commandResult,
+          nodeId,
+        });
+
+        logger.info('Sent command to node through tunnel endpoint', {
+          nodeId,
+          commandId: command.commandId,
+          type: command.type,
+          endpoint,
+        });
+        return true;
+      } catch (error) {
+        logger.warn('Tunnel dispatch request failed, falling back to websocket', {
+          nodeId,
+          commandId: command.commandId,
+          type: command.type,
+          endpoint,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return false;
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    logger.warn('Tunnel dispatch authentication failed with all configured token candidates', {
+      nodeId,
+      commandId: command.commandId,
+      type: command.type,
+    });
+    return false;
   }
 
   /**

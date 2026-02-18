@@ -12,6 +12,7 @@ import HostDatabase from './services/hostDatabase';
 import ScanOrchestrator from './services/scanOrchestrator';
 import * as hostsController from './controllers/hosts';
 import hosts from './routes/hosts';
+import agentCommands from './routes/agentCommands';
 import { agentService } from './services/agentService';
 import { evaluateCorsOrigin } from './utils/corsOrigin';
 import { healthLimiter } from './middleware/rateLimiter';
@@ -77,6 +78,8 @@ function logStartupDiagnostics(): void {
     mode: agentConfig.mode,
     authMode: getAgentAuthMode(),
     wsQueryTokenFallbackEnabled: agentConfig.wsAllowQueryTokenFallback,
+    tunnelMode: agentConfig.tunnelMode,
+    publicUrl: agentConfig.publicUrl || undefined,
     nodeId: agentConfig.nodeId || undefined,
     location: agentConfig.location || undefined,
     environment: config.server.env,
@@ -104,6 +107,8 @@ async function startServer() {
         nodeId: agentConfig.nodeId,
         location: agentConfig.location,
         cncUrl: agentConfig.cncUrl,
+        tunnelMode: agentConfig.tunnelMode,
+        publicUrl: agentConfig.publicUrl || undefined,
       });
 
       // Pass database instance to agent service
@@ -136,6 +141,9 @@ async function startServer() {
 
     // Routes
     app.use('/hosts', hosts);
+    if (agentConfig.mode === 'agent') {
+      app.use('/agent', agentCommands);
+    }
 
     /**
      * @swagger

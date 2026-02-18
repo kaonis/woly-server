@@ -27,25 +27,27 @@ export class NodeModel {
    * Register a new node or update existing
    */
   static async register(registration: NodeRegistration): Promise<Node> {
-    const { nodeId, name, location, metadata } = registration;
+    const { nodeId, name, location, metadata, publicUrl } = registration;
 
     // SQLite and PostgreSQL have different upsert syntax
     const query = this.isSqlite ? `
-      INSERT INTO nodes (id, name, location, status, last_heartbeat, capabilities, metadata)
-      VALUES ($1, $2, $3, 'online', CURRENT_TIMESTAMP, $4, $5)
+      INSERT INTO nodes (id, name, location, public_url, status, last_heartbeat, capabilities, metadata)
+      VALUES ($1, $2, $3, $4, 'online', CURRENT_TIMESTAMP, $5, $6)
       ON CONFLICT (id) DO UPDATE SET
         name = excluded.name,
         location = excluded.location,
+        public_url = excluded.public_url,
         status = 'online',
         last_heartbeat = CURRENT_TIMESTAMP,
         metadata = excluded.metadata,
         updated_at = CURRENT_TIMESTAMP
     ` : `
-      INSERT INTO nodes (id, name, location, status, last_heartbeat, capabilities, metadata)
-      VALUES ($1, $2, $3, 'online', NOW(), $4, $5)
+      INSERT INTO nodes (id, name, location, public_url, status, last_heartbeat, capabilities, metadata)
+      VALUES ($1, $2, $3, $4, 'online', NOW(), $5, $6)
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         location = EXCLUDED.location,
+        public_url = EXCLUDED.public_url,
         status = 'online',
         last_heartbeat = NOW(),
         metadata = EXCLUDED.metadata,
@@ -58,11 +60,12 @@ export class NodeModel {
       nodeId,
       name,
       location,
+      publicUrl ?? null,
       capabilities,
       JSON.stringify(metadata),
     ]);
 
-    logger.info('Node registered', { nodeId, name, location });
+    logger.info('Node registered', { nodeId, name, location, publicUrl: publicUrl ?? null });
 
     // SQLite doesn't support RETURNING in all cases, so fetch the inserted row
     if (this.isSqlite) {

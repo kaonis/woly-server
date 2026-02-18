@@ -184,7 +184,7 @@ export async function dispatchPersistedCommand(
       await new Promise((resolve) => setTimeout(resolve, backoffDelay));
     }
 
-    context.nodeManager.sendCommand(nodeId, payload);
+    await context.nodeManager.sendCommand(nodeId, payload);
     runtimeMetrics.recordCommandDispatched(commandId, commandType, correlationId);
     await CommandModel.markSent(commandId);
 

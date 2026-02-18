@@ -20,6 +20,25 @@ function getEnvBoolean(key: string, defaultValue: boolean): boolean {
   return ['1', 'true', 'yes', 'on'].includes(rawValue.toLowerCase());
 }
 
+function normalizeOptionalUrl(rawValue: string | undefined): string {
+  const trimmed = (rawValue || '').trim();
+  if (trimmed.length === 0) {
+    return '';
+  }
+
+  return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
+}
+
+function resolvePublicUrl(tunnelMode: string): string {
+  const configuredPublicUrl = normalizeOptionalUrl(process.env.NODE_PUBLIC_URL);
+  if (tunnelMode !== 'cloudflare') {
+    return configuredPublicUrl;
+  }
+
+  const cloudflareTunnelUrl = normalizeOptionalUrl(process.env.CLOUDFLARE_TUNNEL_URL);
+  return cloudflareTunnelUrl || configuredPublicUrl;
+}
+
 /**
  * Agent Mode Configuration
  * Controls whether woly-backend operates as standalone or connects to C&C
@@ -41,7 +60,12 @@ export const agentConfig = {
   authToken: process.env.NODE_AUTH_TOKEN || '',
 
   // Public URL for this node (optional, for reverse connections)
-  publicUrl: process.env.NODE_PUBLIC_URL || '',
+  publicUrl: resolvePublicUrl((process.env.TUNNEL_MODE || 'direct').toLowerCase()),
+
+  // Tunnel routing mode for command dispatch from C&C.
+  tunnelMode: (process.env.TUNNEL_MODE || 'direct').toLowerCase() as 'direct' | 'cloudflare',
+  cloudflareTunnelUrl: normalizeOptionalUrl(process.env.CLOUDFLARE_TUNNEL_URL),
+  cloudflareTunnelToken: process.env.CLOUDFLARE_TUNNEL_TOKEN || '',
 
   // Optional session token endpoint for short-lived node tokens
   sessionTokenUrl: process.env.NODE_SESSION_TOKEN_URL || '',
@@ -74,6 +98,11 @@ export const agentConfig = {
  * Throws error if agent mode is enabled but required fields are missing
  */
 export function validateAgentConfig(): void {
+  const allowedTunnelModes = new Set(['direct', 'cloudflare']);
+  if (!allowedTunnelModes.has(agentConfig.tunnelMode)) {
+    throw new Error('TUNNEL_MODE must be either "direct" or "cloudflare"');
+  }
+
   if (agentConfig.mode === 'agent') {
     const missing: string[] = [];
 
@@ -86,6 +115,38 @@ export function validateAgentConfig(): void {
       throw new Error(
         `Agent mode enabled but missing required configuration: ${missing.join(', ')}`
       );
+    }
+
+    if (agentConfig.tunnelMode === 'cloudflare') {
+      if (!agentConfig.cloudflareTunnelUrl) {
+        missing.push('CLOUDFLARE_TUNNEL_URL');
+      }
+      if (!agentConfig.cloudflareTunnelToken) {
+        missing.push('CLOUDFLARE_TUNNEL_TOKEN');
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Agent mode enabled but missing required configuration: ${missing.join(', ')}`
+      );
+    }
+
+    if (agentConfig.publicUrl) {
+      let parsedPublicUrl: URL;
+      try {
+        parsedPublicUrl = new URL(agentConfig.publicUrl);
+      } catch {
+        throw new Error('NODE_PUBLIC_URL/CLOUDFLARE_TUNNEL_URL must be a valid URL');
+      }
+
+      if (!['http:', 'https:'].includes(parsedPublicUrl.protocol)) {
+        throw new Error('NODE_PUBLIC_URL/CLOUDFLARE_TUNNEL_URL must use http:// or https://');
+      }
+    }
+
+    if (agentConfig.tunnelMode === 'cloudflare' && !agentConfig.publicUrl.startsWith('https://')) {
+      throw new Error('CLOUDFLARE_TUNNEL_URL must use https://');
     }
 
     // Enforce TLS in production to prevent token interception

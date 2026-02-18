@@ -28,6 +28,7 @@ describe('NodeModel', () => {
         name: 'Test Node',
         location: 'Test Location',
         authToken: 'test-token',
+        publicUrl: 'https://test-node.example.trycloudflare.com',
         metadata: {
           version: '1.0.0',
           platform: 'linux',
@@ -44,6 +45,7 @@ describe('NodeModel', () => {
       expect(node.id).toBe('test-node-1');
       expect(node.name).toBe('Test Node');
       expect(node.location).toBe('Test Location');
+      expect(node.publicUrl).toBe('https://test-node.example.trycloudflare.com');
       expect(node.status).toBe('online');
       expect(node.metadata).toEqual(registration.metadata);
     });
@@ -54,6 +56,7 @@ describe('NodeModel', () => {
         name: 'Updated Node',
         location: 'Updated Location',
         authToken: 'test-token',
+        publicUrl: 'https://updated-node.example.trycloudflare.com',
         metadata: {
           version: '1.0.1',
           platform: 'linux',
@@ -69,6 +72,7 @@ describe('NodeModel', () => {
 
       expect(node.name).toBe('Updated Node');
       expect(node.location).toBe('Updated Location');
+      expect(node.publicUrl).toBe('https://updated-node.example.trycloudflare.com');
       expect(node.metadata.version).toBe('1.0.1');
     });
   });

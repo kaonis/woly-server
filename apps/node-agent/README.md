@@ -289,7 +289,38 @@ CORS_ORIGINS=http://localhost:19000,http://192.168.1.228:8082
 
 # Logging
 LOG_LEVEL=info          # error, warn, info, http, debug
+
+# Agent mode + tunnel dispatch
+NODE_MODE=agent
+CNC_URL=wss://cnc.example.com
+NODE_ID=home-office-node
+NODE_LOCATION=Home Office
+NODE_AUTH_TOKEN=replace-with-cnc-node-token
+TUNNEL_MODE=direct      # "direct" or "cloudflare"
+CLOUDFLARE_TUNNEL_URL=  # required when TUNNEL_MODE=cloudflare
+CLOUDFLARE_TUNNEL_TOKEN=# required when TUNNEL_MODE=cloudflare
+NODE_PUBLIC_URL=        # optional override for non-cloudflare public URLs
 ```
+
+### Cloudflare Tunnel Setup (Zero Port-Forwarding)
+
+Use this when you want C&C command routing through a Cloudflare public endpoint for the node-agent.
+
+1. Create/authenticate a Cloudflare Tunnel for the node-agent service (`http://localhost:8082`).
+2. Configure node-agent:
+
+```env
+NODE_MODE=agent
+TUNNEL_MODE=cloudflare
+CLOUDFLARE_TUNNEL_URL=https://<your-tunnel-hostname>
+CLOUDFLARE_TUNNEL_TOKEN=<your-cloudflare-tunnel-token>
+```
+
+3. Keep `NODE_AUTH_TOKEN` aligned with C&C `NODE_AUTH_TOKENS`.
+4. Start `cloudflared` with your tunnel token.
+5. Start node-agent and verify registration in C&C (`GET /api/nodes` should show `publicUrl`).
+
+When tunnel dispatch fails or is unavailable, C&C falls back to the direct WebSocket path automatically.
 
 ## Security Features
 
@@ -320,6 +351,7 @@ curl http://localhost:8082/health
 ```
 
 **Security Features**:
+
 - Constant-time key comparison (prevents timing attacks)
 - Flexible whitespace handling per HTTP spec
 - Case-sensitive validation
