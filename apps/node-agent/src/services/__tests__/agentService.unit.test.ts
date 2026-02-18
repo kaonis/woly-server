@@ -775,6 +775,76 @@ describe('AgentService command handlers', () => {
     );
   });
 
+  it.each([
+    ['data is not an object', null, 'Invalid update-host payload: data must be an object'],
+    ['name is missing', {}, 'Invalid update-host payload: name is required'],
+    [
+      'name exceeds 255 characters',
+      { name: 'x'.repeat(256) },
+      'Invalid update-host payload: name must be at most 255 characters',
+    ],
+    [
+      'currentName is empty',
+      { name: 'PHANTOM-MBP', currentName: '' },
+      'Invalid update-host payload: currentName must be a non-empty string',
+    ],
+    [
+      'mac is not a string',
+      { name: 'PHANTOM-MBP', mac: 123 },
+      'Invalid update-host payload: mac must be a string',
+    ],
+    [
+      'ip is not a string',
+      { name: 'PHANTOM-MBP', ip: 42 },
+      'Invalid update-host payload: ip must be a string',
+    ],
+    [
+      'notes is neither string nor null',
+      { name: 'PHANTOM-MBP', notes: { foo: 'bar' } },
+      'Invalid update-host payload: notes must be a string or null',
+    ],
+    [
+      'notes exceed max length',
+      { name: 'PHANTOM-MBP', notes: 'n'.repeat(2001) },
+      'Invalid update-host payload: notes must be at most 2000 characters',
+    ],
+    [
+      'tags is not an array',
+      { name: 'PHANTOM-MBP', tags: 'lab' },
+      'Invalid update-host payload: tags must be an array of strings',
+    ],
+    [
+      'tags has too many entries',
+      { name: 'PHANTOM-MBP', tags: Array.from({ length: 33 }, (_, i) => `tag-${i}`) },
+      'Invalid update-host payload: tags must contain at most 32 entries',
+    ],
+    [
+      'tags has non-string entries',
+      { name: 'PHANTOM-MBP', tags: ['lab', 1] },
+      'Invalid update-host payload: tags must be an array of strings',
+    ],
+  ])('rejects update-host payload when %s', async (_reason, data, expectedError) => {
+    await ((service as unknown) as {
+      handleUpdateHostCommand: (command: unknown) => Promise<void>;
+    }).handleUpdateHostCommand({
+      type: 'update-host',
+      commandId: `cmd-update-invalid-${_reason.replace(/\s+/g, '-')}`,
+      data,
+    });
+
+    expect(hostDbMock.getHost).not.toHaveBeenCalled();
+    expect(hostDbMock.updateHost).not.toHaveBeenCalled();
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          success: false,
+          error: expectedError,
+        }),
+      })
+    );
+  });
+
   it('deletes host and sends removal event', async () => {
     const sendHostRemovedSpy = jest
       .spyOn((service as unknown) as { sendHostRemoved: (name: string) => void }, 'sendHostRemoved')
@@ -859,6 +929,88 @@ describe('AgentService command handlers', () => {
             reachable: true,
             status: 'awake',
           }),
+        }),
+      })
+    );
+  });
+
+  it('returns failure when wake target has no resolvable mac address', async () => {
+    hostDbMock.getHost.mockResolvedValueOnce(undefined);
+    hostDbMock.getHostByMAC.mockResolvedValueOnce(undefined);
+
+    await ((service as unknown) as {
+      handleWakeCommand: (command: unknown) => Promise<void>;
+    }).handleWakeCommand({
+      type: 'wake',
+      commandId: 'cmd-wake-no-target',
+      data: {
+        hostName: 'UNKNOWN',
+        mac: '',
+      },
+    });
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-wake-no-target',
+          success: false,
+          error: 'Host UNKNOWN not found',
+        }),
+      })
+    );
+  });
+
+  it('handles ping-host guard branches for missing database and invalid fallback ip', async () => {
+    ((service as unknown) as { hostDb: unknown }).hostDb = null;
+
+    await ((service as unknown) as {
+      handlePingHostCommand: (command: unknown) => Promise<void>;
+    }).handlePingHostCommand({
+      type: 'ping-host',
+      commandId: 'cmd-ping-no-db',
+      data: {
+        hostName: sampleHost.name,
+        mac: sampleHost.mac,
+        ip: sampleHost.ip,
+      },
+    });
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-ping-no-db',
+          success: false,
+          error: 'Host database not initialized',
+        }),
+      })
+    );
+
+    ((service as unknown) as { hostDb: unknown }).hostDb = hostDbMock;
+    hostDbMock.getHost.mockResolvedValueOnce(undefined);
+    hostDbMock.getHostByMAC.mockResolvedValueOnce(undefined);
+
+    await ((service as unknown) as {
+      handlePingHostCommand: (command: unknown) => Promise<void>;
+    }).handlePingHostCommand({
+      type: 'ping-host',
+      commandId: 'cmd-ping-invalid-ip',
+      data: {
+        hostName: sampleHost.name,
+        mac: sampleHost.mac,
+        ip: 'not-an-ip',
+      },
+    });
+
+    expect(hostDbMock.getHostByMAC).toHaveBeenCalledWith(sampleHost.mac);
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-ping-invalid-ip',
+          success: false,
+          error: `Host ${sampleHost.name} has no valid IP to ping`,
         }),
       })
     );
