@@ -6,7 +6,6 @@ This document tracks the current implementation status of items in [IMPROVEMENTS
 
 - [Full Improvements Document](../IMPROVEMENTS.md)
 - [Security Audit](../SECURITY_AUDIT.md)
-- [Roadmap V11](../docs/ROADMAP_V11_AUTONOMOUS_CYCLE.md)
 
 ## Status Overview
 
@@ -61,7 +60,7 @@ Use existing repository labels:
 
 1. Update this file only after code is merged or issue status materially changes.
 2. Keep implemented items linked to issue numbers.
-3. Keep active queue de-duplicated and aligned with `docs/ROADMAP_V11_AUTONOMOUS_CYCLE.md`.
+3. Keep active queue de-duplicated and aligned with currently open GitHub issues.
 
 ---
 

@@ -3,8 +3,8 @@
 Date: 2026-02-15
 Repository: `woly-server`
 Reviewer: Codex (GPT-5)
-Input baseline: `docs/FULL_REVIEW_REPORT_2026-02-15.md`
-Roadmap executed: `docs/ROADMAP_V10_FULL_REVIEW_REMEDIATION.md`
+Input baseline: historical draft report removed from active docs (available in git history)
+Roadmap executed: historical V10 remediation roadmap removed from active docs (available in git history)
 
 ## 1. Executive Summary
 

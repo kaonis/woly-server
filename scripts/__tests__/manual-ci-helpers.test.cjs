@@ -292,7 +292,7 @@ test('buildCloseoutComment includes core closeout sections', () => {
     followup: 245,
     merge: 'abc1234',
     cycle: 'post-merge cycle (#242 to #244)',
-    roadmap: 'docs/ROADMAP_V21_AUTONOMOUS_CYCLE.md',
+    roadmap: 'docs/ROADMAP_CNC_SYNC_V1.md',
     since: '2026-02-15T21:31:02Z',
     depsPayload: '2026-02-15T22:11:32Z',
   });
