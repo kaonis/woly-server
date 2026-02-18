@@ -23,6 +23,35 @@ Rules:
 - After merge/completion, remove the temporary worktree to avoid stale local clones:
   - `git worktree remove ../woly-server-<topic>`
 
+## End-to-End Worktree Flow (Required)
+
+Use this full lifecycle for every change:
+
+1. Create a fresh worktree from `origin/master`:
+   ```bash
+   git fetch origin
+   git worktree add ../woly-server-<topic> -b codex/<issue>-<topic> origin/master
+   cd ../woly-server-<topic>
+   ```
+2. Implement and validate in that worktree only.
+3. Complete the required review pass on the final diff:
+   ```bash
+   git diff --stat origin/master...HEAD
+   git diff origin/master...HEAD
+   gh pr view --comments
+   ```
+4. Push branch and open/update PR from that same worktree.
+5. Address review feedback in the same worktree, then re-run the review pass.
+6. After merge or explicit cancellation, clean up worktree from the primary checkout:
+   ```bash
+   cd /Users/phantom/projects/woly-server
+   git worktree remove ../woly-server-<topic>
+   ```
+7. Delete leftover local branch only after cleanup if it still exists:
+   ```bash
+   git branch -D codex/<issue>-<topic>
+   ```
+
 ## Review Pass (Required)
 
 Every change (code, docs, config, workflows) must complete a review pass before merge.
