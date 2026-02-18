@@ -44,12 +44,27 @@ export function createRoutes(
   // Route group protection
   router.use('/nodes', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/hosts', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
+  router.use('/schedules', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/admin', apiLimiter, authenticateJwt, authorizeRoles('admin'));
 
   // Node API routes (protected)
   router.get('/nodes', (req, res) => nodesController.listNodes(req, res));
   router.get('/nodes/:id', (req, res) => nodesController.getNode(req, res));
   router.get('/nodes/:id/health', (req, res) => nodesController.getNodeHealth(req, res));
+
+  // Aggregated schedule API routes
+  router.get('/schedules', scheduleSyncLimiter, (req, res) =>
+    schedulesController.listSchedules(req, res),
+  );
+  router.get('/schedules/:id', scheduleSyncLimiter, (req, res) =>
+    schedulesController.getSchedule(req, res),
+  );
+  router.put('/schedules/:id', scheduleSyncLimiter, (req, res) =>
+    schedulesController.updateSchedule(req, res),
+  );
+  router.delete('/schedules/:id', scheduleSyncLimiter, (req, res) =>
+    schedulesController.deleteSchedule(req, res),
+  );
 
   // Host API routes
   // IMPORTANT: mac-vendor must be registered before the :fqn catch-all

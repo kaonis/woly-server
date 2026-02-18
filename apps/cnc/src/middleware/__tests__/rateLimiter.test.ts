@@ -136,6 +136,10 @@ describe('cnc rateLimiter middleware', () => {
     const scheduleSecond = await request(app).get('/api/hosts/office%40home/schedules');
     expect(scheduleFirst.status).toBe(200);
     expect(scheduleSecond.status).toBe(200);
+    const aggregatedScheduleFirst = await request(app).get('/api/schedules?enabled=true');
+    const aggregatedScheduleSecond = await request(app).get('/api/schedules?enabled=true');
+    expect(aggregatedScheduleFirst.status).toBe(200);
+    expect(aggregatedScheduleSecond.status).toBe(200);
 
     const hostsFirst = await request(app).get('/api/hosts');
     const hostsSecond = await request(app).get('/api/hosts');

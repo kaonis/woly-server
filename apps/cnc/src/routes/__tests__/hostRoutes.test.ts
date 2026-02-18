@@ -397,6 +397,38 @@ describe('Host Routes Authentication and Authorization', () => {
     });
   });
 
+  describe('GET /api/schedules', () => {
+    it('returns 401 when no authorization header is provided', async () => {
+      const response = await request(app).get('/api/schedules');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 for unsupported role', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/schedules')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        code: 'AUTH_FORBIDDEN',
+      });
+    });
+  });
+
   describe('GET /api/hosts/:fqn/schedules', () => {
     it('returns 401 when no authorization header is provided', async () => {
       const response = await request(app).get('/api/hosts/node1.example.com/schedules');

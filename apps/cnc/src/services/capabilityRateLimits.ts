@@ -55,7 +55,12 @@ export function buildCncRateLimits(): CncRateLimits {
       maxCalls: SCHEDULE_RATE_LIMIT_MAX,
       windowMs: SCHEDULE_RATE_LIMIT_WINDOW_MS,
       scope: 'ip',
-      appliesTo: ['/api/hosts/:fqn/schedules', '/api/hosts/schedules/:id'],
+      appliesTo: [
+        '/api/schedules',
+        '/api/schedules/:id',
+        '/api/hosts/:fqn/schedules',
+        '/api/hosts/schedules/:id',
+      ],
     },
     wsInboundMessages: {
       maxCalls: parsePositiveIntFromEnv(
