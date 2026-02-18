@@ -87,7 +87,14 @@ The mobile app now maintains a single shared app-level host stream connection (s
 - Capability negotiation format/versioning: unchanged.
 - Decision: classify local app-side wake fallback as an execution-strategy change in the app, not a CNC protocol contract delta.
 
-## 10. Polling Snapshot Stability (GET /api/hosts)
+## 10. Backend Impact for Local App-Side Wake Fallback (Issue #324)
+
+- Backend API/endpoints remain unchanged for this increment.
+- Existing remote wake path remains unchanged (`POST /api/hosts/wakeup/:fqn`).
+- No node-agent protocol or command-surface changes are required.
+- Decision: treat this frontend fallback as backend-neutral for CNC sync chain tracking.
+
+## 11. Polling Snapshot Stability (GET /api/hosts)
 
 Backend assessment for polling clients (tracked by `kaonis/woly-server#328`):
 

@@ -77,6 +77,7 @@
 
 ## Decision Log Updates
 - 2026-02-18 (issue #323): Classified app-local LAN Wake-on-LAN fallback (`kaonis/woly`) as a protocol no-op with no CNC contract delta; capability negotiation and protocol request/response shapes remain unchanged.
+- 2026-02-18 (issue #324): Verified backend impact is unchanged for app-local LAN Wake-on-LAN fallback; existing remote wake endpoint (`POST /api/hosts/wakeup/:fqn`) and command flow remain unchanged.
 
 ## Rolling Manual-CI Progress
 - 2026-02-18: Completed weekly manual-first operations review for issue #280 using `npm run ci:audit:manual -- --since 2026-02-16T18:35:12Z --fail-on-unexpected` (PASS) and `npm run ci:policy:check` (PASS).
