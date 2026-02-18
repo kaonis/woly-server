@@ -54,6 +54,10 @@ const options: swaggerJsdoc.Options = {
         description: 'Aggregated host management across nodes',
       },
       {
+        name: 'Webhooks',
+        description: 'Webhook registration and delivery diagnostics',
+      },
+      {
         name: 'Meta',
         description: 'Capability negotiation and metadata endpoints',
       },
@@ -410,6 +414,164 @@ const options: swaggerJsdoc.Options = {
             'transitions',
             'currentStatus',
           ],
+        },
+        WebhookEventType: {
+          type: 'string',
+          enum: [
+            'host.awake',
+            'host.asleep',
+            'host.discovered',
+            'host.removed',
+            'scan.complete',
+            'node.connected',
+            'node.disconnected',
+          ],
+        },
+        CreateWebhookRequest: {
+          type: 'object',
+          properties: {
+            url: {
+              type: 'string',
+              format: 'uri',
+              example: 'https://example.com/hooks/woly',
+            },
+            events: {
+              type: 'array',
+              minItems: 1,
+              items: {
+                $ref: '#/components/schemas/WebhookEventType',
+              },
+            },
+            secret: {
+              type: 'string',
+              nullable: true,
+              example: 'shared-secret',
+            },
+          },
+          required: ['url', 'events'],
+        },
+        WebhookSubscription: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              example: 'webhook-1',
+            },
+            url: {
+              type: 'string',
+              format: 'uri',
+              example: 'https://example.com/hooks/woly',
+            },
+            events: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/WebhookEventType',
+              },
+            },
+            hasSecret: {
+              type: 'boolean',
+              example: true,
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-18T20:00:00.000Z',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-18T20:00:00.000Z',
+            },
+          },
+          required: ['id', 'url', 'events', 'hasSecret', 'createdAt', 'updatedAt'],
+        },
+        WebhooksResponse: {
+          type: 'object',
+          properties: {
+            webhooks: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/WebhookSubscription',
+              },
+            },
+          },
+          required: ['webhooks'],
+        },
+        WebhookDeliveryLog: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              example: 101,
+            },
+            webhookId: {
+              type: 'string',
+              example: 'webhook-1',
+            },
+            eventType: {
+              $ref: '#/components/schemas/WebhookEventType',
+            },
+            attempt: {
+              type: 'integer',
+              minimum: 1,
+              example: 2,
+            },
+            status: {
+              type: 'string',
+              enum: ['success', 'failed'],
+              example: 'failed',
+            },
+            responseStatus: {
+              type: 'integer',
+              nullable: true,
+              example: 503,
+            },
+            error: {
+              type: 'string',
+              nullable: true,
+              example: 'HTTP 503',
+            },
+            payload: {
+              type: 'object',
+              additionalProperties: true,
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-18T20:00:05.000Z',
+            },
+          },
+          required: ['id', 'webhookId', 'eventType', 'attempt', 'status', 'responseStatus', 'error', 'payload', 'createdAt'],
+        },
+        WebhookDeliveriesResponse: {
+          type: 'object',
+          properties: {
+            webhookId: {
+              type: 'string',
+              example: 'webhook-1',
+            },
+            deliveries: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/WebhookDeliveryLog',
+              },
+            },
+          },
+          required: ['webhookId', 'deliveries'],
+        },
+        DeleteWebhookResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean',
+              example: true,
+            },
+            id: {
+              type: 'string',
+              example: 'webhook-1',
+            },
+          },
+          required: ['success', 'id'],
         },
         CapabilitiesResponse: {
           type: 'object',

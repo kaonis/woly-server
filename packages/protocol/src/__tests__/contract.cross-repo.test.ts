@@ -14,6 +14,7 @@
  */
 
 import {
+  createWebhookRequestSchema,
   createHostWakeScheduleRequestSchema,
   HOST_STATE_STREAM_MUTATING_EVENT_TYPES,
   hostStatusHistoryResponseSchema,
@@ -21,6 +22,9 @@ import {
   hostStateStreamEventSchema,
   hostUptimeSummarySchema,
   hostWakeScheduleSchema,
+  webhookDeliveriesResponseSchema,
+  webhookSubscriptionSchema,
+  webhooksResponseSchema,
   inboundCncCommandSchema,
   outboundNodeMessageSchema,
   PROTOCOL_VERSION,
@@ -755,6 +759,61 @@ describe('Cross-repo protocol contract', () => {
 
       expect(hostUptimeSummarySchema.safeParse(payload).success).toBe(true);
       expect(hostUptimeSummarySchema.safeParse(JSON.parse(JSON.stringify(payload))).success).toBe(
+        true,
+      );
+    });
+  });
+
+  describe('Webhook API contracts', () => {
+    it('accepts webhook create request payloads used by CNC integrations', () => {
+      const payload = {
+        url: 'https://example.com/hooks/woly',
+        events: ['host.awake', 'node.disconnected'],
+        secret: 'shared-secret',
+      };
+
+      expect(createWebhookRequestSchema.safeParse(payload).success).toBe(true);
+      expect(createWebhookRequestSchema.safeParse(JSON.parse(JSON.stringify(payload))).success).toBe(
+        true,
+      );
+    });
+
+    it('accepts webhook subscription list envelopes used by clients', () => {
+      const webhook = {
+        id: 'webhook-1',
+        url: 'https://example.com/hooks/woly',
+        events: ['host.awake'],
+        hasSecret: true,
+        createdAt: '2026-02-18T08:00:00.000Z',
+        updatedAt: '2026-02-18T08:00:00.000Z',
+      };
+
+      expect(webhookSubscriptionSchema.safeParse(webhook).success).toBe(true);
+      expect(webhooksResponseSchema.safeParse({ webhooks: [webhook] }).success).toBe(true);
+    });
+
+    it('accepts webhook delivery logs for retry/debug surfaces', () => {
+      const payload = {
+        webhookId: 'webhook-1',
+        deliveries: [
+          {
+            id: 1,
+            webhookId: 'webhook-1',
+            eventType: 'host.awake',
+            attempt: 2,
+            status: 'failed',
+            responseStatus: 503,
+            error: 'HTTP 503',
+            payload: {
+              event: 'host.awake',
+            },
+            createdAt: '2026-02-18T08:00:10.000Z',
+          },
+        ],
+      };
+
+      expect(webhookDeliveriesResponseSchema.safeParse(payload).success).toBe(true);
+      expect(webhookDeliveriesResponseSchema.safeParse(JSON.parse(JSON.stringify(payload))).success).toBe(
         true,
       );
     });

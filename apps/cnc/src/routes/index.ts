@@ -9,6 +9,7 @@ import { HostsController } from '../controllers/hosts';
 import { SchedulesController } from '../controllers/schedules';
 import { AuthController } from '../controllers/auth';
 import { MetaController } from '../controllers/meta';
+import { WebhooksController } from '../controllers/webhooks';
 import { NodeManager } from '../services/nodeManager';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
@@ -41,6 +42,7 @@ export function createRoutes(
   const schedulesController = new SchedulesController(hostAggregator);
   const authController = new AuthController();
   const metaController = new MetaController();
+  const webhooksController = new WebhooksController();
 
   // Public API routes with rate limiting
   router.post('/auth/token', strictAuthLimiter, (req, res) => authController.issueToken(req, res));
@@ -52,6 +54,7 @@ export function createRoutes(
   router.use('/nodes', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/hosts', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/schedules', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
+  router.use('/webhooks', apiLimiter, authenticateJwt, authorizeRoles('operator', 'admin'));
   router.use('/admin', apiLimiter, authenticateJwt, authorizeRoles('admin'));
 
   // Node API routes (protected)
@@ -72,6 +75,12 @@ export function createRoutes(
   router.delete('/schedules/:id', scheduleSyncLimiter, (req, res) =>
     schedulesController.deleteSchedule(req, res),
   );
+
+  // Webhook API routes
+  router.get('/webhooks', (req, res) => webhooksController.listWebhooks(req, res));
+  router.post('/webhooks', (req, res) => webhooksController.createWebhook(req, res));
+  router.get('/webhooks/:id/deliveries', (req, res) => webhooksController.getWebhookDeliveries(req, res));
+  router.delete('/webhooks/:id', (req, res) => webhooksController.deleteWebhook(req, res));
 
   // Host API routes
   // IMPORTANT: mac-vendor must be registered before the :fqn catch-all

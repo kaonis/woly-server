@@ -217,6 +217,54 @@ export interface HostUptimeSummary {
   currentStatus: HostStatus;
 }
 
+export const WEBHOOK_EVENT_TYPES = [
+  'host.awake',
+  'host.asleep',
+  'host.discovered',
+  'host.removed',
+  'scan.complete',
+  'node.connected',
+  'node.disconnected',
+] as const;
+
+export type WebhookEventType = typeof WEBHOOK_EVENT_TYPES[number];
+
+export interface WebhookSubscription {
+  id: string;
+  url: string;
+  events: WebhookEventType[];
+  hasSecret: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWebhookRequest {
+  url: string;
+  events: WebhookEventType[];
+  secret?: string;
+}
+
+export interface WebhooksResponse {
+  webhooks: WebhookSubscription[];
+}
+
+export interface WebhookDeliveryLog {
+  id: number;
+  webhookId: string;
+  eventType: WebhookEventType;
+  attempt: number;
+  status: 'success' | 'failed';
+  responseStatus: number | null;
+  error: string | null;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface WebhookDeliveriesResponse {
+  webhookId: string;
+  deliveries: WebhookDeliveryLog[];
+}
+
 export interface HostPingResult {
   hostName: string;
   mac: string;
@@ -603,6 +651,56 @@ export const hostUptimeSummarySchema: z.ZodType<HostUptimeSummary> = z
     asleepMs: z.number().int().nonnegative(),
     transitions: z.number().int().nonnegative(),
     currentStatus: hostStatusSchema,
+  })
+  .strict();
+
+export const webhookEventTypeSchema = z.enum(WEBHOOK_EVENT_TYPES);
+
+export const webhookSubscriptionSchema: z.ZodType<WebhookSubscription> = z
+  .object({
+    id: z.string().min(1),
+    url: z.string().url(),
+    events: z.array(webhookEventTypeSchema).min(1),
+    hasSecret: z.boolean(),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+  })
+  .strict();
+
+export const createWebhookRequestSchema: z.ZodType<CreateWebhookRequest> = z
+  .object({
+    url: z.string().url(),
+    events: z.array(webhookEventTypeSchema).min(1).refine((events) => {
+      return new Set(events).size === events.length;
+    }, 'Webhook events must be unique'),
+    secret: z.string().min(1).max(256).optional(),
+  })
+  .strict();
+
+export const webhooksResponseSchema: z.ZodType<WebhooksResponse> = z
+  .object({
+    webhooks: z.array(webhookSubscriptionSchema),
+  })
+  .strict();
+
+export const webhookDeliveryLogSchema: z.ZodType<WebhookDeliveryLog> = z
+  .object({
+    id: z.number().int().positive(),
+    webhookId: z.string().min(1),
+    eventType: webhookEventTypeSchema,
+    attempt: z.number().int().min(1),
+    status: z.enum(['success', 'failed']),
+    responseStatus: z.number().int().min(100).max(599).nullable(),
+    error: z.string().nullable(),
+    payload: z.record(z.string(), z.unknown()),
+    createdAt: z.string().datetime(),
+  })
+  .strict();
+
+export const webhookDeliveriesResponseSchema: z.ZodType<WebhookDeliveriesResponse> = z
+  .object({
+    webhookId: z.string().min(1),
+    deliveries: z.array(webhookDeliveryLogSchema),
   })
   .strict();
 

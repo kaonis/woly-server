@@ -408,6 +408,13 @@ export class HostAggregator extends EventEmitter {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+
+    this.emit('host-status-transition', {
+      hostFqn,
+      oldStatus,
+      newStatus,
+      changedAt,
+    });
   }
 
   // Internal row shape used for reconciliation/deduping. External API types do not expose `id`.

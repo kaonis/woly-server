@@ -83,6 +83,30 @@ CREATE TABLE IF NOT EXISTS wake_schedules (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Webhooks table
+CREATE TABLE IF NOT EXISTS webhooks (
+    id TEXT PRIMARY KEY,
+    url TEXT NOT NULL,
+    events TEXT NOT NULL,
+    secret TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Webhook delivery log table
+CREATE TABLE IF NOT EXISTS webhook_delivery_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    webhook_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    attempt INTEGER NOT NULL CHECK(attempt >= 1),
+    status TEXT NOT NULL CHECK(status IN ('success', 'failed')),
+    response_status INTEGER,
+    error TEXT,
+    payload TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_nodes_status ON nodes(status);
 CREATE INDEX IF NOT EXISTS idx_nodes_last_heartbeat ON nodes(last_heartbeat);
@@ -98,6 +122,9 @@ CREATE INDEX IF NOT EXISTS idx_commands_created_at ON commands(created_at);
 CREATE INDEX IF NOT EXISTS idx_wake_schedules_owner_sub ON wake_schedules(owner_sub);
 CREATE INDEX IF NOT EXISTS idx_wake_schedules_host_fqn ON wake_schedules(host_fqn);
 CREATE INDEX IF NOT EXISTS idx_wake_schedules_owner_host ON wake_schedules(owner_sub, host_fqn);
+CREATE INDEX IF NOT EXISTS idx_webhooks_created_at ON webhooks(created_at);
+CREATE INDEX IF NOT EXISTS idx_webhook_delivery_logs_webhook_id ON webhook_delivery_logs(webhook_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_delivery_logs_created_at ON webhook_delivery_logs(created_at);
 
 -- Triggers for updated_at (SQLite version)
 CREATE TRIGGER IF NOT EXISTS update_nodes_updated_at
@@ -126,4 +153,11 @@ CREATE TRIGGER IF NOT EXISTS update_wake_schedules_updated_at
     FOR EACH ROW
 BEGIN
     UPDATE wake_schedules SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_webhooks_updated_at
+    AFTER UPDATE ON webhooks
+    FOR EACH ROW
+BEGIN
+    UPDATE webhooks SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;

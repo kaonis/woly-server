@@ -516,6 +516,8 @@ export class NodeManager extends EventEmitter {
       nodeId: data.nodeId,
       hostCount: data.hostCount,
     });
+
+    this.emit('scan-complete', data);
   }
 
   /**
