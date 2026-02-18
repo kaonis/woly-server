@@ -15,6 +15,7 @@ jobs:
     timeout-minutes: 8
     permissions:
       contents: read
+      issues: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -29,4 +30,85 @@ jobs:
         run: npm ci
 
       - name: Run dependency health checks
-        run: npm run deps:check
+        id: deps_check
+        continue-on-error: true
+        run: npm run deps:check 2>&1 | tee dependency-health.log
+
+      - name: Build dependency checkpoint comment
+        if: always()
+        env:
+          DEP_CHECK_OUTCOME: ${{ steps.deps_check.outcome }}
+          DEP_CHECK_CONCLUSION: ${{ steps.deps_check.conclusion }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          checked_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          if [ "${DEP_CHECK_OUTCOME}" = "success" ]; then
+            result_label="PASS"
+          else
+            result_label="FAIL"
+          fi
+
+          cat <<EOF > dependency-health-comment.md
+          <!-- dependency-health-checkpoint -->
+          ## Dependency Health Checkpoint
+
+          Checked at: \`${checked_at}\`
+
+          - Workflow run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          - Trigger: \`${GITHUB_EVENT_NAME}\`
+          - Step outcome: \`${DEP_CHECK_OUTCOME}\` (\`${DEP_CHECK_CONCLUSION}\`)
+          - Result: **${result_label}**
+
+          Checks executed:
+          - \`npm run deps:check:audit\` (blocking; high+ runtime vulnerabilities)
+          - \`npm run deps:check:outdated\` (non-blocking inventory)
+          - \`npm run deps:check-eslint10\` (compatibility signal)
+          EOF
+
+      - name: Post/update dependency dashboard checkpoint
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('node:fs');
+            const marker = '<!-- dependency-health-checkpoint -->';
+            const issue_number = 4;
+            const body = fs.readFileSync('dependency-health-comment.md', 'utf8');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find((comment) =>
+              comment.user?.login === 'github-actions[bot]' &&
+              comment.body?.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
+
+      - name: Fail when dependency checks fail
+        if: steps.deps_check.outcome != 'success'
+        run: |
+          echo "Dependency health checks failed."
+          exit 1
