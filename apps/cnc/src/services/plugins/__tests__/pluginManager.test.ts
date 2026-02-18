@@ -67,4 +67,16 @@ describe('PluginManager', () => {
     expect(destroy).toHaveBeenCalledTimes(1);
     expect(manager.getActivePluginNames()).toEqual([]);
   });
+
+  it('starts built-in push-notifications plugin when enabled', async () => {
+    const manager = new PluginManager({
+      eventBus: new PluginEventBus(),
+      enabledPlugins: ['push-notifications'],
+    });
+
+    await manager.start();
+
+    expect(manager.getActivePluginNames()).toEqual(['push-notifications']);
+    await manager.shutdown();
+  });
 });

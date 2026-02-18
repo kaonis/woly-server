@@ -109,6 +109,27 @@ CREATE TABLE IF NOT EXISTS webhook_delivery_logs (
     FOREIGN KEY (webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE
 );
 
+-- Push notification device tokens
+CREATE TABLE IF NOT EXISTS push_devices (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    platform TEXT NOT NULL CHECK(platform IN ('ios', 'android')),
+    token TEXT NOT NULL UNIQUE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Per-user notification preferences
+CREATE TABLE IF NOT EXISTS notification_preferences (
+    user_id TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0, 1)),
+    events TEXT NOT NULL,
+    quiet_hours TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_nodes_status ON nodes(status);
 CREATE INDEX IF NOT EXISTS idx_nodes_last_heartbeat ON nodes(last_heartbeat);
@@ -127,6 +148,8 @@ CREATE INDEX IF NOT EXISTS idx_wake_schedules_owner_host ON wake_schedules(owner
 CREATE INDEX IF NOT EXISTS idx_webhooks_created_at ON webhooks(created_at);
 CREATE INDEX IF NOT EXISTS idx_webhook_delivery_logs_webhook_id ON webhook_delivery_logs(webhook_id);
 CREATE INDEX IF NOT EXISTS idx_webhook_delivery_logs_created_at ON webhook_delivery_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_push_devices_user_id ON push_devices(user_id);
+CREATE INDEX IF NOT EXISTS idx_push_devices_platform ON push_devices(platform);
 
 -- Triggers for updated_at (SQLite version)
 CREATE TRIGGER IF NOT EXISTS update_nodes_updated_at
@@ -162,4 +185,18 @@ CREATE TRIGGER IF NOT EXISTS update_webhooks_updated_at
     FOR EACH ROW
 BEGIN
     UPDATE webhooks SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_push_devices_updated_at
+    AFTER UPDATE ON push_devices
+    FOR EACH ROW
+BEGIN
+    UPDATE push_devices SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS update_notification_preferences_updated_at
+    AFTER UPDATE ON notification_preferences
+    FOR EACH ROW
+BEGIN
+    UPDATE notification_preferences SET updated_at = CURRENT_TIMESTAMP WHERE user_id = NEW.user_id;
 END;

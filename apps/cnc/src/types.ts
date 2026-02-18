@@ -13,7 +13,15 @@ import type {
   HostPortScanResult as ProtocolHostPortScanResult,
   HostPortScanResponse as ProtocolHostPortScanResponse,
   CreateWebhookRequest as ProtocolCreateWebhookRequest,
+  DeviceDeregistrationResponse as ProtocolDeviceDeregistrationResponse,
+  DeviceRegistration as ProtocolDeviceRegistration,
+  DeviceRegistrationRequest as ProtocolDeviceRegistrationRequest,
+  DevicesResponse as ProtocolDevicesResponse,
+  NotificationPreferences as ProtocolNotificationPreferences,
+  NotificationPreferencesResponse as ProtocolNotificationPreferencesResponse,
   NodeMetadata as ProtocolNodeMetadata,
+  PushNotificationEventType as ProtocolPushNotificationEventType,
+  PushNotificationPlatform as ProtocolPushNotificationPlatform,
   ScheduleFrequency as ProtocolScheduleFrequency,
   WebhookDeliveriesResponse as ProtocolWebhookDeliveriesResponse,
   WebhookDeliveryLog as ProtocolWebhookDeliveryLog,
@@ -131,6 +139,14 @@ export type CreateWebhookRequest = ProtocolCreateWebhookRequest;
 export type WebhooksResponse = ProtocolWebhooksResponse;
 export type WebhookDeliveryLog = ProtocolWebhookDeliveryLog;
 export type WebhookDeliveriesResponse = ProtocolWebhookDeliveriesResponse;
+export type PushNotificationEventType = ProtocolPushNotificationEventType;
+export type PushNotificationPlatform = ProtocolPushNotificationPlatform;
+export type NotificationPreferences = ProtocolNotificationPreferences;
+export type NotificationPreferencesResponse = ProtocolNotificationPreferencesResponse;
+export type DeviceRegistrationRequest = ProtocolDeviceRegistrationRequest;
+export type DeviceRegistration = ProtocolDeviceRegistration;
+export type DevicesResponse = ProtocolDevicesResponse;
+export type DeviceDeregistrationResponse = ProtocolDeviceDeregistrationResponse;
 
 export interface HostPingResponse {
   target: string;
@@ -217,6 +233,11 @@ export interface ServerConfig {
   schedulePollIntervalMs: number;
   scheduleBatchSize: number;
   enabledPlugins: string[];
+  pushNotificationsEnabled: boolean;
+  fcmServerKey: string;
+  apnsBearerToken: string;
+  apnsTopic: string;
+  apnsHost: string;
   webhookRetryBaseDelayMs: number;
   webhookDeliveryTimeoutMs: number;
   logLevel: string;

@@ -116,6 +116,27 @@ CREATE TABLE IF NOT EXISTS webhook_delivery_logs (
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Push notification device tokens
+CREATE TABLE IF NOT EXISTS push_devices (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL,
+    platform VARCHAR(20) NOT NULL CHECK (platform IN ('ios', 'android')),
+    token TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    last_seen_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Per-user notification preferences
+CREATE TABLE IF NOT EXISTS notification_preferences (
+    user_id VARCHAR(255) PRIMARY KEY,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    events JSONB NOT NULL,
+    quiet_hours JSONB,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_nodes_status ON nodes(status);
 CREATE INDEX IF NOT EXISTS idx_nodes_last_heartbeat ON nodes(last_heartbeat);
@@ -129,6 +150,8 @@ CREATE INDEX IF NOT EXISTS idx_host_status_history_changed_at ON host_status_his
 CREATE INDEX IF NOT EXISTS idx_webhooks_created_at ON webhooks(created_at);
 CREATE INDEX IF NOT EXISTS idx_webhook_delivery_logs_webhook_id ON webhook_delivery_logs(webhook_id);
 CREATE INDEX IF NOT EXISTS idx_webhook_delivery_logs_created_at ON webhook_delivery_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_push_devices_user_id ON push_devices(user_id);
+CREATE INDEX IF NOT EXISTS idx_push_devices_platform ON push_devices(platform);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -162,5 +185,15 @@ CREATE TRIGGER update_wake_schedules_updated_at
 
 CREATE TRIGGER update_webhooks_updated_at
     BEFORE UPDATE ON webhooks
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_push_devices_updated_at
+    BEFORE UPDATE ON push_devices
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_notification_preferences_updated_at
+    BEFORE UPDATE ON notification_preferences
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();

@@ -14,11 +14,17 @@
  */
 
 import {
+  deviceDeregistrationResponseSchema,
+  deviceRegistrationRequestSchema,
+  deviceRegistrationSchema,
+  devicesResponseSchema,
   createWebhookRequestSchema,
   createHostWakeScheduleRequestSchema,
   HOST_STATE_STREAM_MUTATING_EVENT_TYPES,
   hostStatusHistoryResponseSchema,
   hostSchedulesResponseSchema,
+  notificationPreferencesResponseSchema,
+  notificationPreferencesSchema,
   hostStateStreamEventSchema,
   hostUptimeSummarySchema,
   hostWakeScheduleSchema,
@@ -863,6 +869,68 @@ describe('Cross-repo protocol contract', () => {
       expect(webhookDeliveriesResponseSchema.safeParse(JSON.parse(JSON.stringify(payload))).success).toBe(
         true,
       );
+    });
+  });
+
+  describe('Push notification API contracts', () => {
+    it('accepts device registration request payloads used by mobile clients', () => {
+      const payload = {
+        platform: 'ios',
+        token: 'device-token-example-1234',
+        preferences: {
+          enabled: true,
+          events: ['host.awake', 'scan.complete'],
+        },
+      };
+
+      expect(deviceRegistrationRequestSchema.safeParse(payload).success).toBe(true);
+      expect(deviceRegistrationRequestSchema.safeParse(JSON.parse(JSON.stringify(payload))).success).toBe(
+        true,
+      );
+    });
+
+    it('accepts persisted device registration envelopes', () => {
+      const device = {
+        id: 'device-1',
+        userId: 'operator-1',
+        platform: 'android',
+        token: 'device-token-example-1234',
+        createdAt: '2026-02-18T08:00:00.000Z',
+        updatedAt: '2026-02-18T08:00:00.000Z',
+        lastSeenAt: '2026-02-18T08:00:00.000Z',
+      };
+
+      expect(deviceRegistrationSchema.safeParse(device).success).toBe(true);
+      expect(devicesResponseSchema.safeParse({ devices: [device] }).success).toBe(true);
+    });
+
+    it('accepts notification preference payloads and response envelopes', () => {
+      const preferences = {
+        enabled: true,
+        events: ['host.awake', 'node.disconnected'],
+        quietHours: {
+          startHour: 22,
+          endHour: 7,
+          timezone: 'UTC',
+        },
+      };
+
+      expect(notificationPreferencesSchema.safeParse(preferences).success).toBe(true);
+      expect(
+        notificationPreferencesResponseSchema.safeParse({
+          userId: 'operator-1',
+          preferences,
+        }).success
+      ).toBe(true);
+    });
+
+    it('accepts deregistration response payloads', () => {
+      expect(
+        deviceDeregistrationResponseSchema.safeParse({
+          success: true,
+          token: 'device-token-example-1234',
+        }).success
+      ).toBe(true);
     });
   });
 

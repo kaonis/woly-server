@@ -1,10 +1,12 @@
 import logger from '../../utils/logger';
 import type { PluginEventBus } from '../pluginEventBus';
 import type { PluginContext, PluginFactory, WolyPlugin } from './types';
+import { PushNotificationsPlugin } from './pushNotificationsPlugin';
 import { WebhookPlugin } from './webhookPlugin';
 
 const DEFAULT_PLUGIN_FACTORIES: Record<string, PluginFactory> = {
   webhook: () => new WebhookPlugin(),
+  'push-notifications': () => new PushNotificationsPlugin(),
 };
 
 type PluginManagerOptions = {

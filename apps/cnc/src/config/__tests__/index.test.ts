@@ -51,6 +51,11 @@ describe('config parsing and validation', () => {
       SCHEDULE_POLL_INTERVAL_MS: '45000',
       SCHEDULE_BATCH_SIZE: '10',
       CNC_PLUGINS: 'webhook, custom-plugin,',
+      PUSH_NOTIFICATIONS_ENABLED: 'true',
+      FCM_SERVER_KEY: 'fcm-key',
+      APNS_BEARER_TOKEN: 'apns-token',
+      APNS_TOPIC: 'com.example.woly',
+      APNS_HOST: 'https://api.sandbox.push.apple.com',
       WEBHOOK_RETRY_BASE_DELAY_MS: '2000',
       WEBHOOK_DELIVERY_TIMEOUT_MS: '8000',
       OFFLINE_COMMAND_TTL_MS: '120000',
@@ -66,6 +71,11 @@ describe('config parsing and validation', () => {
     expect(config.schedulePollIntervalMs).toBe(45000);
     expect(config.scheduleBatchSize).toBe(10);
     expect(config.enabledPlugins).toEqual(['webhook', 'custom-plugin']);
+    expect(config.pushNotificationsEnabled).toBe(true);
+    expect(config.fcmServerKey).toBe('fcm-key');
+    expect(config.apnsBearerToken).toBe('apns-token');
+    expect(config.apnsTopic).toBe('com.example.woly');
+    expect(config.apnsHost).toBe('https://api.sandbox.push.apple.com');
     expect(config.webhookRetryBaseDelayMs).toBe(2000);
     expect(config.webhookDeliveryTimeoutMs).toBe(8000);
     expect(config.offlineCommandTtlMs).toBe(120000);

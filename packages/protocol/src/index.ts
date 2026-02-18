@@ -2,9 +2,10 @@ import { z } from 'zod';
 
 // --- Protocol versioning ---
 
-export const PROTOCOL_VERSION = '1.4.0' as const;
+export const PROTOCOL_VERSION = '1.5.0' as const;
 export const SUPPORTED_PROTOCOL_VERSIONS: readonly string[] = [
   PROTOCOL_VERSION,
+  '1.4.0',
   '1.3.0',
   '1.2.0',
   '1.1.1',
@@ -295,6 +296,60 @@ export interface WebhookDeliveryLog {
 export interface WebhookDeliveriesResponse {
   webhookId: string;
   deliveries: WebhookDeliveryLog[];
+}
+
+export const PUSH_NOTIFICATION_EVENT_TYPES = [
+  'host.awake',
+  'host.asleep',
+  'scan.complete',
+  'schedule.wake',
+  'node.disconnected',
+] as const;
+
+export type PushNotificationEventType = typeof PUSH_NOTIFICATION_EVENT_TYPES[number];
+
+export type PushNotificationPlatform = 'ios' | 'android';
+
+export interface NotificationQuietHours {
+  startHour: number;
+  endHour: number;
+  timezone?: string;
+}
+
+export interface NotificationPreferences {
+  enabled: boolean;
+  events: PushNotificationEventType[];
+  quietHours?: NotificationQuietHours | null;
+}
+
+export interface DeviceRegistrationRequest {
+  platform: PushNotificationPlatform;
+  token: string;
+  preferences?: NotificationPreferences;
+}
+
+export interface DeviceRegistration {
+  id: string;
+  userId: string;
+  platform: PushNotificationPlatform;
+  token: string;
+  createdAt: string;
+  updatedAt: string;
+  lastSeenAt: string;
+}
+
+export interface DevicesResponse {
+  devices: DeviceRegistration[];
+}
+
+export interface DeviceDeregistrationResponse {
+  success: boolean;
+  token: string;
+}
+
+export interface NotificationPreferencesResponse {
+  userId: string;
+  preferences: NotificationPreferences;
 }
 
 export interface HostPingResult {
@@ -781,6 +836,68 @@ export const webhookDeliveriesResponseSchema: z.ZodType<WebhookDeliveriesRespons
   .object({
     webhookId: z.string().min(1),
     deliveries: z.array(webhookDeliveryLogSchema),
+  })
+  .strict();
+
+export const pushNotificationEventTypeSchema = z.enum(PUSH_NOTIFICATION_EVENT_TYPES);
+
+export const pushNotificationPlatformSchema = z.enum(['ios', 'android']);
+
+export const notificationQuietHoursSchema: z.ZodType<NotificationQuietHours> = z
+  .object({
+    startHour: z.number().int().min(0).max(23),
+    endHour: z.number().int().min(0).max(23),
+    timezone: z.string().min(1).max(64).optional(),
+  })
+  .strict();
+
+export const notificationPreferencesSchema: z.ZodType<NotificationPreferences> = z
+  .object({
+    enabled: z.boolean(),
+    events: z.array(pushNotificationEventTypeSchema).min(1).refine((events) => {
+      return new Set(events).size === events.length;
+    }, 'Push notification events must be unique'),
+    quietHours: notificationQuietHoursSchema.nullable().optional(),
+  })
+  .strict();
+
+export const deviceRegistrationRequestSchema: z.ZodType<DeviceRegistrationRequest> = z
+  .object({
+    platform: pushNotificationPlatformSchema,
+    token: z.string().min(8).max(4096),
+    preferences: notificationPreferencesSchema.optional(),
+  })
+  .strict();
+
+export const deviceRegistrationSchema: z.ZodType<DeviceRegistration> = z
+  .object({
+    id: z.string().min(1),
+    userId: z.string().min(1),
+    platform: pushNotificationPlatformSchema,
+    token: z.string().min(8).max(4096),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    lastSeenAt: z.string().datetime(),
+  })
+  .strict();
+
+export const devicesResponseSchema: z.ZodType<DevicesResponse> = z
+  .object({
+    devices: z.array(deviceRegistrationSchema),
+  })
+  .strict();
+
+export const deviceDeregistrationResponseSchema: z.ZodType<DeviceDeregistrationResponse> = z
+  .object({
+    success: z.literal(true),
+    token: z.string().min(1),
+  })
+  .strict();
+
+export const notificationPreferencesResponseSchema: z.ZodType<NotificationPreferencesResponse> = z
+  .object({
+    userId: z.string().min(1),
+    preferences: notificationPreferencesSchema,
   })
   .strict();
 
