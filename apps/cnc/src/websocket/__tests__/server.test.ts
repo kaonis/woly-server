@@ -17,9 +17,13 @@ type MockSocket = {
 
 type MockNodeManager = Pick<NodeManager, 'handleConnection'>;
 
-function createUpgradeRequest(ip: string, forwardedFor?: string): IncomingMessage {
+function createUpgradeRequest(
+  ip: string,
+  forwardedFor?: string | string[],
+  path = '/ws/node'
+): IncomingMessage {
   return {
-    url: '/ws/node',
+    url: path,
     headers: forwardedFor ? { 'x-forwarded-for': forwardedFor } : {},
     socket: { remoteAddress: ip },
   } as unknown as IncomingMessage;
@@ -112,5 +116,60 @@ describe('createWebSocketServer', () => {
     expect(nodeManager.handleConnection).toHaveBeenCalledTimes(2);
     expect(secondSocket.write).not.toHaveBeenCalled();
     expect(secondSocket.destroy).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-node websocket upgrade paths', () => {
+    const { handleUpgradeSpy } = setupWss();
+    const socket = createMockSocket();
+
+    httpServer.emit('upgrade', createUpgradeRequest('10.0.0.2', undefined, '/ws/unknown'), socket, Buffer.alloc(0));
+
+    expect(handleUpgradeSpy).not.toHaveBeenCalled();
+    expect(socket.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects non-TLS upgrade requests when TLS is required', () => {
+    (config as any).wsRequireTls = true;
+    const { handleUpgradeSpy } = setupWss();
+    const socket = createMockSocket();
+
+    httpServer.emit('upgrade', createUpgradeRequest('10.0.0.3'), socket, Buffer.alloc(0));
+
+    expect(handleUpgradeSpy).not.toHaveBeenCalled();
+    expect(socket.write).toHaveBeenCalledWith('HTTP/1.1 426 Upgrade Required\r\n\r\n');
+    expect(socket.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects upgrade requests when websocket auth fails', () => {
+    mockAuthenticateWsUpgrade.mockReturnValue(null);
+    const { handleUpgradeSpy } = setupWss();
+    const socket = createMockSocket();
+
+    httpServer.emit('upgrade', createUpgradeRequest('10.0.0.4'), socket, Buffer.alloc(0));
+
+    expect(handleUpgradeSpy).not.toHaveBeenCalled();
+    expect(socket.write).toHaveBeenCalledWith('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    expect(socket.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the first forwarded-for header value when an array is provided', () => {
+    const { handleUpgradeSpy } = setupWss();
+    const firstWs = new EventEmitter() as unknown as WebSocket;
+    upgradedSocketsQueue.push(firstWs);
+
+    const firstSocket = createMockSocket();
+    httpServer.emit(
+      'upgrade',
+      createUpgradeRequest('10.0.0.50', ['198.51.100.50', '203.0.113.50']),
+      firstSocket,
+      Buffer.alloc(0)
+    );
+
+    const secondSocket = createMockSocket();
+    httpServer.emit('upgrade', createUpgradeRequest('10.0.0.60', '198.51.100.50'), secondSocket, Buffer.alloc(0));
+
+    expect(handleUpgradeSpy).toHaveBeenCalledTimes(1);
+    expect(secondSocket.write).toHaveBeenCalledWith('HTTP/1.1 429 Too Many Requests\r\n\r\n');
+    expect(secondSocket.destroy).toHaveBeenCalledTimes(1);
   });
 });
