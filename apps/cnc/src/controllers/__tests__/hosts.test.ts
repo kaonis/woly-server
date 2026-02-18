@@ -256,6 +256,25 @@ describe('HostsController.updateHost', () => {
       });
     });
 
+    it('should accept wolPort metadata updates', async () => {
+      mockCommandRouter.routeUpdateHostCommand.mockResolvedValueOnce({ success: true });
+
+      const req = createMockRequest({ wolPort: 7 });
+      const res = createMockResponse();
+
+      await controller.updateHost(req, res);
+
+      expect(mockCommandRouter.routeUpdateHostCommand).toHaveBeenCalledWith(
+        'testhost@location',
+        { wolPort: 7 },
+        { idempotencyKey: null }
+      );
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Host updated successfully',
+      });
+    });
+
     it('should accept empty body (all fields optional)', async () => {
       mockCommandRouter.routeUpdateHostCommand.mockResolvedValueOnce({ success: true });
 
@@ -405,6 +424,16 @@ describe('HostsController.updateHost', () => {
 
     it('should reject invalid tags payload', async () => {
       const req = createMockRequest({ tags: [''] });
+      const res = createMockResponse();
+
+      await controller.updateHost(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(mockCommandRouter.routeUpdateHostCommand).not.toHaveBeenCalled();
+    });
+
+    it('should reject invalid wolPort payload', async () => {
+      const req = createMockRequest({ wolPort: 70000 });
       const res = createMockResponse();
 
       await controller.updateHost(req, res);

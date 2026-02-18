@@ -193,7 +193,7 @@ describe('hosts controller', () => {
 
       // Mock WoL success
       (wol.wake as jest.Mock).mockImplementation(
-        (_mac: string, callback: (err: Error | null) => void) => {
+        (_mac: string, _opts: unknown, callback: (err: Error | null) => void) => {
           callback(null);
         }
       );
@@ -204,15 +204,52 @@ describe('hosts controller', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(mockDb.getHost).toHaveBeenCalledWith('Host1');
-      expect(wol.wake).toHaveBeenCalledWith('AA:BB:CC:DD:EE:FF', expect.any(Function));
+      expect(wol.wake).toHaveBeenCalledWith(
+        'AA:BB:CC:DD:EE:FF',
+        { port: 9 },
+        expect.any(Function)
+      );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
           name: 'Host1',
+          wolPort: 9,
           verification: expect.objectContaining({
             status: 'not_requested',
           }),
+        })
+      );
+    });
+
+    it('should send WoL packet with custom request port when provided', async () => {
+      const mockHost = {
+        name: 'Host1',
+        mac: 'AA:BB:CC:DD:EE:FF',
+        ip: '192.168.1.1',
+        status: 'asleep',
+        wolPort: 9,
+        lastSeen: null,
+        discovered: 1,
+      };
+      mockReq.params = { name: 'Host1' };
+      mockReq.body = { wolPort: 7 };
+      mockDb.getHost.mockResolvedValue(mockHost as any);
+      (wol.wake as jest.Mock).mockImplementation(
+        (_mac: string, _opts: unknown, callback: (err: Error | null) => void) => callback(null)
+      );
+
+      await hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
+
+      expect(wol.wake).toHaveBeenCalledWith(
+        'AA:BB:CC:DD:EE:FF',
+        { port: 7 },
+        expect.any(Function)
+      );
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          wolPort: 7,
         })
       );
     });
@@ -244,7 +281,7 @@ describe('hosts controller', () => {
       mockDb.getHost.mockResolvedValue(mockHost as any);
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(true);
       (wol.wake as jest.Mock).mockImplementation(
-        (_mac: string, callback: (err: Error | null) => void) => callback(null)
+        (_mac: string, _opts: unknown, callback: (err: Error | null) => void) => callback(null)
       );
 
       await hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
@@ -277,7 +314,7 @@ describe('hosts controller', () => {
       mockDb.getHost.mockResolvedValue(mockHost as any);
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(false);
       (wol.wake as jest.Mock).mockImplementation(
-        (_mac: string, callback: (err: Error | null) => void) => callback(null)
+        (_mac: string, _opts: unknown, callback: (err: Error | null) => void) => callback(null)
       );
 
       const wakePromise = hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
@@ -310,7 +347,7 @@ describe('hosts controller', () => {
       mockReq.query = { verify: 'true', verifyTimeoutMs: '1000', verifyPollIntervalMs: '100' };
       mockDb.getHost.mockResolvedValueOnce(mockHost as any).mockResolvedValueOnce(undefined);
       (wol.wake as jest.Mock).mockImplementation(
-        (_mac: string, callback: (err: Error | null) => void) => callback(null)
+        (_mac: string, _opts: unknown, callback: (err: Error | null) => void) => callback(null)
       );
 
       await hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
@@ -339,7 +376,7 @@ describe('hosts controller', () => {
       mockDb.getHost.mockResolvedValue(mockHost as any);
       (networkDiscovery.isHostAlive as jest.Mock).mockRejectedValueOnce(new Error('probe exploded'));
       (wol.wake as jest.Mock).mockImplementation(
-        (_mac: string, callback: (err: Error | null) => void) => callback(null)
+        (_mac: string, _opts: unknown, callback: (err: Error | null) => void) => callback(null)
       );
 
       await hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
@@ -368,7 +405,7 @@ describe('hosts controller', () => {
 
       // Mock WoL error
       (wol.wake as jest.Mock).mockImplementation(
-        (_mac: string, callback: (err: Error | null) => void) => {
+        (_mac: string, _opts: unknown, callback: (err: Error | null) => void) => {
           callback(new Error('WoL failed'));
         }
       );
@@ -391,6 +428,21 @@ describe('hosts controller', () => {
     it('should return 400 for invalid wake verification query params', async () => {
       mockReq.params = { name: 'Host1' };
       mockReq.query = { verify: 'invalid-value' };
+
+      await hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: 'Bad Request',
+        })
+      );
+      expect(mockDb.getHost).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 for invalid wolPort override', async () => {
+      mockReq.params = { name: 'Host1' };
+      mockReq.body = { wolPort: 70_000 };
 
       await hostsController.wakeUpHost(mockReq as Request, mockRes as Response);
 
@@ -546,12 +598,14 @@ describe('hosts controller', () => {
         name: 'OLD-HOST',
         mac: 'AA:BB:CC:DD:EE:01',
         ip: '192.168.1.50',
+        wolPort: 9,
         status: 'awake',
       };
       const updatedHost = {
         name: 'NEW-HOST',
         mac: 'AA:BB:CC:DD:EE:01',
         ip: '192.168.1.60',
+        wolPort: 9,
         status: 'awake',
       };
 
@@ -570,6 +624,29 @@ describe('hosts controller', () => {
       expect(mockDb.emit).toHaveBeenCalledWith('host-updated', updatedHost);
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(updatedHost);
+    });
+
+    it('should forward wolPort updates', async () => {
+      mockReq.params = { name: 'PORT-HOST' };
+      mockReq.body = { wolPort: 7 };
+      mockDb.getHost.mockResolvedValueOnce({
+        name: 'PORT-HOST',
+        mac: 'AA:BB:CC:DD:EE:11',
+        ip: '192.168.1.61',
+        status: 'asleep',
+        wolPort: 9,
+      } as any);
+      mockDb.getHost.mockResolvedValueOnce({
+        name: 'PORT-HOST',
+        mac: 'AA:BB:CC:DD:EE:11',
+        ip: '192.168.1.61',
+        status: 'asleep',
+        wolPort: 7,
+      } as any);
+
+      await hostsController.updateHost(mockReq as Request, mockRes as Response);
+
+      expect(mockDb.updateHost).toHaveBeenCalledWith('PORT-HOST', { wolPort: 7 });
     });
 
     it('should return 404 when host does not exist', async () => {

@@ -9,6 +9,7 @@ import {
   hostNameParamSchema,
   macAddressSchema,
   updateHostSchema,
+  wakeHostSchema,
 } from '../validators/hostValidator';
 
 const router = express.Router();
@@ -43,6 +44,7 @@ router.post(
   '/wakeup/:name',
   wakeLimiter,
   validateRequest(hostNameParamSchema, 'params'),
+  validateRequest(wakeHostSchema, 'body'),
   hostsController.wakeUpHost
 );
 

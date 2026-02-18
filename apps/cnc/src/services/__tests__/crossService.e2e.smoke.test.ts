@@ -184,6 +184,7 @@ function seedNodeAgentDatabase(dbPath: string): void {
     mac text NOT NULL UNIQUE,
     ip text NOT NULL UNIQUE,
     status text NOT NULL,
+    wol_port integer NOT NULL DEFAULT 9,
     lastSeen datetime,
     discovered integer DEFAULT 0,
     pingResponsive integer,
@@ -192,13 +193,14 @@ function seedNodeAgentDatabase(dbPath: string): void {
   )`);
 
   db.prepare(
-    `INSERT INTO hosts (name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags)
-     VALUES (?, ?, ?, ?, datetime('now'), ?, ?, ?, ?)`
+    `INSERT INTO hosts (name, mac, ip, status, wol_port, lastSeen, discovered, pingResponsive, notes, tags)
+     VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?)`
   ).run(
     SMOKE_HOST_NAME,
     'AA:BB:CC:DD:EE:11',
     '192.168.10.42',
     'awake',
+    9,
     1,
     1,
     'seeded by cross-service smoke',

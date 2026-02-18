@@ -17,6 +17,7 @@ interface HostUpdateData {
   name?: string;
   mac?: string;
   ip?: string;
+  wolPort?: number;
   status?: HostStatus;
   notes?: string | null;
   tags?: string[];
@@ -124,6 +125,7 @@ export class CommandRouter extends EventEmitter {
     options?: {
       idempotencyKey?: string | null;
       correlationId?: string | null;
+      wolPort?: number | null;
       verify?: WakeVerifyOptions | null;
     }
   ): Promise<WakeupResponse> {
@@ -143,12 +145,14 @@ export class CommandRouter extends EventEmitter {
     // Create command — include verify options if requested
     const commandId = this.generateCommandId();
     const verify = options?.verify ?? null;
+    const wolPort = options?.wolPort ?? host.wolPort;
     const command: DispatchCommand = {
       type: 'wake',
       commandId,
       data: {
         hostName: hostname,
         mac: host.mac,
+        ...(typeof wolPort === 'number' ? { wolPort } : {}),
         ...(verify ? { verify } : {}),
       }
     };
@@ -476,6 +480,7 @@ export class CommandRouter extends EventEmitter {
         name: hostData.name ?? host.name,
         mac: hostData.mac ?? host.mac,
         ip: hostData.ip ?? host.ip,
+        wolPort: hostData.wolPort ?? host.wolPort,
         status: hostData.status ?? host.status,
         notes: hostData.notes !== undefined ? hostData.notes : host.notes,
         tags: hostData.tags !== undefined ? hostData.tags : host.tags,

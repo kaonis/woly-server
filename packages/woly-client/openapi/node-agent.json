@@ -81,6 +81,13 @@
             "description": "IP address",
             "example": "192.168.1.147"
           },
+          "wolPort": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535,
+            "description": "Configured Wake-on-LAN UDP destination port",
+            "example": 9
+          },
           "status": {
             "type": "string",
             "enum": ["awake", "asleep"],
@@ -559,6 +566,12 @@
                     "type": "string",
                     "example": "192.168.1.200"
                   },
+                  "wolPort": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "example": 9
+                  },
                   "notes": {
                     "type": "string",
                     "nullable": true,
@@ -677,6 +690,25 @@
             "description": "Verification polling interval in milliseconds (bounded by server limits)"
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "wolPort": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "Optional WoL UDP destination port override for this request",
+                    "example": 7
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Magic packet sent successfully",
@@ -696,6 +728,10 @@
                     "mac": {
                       "type": "string",
                       "example": "80:6D:97:60:39:08"
+                    },
+                    "wolPort": {
+                      "type": "integer",
+                      "example": 9
                     },
                     "message": {
                       "type": "string",

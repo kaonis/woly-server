@@ -127,6 +127,13 @@
             "description": "IP address",
             "example": "192.168.1.147"
           },
+          "wolPort": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535,
+            "description": "Configured Wake-on-LAN UDP destination port",
+            "example": 9
+          },
           "status": {
             "type": "string",
             "enum": ["awake", "asleep"],
@@ -1013,6 +1020,11 @@
                   "ip": {
                     "type": "string"
                   },
+                  "wolPort": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
                   "status": {
                     "type": "string",
                     "enum": ["awake", "asleep"]
@@ -1170,6 +1182,29 @@
             "example": "unique-request-id-123"
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "verify": {
+                    "type": "boolean",
+                    "description": "Enable asynchronous wake verification for this command"
+                  },
+                  "wolPort": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "Optional WoL UDP destination port override for this wake request",
+                    "example": 7
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Wake command sent successfully",

@@ -24,6 +24,8 @@ const MIN_WAKE_VERIFY_TIMEOUT_MS = 500;
 const MAX_WAKE_VERIFY_TIMEOUT_MS = 60_000;
 const MIN_WAKE_VERIFY_POLL_INTERVAL_MS = 100;
 const MAX_WAKE_VERIFY_POLL_INTERVAL_MS = 10_000;
+const MIN_WOL_PORT = 1;
+const MAX_WOL_PORT = 65_535;
 const DEFAULT_WAKE_VERIFY_ENABLED = false;
 const DEFAULT_WAKE_VERIFY_TIMEOUT_MS = 10_000;
 const DEFAULT_WAKE_VERIFY_POLL_INTERVAL_MS = 1_000;
@@ -423,6 +425,19 @@ const getHost = async (req: Request, res: Response): Promise<void> => {
  *         schema:
  *           type: integer
  *         description: Verification polling interval in milliseconds (bounded by server limits)
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               wolPort:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 65535
+ *                 description: Optional WoL UDP destination port override for this request
+ *                 example: 7
  *     responses:
  *       200:
  *         description: Magic packet sent successfully
@@ -440,6 +455,9 @@ const getHost = async (req: Request, res: Response): Promise<void> => {
  *                 mac:
  *                   type: string
  *                   example: '80:6D:97:60:39:08'
+ *                 wolPort:
+ *                   type: integer
+ *                   example: 9
  *                 message:
  *                   type: string
  *                   example: Wake-on-LAN packet sent
@@ -494,6 +512,21 @@ const getHost = async (req: Request, res: Response): Promise<void> => {
 const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
   const name = req.params.name as string;
   logger.info(`Trying to wake up host with name ${name}`);
+  const requestedWolPortRaw = (req.body as { wolPort?: unknown } | undefined)?.wolPort;
+  if (requestedWolPortRaw !== undefined) {
+    if (
+      typeof requestedWolPortRaw !== 'number' ||
+      !Number.isInteger(requestedWolPortRaw) ||
+      requestedWolPortRaw < MIN_WOL_PORT ||
+      requestedWolPortRaw > MAX_WOL_PORT
+    ) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: `Field "wolPort" must be an integer between ${MIN_WOL_PORT} and ${MAX_WOL_PORT}`,
+      });
+      return;
+    }
+  }
 
   const verificationOptionsResult = resolveWakeVerificationOptions(req);
   if (!verificationOptionsResult.options) {
@@ -515,16 +548,18 @@ const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
     logger.info(`No host found with name ${name}`);
     return;
   }
+  const requestedWolPort = typeof requestedWolPortRaw === 'number' ? requestedWolPortRaw : undefined;
+  const effectiveWolPort = requestedWolPort ?? host.wolPort ?? 9;
 
   // Promisify wol.wake for better async handling
   try {
     await new Promise<void>((resolve, reject) => {
-      wol.wake(host.mac, (error: Error | null) => {
+      wol.wake(host.mac, { port: effectiveWolPort }, (error: Error | null) => {
         if (error) {
           logger.error(`Error waking up host ${name}:`, { error: error.message, stack: error.stack });
           reject(error);
         } else {
-          logger.info(`Sent WoL magic packet to host ${name} (${host.mac})`);
+          logger.info(`Sent WoL magic packet to host ${name} (${host.mac}) on port ${effectiveWolPort}`);
           resolve();
         }
       });
@@ -535,6 +570,7 @@ const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
       success: false,
       name: host.name,
       mac: host.mac,
+      wolPort: effectiveWolPort,
       error: 'WOL_SEND_FAILED',
       message,
       verification: {
@@ -557,6 +593,7 @@ const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
     success: true,
     name: host.name,
     mac: host.mac,
+    wolPort: effectiveWolPort,
     message: 'Wake-on-LAN packet sent',
     verification,
   });
@@ -749,6 +786,11 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
  *               ip:
  *                 type: string
  *                 example: 192.168.1.200
+ *               wolPort:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 65535
+ *                 example: 9
  *               notes:
  *                 type: string
  *                 nullable: true
@@ -772,7 +814,7 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
  */
 const updateHost = async (req: Request, res: Response): Promise<void> => {
   const currentName = req.params.name as string;
-  const updates = req.body as Partial<Pick<Host, 'name' | 'mac' | 'ip' | 'notes' | 'tags'>>;
+  const updates = req.body as Partial<Pick<Host, 'name' | 'mac' | 'ip' | 'notes' | 'tags' | 'wolPort'>>;
 
   if (!hostDb) {
     res.status(500).json({ error: 'Database not initialized' });

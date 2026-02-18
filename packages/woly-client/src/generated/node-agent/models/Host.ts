@@ -16,6 +16,10 @@ export type Host = {
      */
     ip: string;
     /**
+     * Configured Wake-on-LAN UDP destination port
+     */
+    wolPort?: number;
+    /**
      * Current host status
      */
     status: 'awake' | 'asleep';

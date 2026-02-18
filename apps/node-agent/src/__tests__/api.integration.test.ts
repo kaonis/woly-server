@@ -199,6 +199,18 @@ describe('API Integration Tests', () => {
 
       expect(response.body).toHaveProperty('error', 'Not Found');
     });
+
+    it('should update host wolPort', async () => {
+      await db.addHost('TEST-UPDATE-WOLPORT', 'AA:BB:CC:44:44:45', '192.168.1.115');
+      const response = await request(app)
+        .put('/hosts/TEST-UPDATE-WOLPORT')
+        .send({ wolPort: 7 })
+        .expect(200);
+
+      expect(response.body.wolPort).toBe(7);
+      const getResponse = await request(app).get('/hosts/TEST-UPDATE-WOLPORT').expect(200);
+      expect(getResponse.body.wolPort).toBe(7);
+    });
   });
 
   describe('DELETE /hosts/:name', () => {
@@ -235,7 +247,7 @@ describe('API Integration Tests', () => {
     it('should send WoL packet for existing host', async () => {
       // Mock successful WoL
       (wol.wake as jest.Mock).mockImplementation(
-        (mac: string, callback: (err: Error | null) => void) => {
+        (_mac: string, _opts: unknown, callback: (err: Error | null) => void) => {
           callback(null);
         }
       );
@@ -244,9 +256,31 @@ describe('API Integration Tests', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.name).toBe('TEST-WOL-HOST');
+      expect(response.body.wolPort).toBe(9);
       expect(response.body.verification).toBeDefined();
       expect(response.body.verification.status).toBe('not_requested');
       expect(wol.wake).toHaveBeenCalled();
+    });
+
+    it('should support custom wolPort override in request body', async () => {
+      (wol.wake as jest.Mock).mockImplementation(
+        (_mac: string, _opts: unknown, callback: (err: Error | null) => void) => {
+          callback(null);
+        }
+      );
+
+      const response = await request(app)
+        .post('/hosts/wakeup/TEST-WOL-HOST')
+        .send({ wolPort: 7 })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.wolPort).toBe(7);
+      expect(wol.wake).toHaveBeenCalledWith(
+        'AA:BB:CC:33:33:33',
+        { port: 7 },
+        expect.any(Function)
+      );
     });
 
     it('should return 404 for non-existent host', async () => {
@@ -259,7 +293,7 @@ describe('API Integration Tests', () => {
     it('should handle WoL errors', async () => {
       // Mock WoL failure
       (wol.wake as jest.Mock).mockImplementation(
-        (mac: string, callback: (err: Error | null) => void) => {
+        (_mac: string, _opts: unknown, callback: (err: Error | null) => void) => {
           callback(new Error('WoL failed'));
         }
       );
@@ -275,7 +309,7 @@ describe('API Integration Tests', () => {
 
     it('should support per-request wake verification via query params', async () => {
       (wol.wake as jest.Mock).mockImplementation(
-        (_mac: string, callback: (err: Error | null) => void) => {
+        (_mac: string, _opts: unknown, callback: (err: Error | null) => void) => {
           callback(null);
         }
       );

@@ -39,12 +39,15 @@ type ValidatedUpdateHostData = {
   name: string;
   mac?: string;
   ip?: string;
+  wolPort?: number;
   status?: Host['status'];
   notes?: string | null;
   tags?: string[];
 };
 
 const MAC_ADDRESS_REGEX = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^([0-9A-Fa-f]{12})$/;
+const MIN_WOL_PORT = 1;
+const MAX_WOL_PORT = 65_535;
 const COMMAND_EXECUTION_TIMEOUT_CODE = 'COMMAND_EXECUTION_TIMEOUT';
 
 type CommandExecutionPolicy = {
@@ -529,6 +532,10 @@ export class AgentService extends EventEmitter {
       return true;
     }
 
+    if ((previous.wolPort ?? 9) !== (next.wolPort ?? 9)) {
+      return true;
+    }
+
     if (previous.status !== next.status) {
       return true;
     }
@@ -907,9 +914,15 @@ export class AgentService extends EventEmitter {
    */
   private async handleWakeCommand(command: WakeCommand): Promise<void> {
     const { commandId, data } = command;
-    const { hostName, mac, verify } = data;
+    const { hostName, mac, verify, wolPort } = data;
 
-    logger.info('Received wake command from C&C', { commandId, hostName, mac, verify: !!verify });
+    logger.info('Received wake command from C&C', {
+      commandId,
+      hostName,
+      mac,
+      wolPort,
+      verify: !!verify,
+    });
 
     await this.executeCommandWithReliability(command, async () => {
       if (!this.hostDb) {
@@ -926,11 +939,21 @@ export class AgentService extends EventEmitter {
       if (!targetMac) {
         throw new NonRetryableCommandError(`Host ${hostName} not found`);
       }
+      const resolvedWolPort = wolPort ?? host?.wolPort ?? 9;
+      if (
+        !Number.isInteger(resolvedWolPort) ||
+        resolvedWolPort < MIN_WOL_PORT ||
+        resolvedWolPort > MAX_WOL_PORT
+      ) {
+        throw new NonRetryableCommandError(
+          `Invalid wake port ${String(resolvedWolPort)} for host ${hostName}`
+        );
+      }
 
       // Send Wake-on-LAN packet
       const wol = await import('wake_on_lan');
       await new Promise<void>((resolve, reject) => {
-        wol.wake(targetMac, (error: Error | null) => {
+        wol.wake(targetMac, { port: resolvedWolPort }, (error: Error | null) => {
           if (error) {
             reject(error);
           } else {
@@ -1258,6 +1281,7 @@ export class AgentService extends EventEmitter {
         name: data.name,
         mac: data.mac,
         ip: data.ip,
+        wolPort: data.wolPort,
         status: data.status,
         notes: data.notes,
         tags: data.tags,
@@ -1409,6 +1433,19 @@ export class AgentService extends EventEmitter {
       ip = normalizedIp;
     }
 
+    let wolPort: number | undefined;
+    if (payload.wolPort !== undefined) {
+      if (typeof payload.wolPort !== 'number' || !Number.isInteger(payload.wolPort)) {
+        throw new Error('Invalid update-host payload: wolPort must be an integer');
+      }
+      if (payload.wolPort < MIN_WOL_PORT || payload.wolPort > MAX_WOL_PORT) {
+        throw new Error(
+          `Invalid update-host payload: wolPort must be between ${MIN_WOL_PORT} and ${MAX_WOL_PORT}`
+        );
+      }
+      wolPort = payload.wolPort;
+    }
+
     let status: Host['status'] | undefined;
     if (payload.status !== undefined) {
       if (payload.status !== 'awake' && payload.status !== 'asleep') {
@@ -1456,6 +1493,7 @@ export class AgentService extends EventEmitter {
       name,
       mac,
       ip,
+      wolPort,
       status,
       notes,
       tags,

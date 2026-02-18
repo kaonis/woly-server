@@ -13,6 +13,7 @@ export class WakeOnLanService {
      * @param verify Enable/disable post-WoL wake verification for this request
      * @param verifyTimeoutMs Verification timeout in milliseconds (bounded by server limits)
      * @param verifyPollIntervalMs Verification polling interval in milliseconds (bounded by server limits)
+     * @param requestBody
      * @returns any Magic packet sent successfully
      * @throws ApiError
      */
@@ -21,10 +22,17 @@ export class WakeOnLanService {
         verify?: boolean,
         verifyTimeoutMs?: number,
         verifyPollIntervalMs?: number,
+        requestBody?: {
+            /**
+             * Optional WoL UDP destination port override for this request
+             */
+            wolPort?: number;
+        },
     ): CancelablePromise<{
         success?: boolean;
         name?: string;
         mac?: string;
+        wolPort?: number;
         message?: string;
         verification?: {
             enabled?: boolean;
@@ -49,6 +57,8 @@ export class WakeOnLanService {
                 'verifyTimeoutMs': verifyTimeoutMs,
                 'verifyPollIntervalMs': verifyPollIntervalMs,
             },
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 401: `Unauthorized - API key required (when NODE_API_KEY is configured)`,
                 404: `Host not found`,
