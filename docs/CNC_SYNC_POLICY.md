@@ -79,7 +79,15 @@ The mobile app now maintains a single shared app-level host stream connection (s
 - Reconnect behavior: clients should reconnect on transient disconnects and then refetch current host state; stream events are not guaranteed replay buffers.
 - Payload model: events are **mixed deltas/summaries** (not authoritative snapshots). Canonical state remains `GET /api/hosts`; stream events are invalidation hints.
 
-## 9. Polling Snapshot Stability (GET /api/hosts)
+## 9. Local App-Side Wake Fallback Classification (Issue #323)
+
+- Scope: mobile app LAN fallback Wake-on-LAN transport implemented in `kaonis/woly`.
+- Protocol impact: none.
+- CNC request/response contracts: unchanged.
+- Capability negotiation format/versioning: unchanged.
+- Decision: classify local app-side wake fallback as an execution-strategy change in the app, not a CNC protocol contract delta.
+
+## 10. Polling Snapshot Stability (GET /api/hosts)
 
 Backend assessment for polling clients (tracked by `kaonis/woly-server#328`):
 
