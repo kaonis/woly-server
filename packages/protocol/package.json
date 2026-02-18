@@ -19,6 +19,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "lint": "eslint src --max-warnings=0",
     "test": "jest --watchman=false",
     "test:ci": "jest --watchman=false",
     "typecheck": "tsc --noEmit",

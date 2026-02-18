@@ -6,10 +6,19 @@ This document tracks the warning-ratchet rollout to reach strict lint mode (`--m
 
 - `apps/node-agent` lint command already enforces strict mode: `eslint src --max-warnings=0`.
 - `apps/cnc` lint command already enforces strict mode: `eslint src --max-warnings=0`.
+- `packages/protocol` lint command now enforces strict mode: `eslint src --max-warnings=0`.
 - Root lint orchestration (`npm run lint`) currently depends on workspace lint scripts.
-- Remaining gap to true repo-wide strict mode:
-  - `packages/protocol` has no lint target yet.
-  - Root scripts/config files are not part of an explicit strict lint gate.
+- Current out-of-scope area for this ratchet:
+  - Root scripts/config files are not yet in an explicit strict lint gate.
+  - They remain tracked as follow-up technical-debt work, separate from workspace source strictness.
+
+## Targeted Scopes
+
+This ratchet applies to workspace source scopes that participate in Turbo lint:
+
+- `apps/node-agent/src`
+- `apps/cnc/src`
+- `packages/protocol/src`
 
 ## Policy
 
@@ -19,11 +28,11 @@ This document tracks the warning-ratchet rollout to reach strict lint mode (`--m
 
 ## Milestones
 
-1. Add ESLint target for `packages/protocol` and measure baseline warnings.
-2. Add lint coverage for root scripts/config files where practical.
-3. Remove warning-only rules or unresolved warning debt in newly-covered scopes.
-4. Flip newly-covered scopes to strict mode (`--max-warnings=0`).
-5. Keep strict mode as a permanent default for all linted scopes.
+1. Done: add ESLint target for `packages/protocol` and enforce strict mode.
+2. In progress (separate follow-up): add lint coverage for root scripts/config files where practical.
+3. Done: remove warning debt in currently targeted workspace source scopes.
+4. Done: enforce `--max-warnings=0` for all targeted workspace source scopes.
+5. Done (for targeted scopes): keep strict mode as permanent default across all targeted workspace lint scopes.
 
 ## Ownership
 
