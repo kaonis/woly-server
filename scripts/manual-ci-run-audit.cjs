@@ -6,9 +6,15 @@ const { execFileSync } = require('node:child_process');
 const ALLOWLISTED_NON_MANUAL_RUNS = [
   {
     event: 'pull_request',
-    workflowName: 'CNC Mobile Contract Gate',
+    workflowName: 'CNC Sync Policy',
     rationale:
-      'Required minimal automation gate for CNC protocol/app compatibility.',
+      'Required low-cost policy gate for PR policy enforcement.',
+  },
+  {
+    event: 'schedule',
+    workflowName: 'Dependency Health',
+    rationale:
+      'Required low-cost weekly dependency checkpoint automation.',
   },
 ];
 
@@ -143,6 +149,10 @@ function renderMarkdown(summary, limit) {
   const eventLines = Object.entries(summary.countsByEvent)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([event, count]) => `- \`${event}\`: ${count}`);
+  const allowlistLines = ALLOWLISTED_NON_MANUAL_RUNS.map(
+    (rule) =>
+      `  - \`${rule.event}\` for \`${rule.workflowName}\` (${rule.rationale})`
+  );
 
   const lines = [
     '## Manual CI Run Audit',
@@ -153,7 +163,7 @@ function renderMarkdown(summary, limit) {
     `- Total runs analyzed: ${summary.totalRuns}`,
     '- Baseline allowed events:',
     '  - `workflow_dispatch`',
-    '  - `pull_request` for `CNC Mobile Contract Gate` (path-scoped, minimal automation exception)',
+    ...allowlistLines,
     `- Non-manual runs observed: ${summary.nonManualRunCount}`,
     `- Allowlisted non-manual runs: ${summary.allowlistedNonManualRunCount}`,
     `- Unexpected non-manual runs: ${summary.unexpectedRunCount}`,

@@ -194,3 +194,9 @@ Issue #144 is complete when:
   - Ran rolling policy audit via helper:
     - `npm run ci:audit:latest -- --fail-on-unexpected` (PASS; 0 runs; checkpoint `2026-02-15T21:31:02Z`).
   - ESLint 10 compatibility status unchanged (`#150` remains blocked; latest checkpoint payload `2026-02-15T22:19:54Z`).
+- 2026-02-18 (V25 / issue #280 checkpoint):
+  - Ran scoped audit:
+    - `npm run ci:audit:manual -- --since 2026-02-16T18:35:12Z --fail-on-unexpected` (PASS; `pull_request` runs were limited to approved `CNC Sync Policy` automation exception).
+  - Ran policy guard:
+    - `npm run ci:policy:check` (PASS; approved exceptions remain `pull_request` for `cnc-sync-policy.yml` and `schedule` for `dependency-health.yml`).
+  - Aligned audit allowlist logic in `scripts/manual-ci-run-audit.cjs` to match policy guard exceptions.
