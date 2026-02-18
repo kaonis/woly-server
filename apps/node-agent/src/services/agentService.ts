@@ -353,7 +353,16 @@ export class AgentService extends EventEmitter {
    */
   public sendHostUpdated(host: Host): void {
     const normalizedHost = this.normalizeHostForReporting(host);
+    const previousState =
+      this.pendingHostUpdates.get(normalizedHost.name) ??
+      this.hostCache.get(normalizedHost.name);
+
     this.hostCache.set(normalizedHost.name, normalizedHost);
+
+    if (previousState && !this.hasMeaningfulHostStateChange(previousState, normalizedHost)) {
+      return;
+    }
+
     this.pendingHostUpdates.set(normalizedHost.name, normalizedHost);
     this.scheduleHostUpdateFlush();
   }
@@ -502,6 +511,38 @@ export class AgentService extends EventEmitter {
       status: 'asleep',
       pingResponsive: 0,
     };
+  }
+
+  private hasMeaningfulHostStateChange(previous: Host, next: Host): boolean {
+    if (previous.name !== next.name) {
+      return true;
+    }
+
+    if (previous.mac !== next.mac) {
+      return true;
+    }
+
+    if (previous.ip !== next.ip) {
+      return true;
+    }
+
+    if (previous.status !== next.status) {
+      return true;
+    }
+
+    if ((previous.discovered ?? 0) !== (next.discovered ?? 0)) {
+      return true;
+    }
+
+    if ((previous.pingResponsive ?? null) !== (next.pingResponsive ?? null)) {
+      return true;
+    }
+
+    if ((previous.notes ?? null) !== (next.notes ?? null)) {
+      return true;
+    }
+
+    return JSON.stringify(previous.tags ?? []) !== JSON.stringify(next.tags ?? []);
   }
 
   private isStaleHost(host: Host): boolean {

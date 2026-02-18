@@ -53,6 +53,12 @@ const capabilityMatrix: CncCapabilitiesResponse['capabilities'] = {
     persistence: 'backend',
     note: 'Host wake schedules are persisted and executed in CNC backend. Legacy /api/hosts/* schedule routes remain supported.',
   },
+  hostStateStreaming: {
+    supported: true,
+    transport: 'websocket',
+    routes: ['/ws/mobile/hosts'],
+    note: 'Server-initiated host state change events are streamed to authenticated mobile clients.',
+  },
   commandStatusStreaming: {
     supported: false,
     transport: null,
@@ -121,6 +127,8 @@ export class MetaController {
    *                     notesTags:
    *                       type: object
    *                     schedules:
+   *                       type: object
+   *                     hostStateStreaming:
    *                       type: object
    *                     commandStatusStreaming:
    *                       type: object

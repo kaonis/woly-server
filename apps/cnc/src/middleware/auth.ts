@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { NextFunction, Request, Response } from 'express';
 import config from '../config';
 import { JwtPayload } from '../types/auth';
+import type { AuthContext } from '../types/auth';
 
 interface JwtVerifyOptions {
   issuer: string;
@@ -104,6 +105,26 @@ function extractRoles(payload: JwtPayload): string[] {
   return Array.from(new Set(merged));
 }
 
+export function verifyJwtToken(token: string): AuthContext {
+  verifySignature(token, config.jwtSecret);
+  const payload = parsePayload(token);
+  validatePayload(payload, {
+    issuer: config.jwtIssuer,
+    audience: config.jwtAudience,
+  });
+
+  const subject = toStringClaim(payload.sub);
+  if (!subject) {
+    throw new Error('Token subject is required');
+  }
+
+  return {
+    sub: subject,
+    roles: extractRoles(payload),
+    claims: payload,
+  };
+}
+
 function unauthorized(res: Response, message: string): void {
   res.status(401).json({
     error: 'Unauthorized',
@@ -123,24 +144,7 @@ function forbidden(res: Response, message: string): void {
 export function authenticateJwt(req: Request, res: Response, next: NextFunction): void {
   try {
     const token = getBearerToken(req);
-    verifySignature(token, config.jwtSecret);
-    const payload = parsePayload(token);
-    validatePayload(payload, {
-      issuer: config.jwtIssuer,
-      audience: config.jwtAudience,
-    });
-
-    const subject = toStringClaim(payload.sub);
-    if (!subject) {
-      unauthorized(res, 'Token subject is required');
-      return;
-    }
-
-    req.auth = {
-      sub: subject,
-      roles: extractRoles(payload),
-      claims: payload,
-    };
+    req.auth = verifyJwtToken(token);
     next();
   } catch (error) {
     unauthorized(res, error instanceof Error ? error.message : 'Invalid token');

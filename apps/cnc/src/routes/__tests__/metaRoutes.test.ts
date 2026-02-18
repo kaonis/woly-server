@@ -111,6 +111,11 @@ describe('Capabilities Route', () => {
             supported: true,
             persistence: 'backend',
           },
+          hostStateStreaming: {
+            supported: true,
+            transport: 'websocket',
+            routes: ['/ws/mobile/hosts'],
+          },
           commandStatusStreaming: { supported: false, transport: null },
         },
         rateLimits: {

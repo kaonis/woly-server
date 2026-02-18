@@ -95,6 +95,11 @@ describe('Capabilities Routes', () => {
           scan: expect.objectContaining({ supported: true }),
           notesTags: expect.objectContaining({ supported: true, persistence: 'backend' }),
           schedules: expect.objectContaining({ supported: true, persistence: 'backend' }),
+          hostStateStreaming: expect.objectContaining({
+            supported: true,
+            transport: 'websocket',
+            routes: ['/ws/mobile/hosts'],
+          }),
           commandStatusStreaming: expect.objectContaining({ supported: false, transport: null }),
         },
         rateLimits: {

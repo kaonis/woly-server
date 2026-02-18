@@ -13,6 +13,7 @@ import db from './database/connection';
 import { NodeManager } from './services/nodeManager';
 import { HostAggregator } from './services/hostAggregator';
 import { CommandRouter } from './services/commandRouter';
+import { HostStateStreamBroker } from './services/hostStateStreamBroker';
 import { createRoutes } from './routes';
 import { createWebSocketServer } from './websocket/server';
 import { errorHandler } from './middleware/errorHandler';
@@ -34,6 +35,7 @@ class Server {
   private hostAggregator: HostAggregator;
   private nodeManager: NodeManager;
   private commandRouter: CommandRouter;
+  private hostStateStreamBroker: HostStateStreamBroker;
 
   constructor() {
     this.app = express();
@@ -42,6 +44,7 @@ class Server {
     this.hostAggregator = new HostAggregator();
     this.nodeManager = new NodeManager(this.hostAggregator);
     this.commandRouter = new CommandRouter(this.nodeManager, this.hostAggregator);
+    this.hostStateStreamBroker = new HostStateStreamBroker(this.hostAggregator);
     this.setupMiddleware();
     this.setupRoutes();
     this.setupWebSocket();
@@ -170,7 +173,7 @@ class Server {
   }
 
   private setupWebSocket(): void {
-    createWebSocketServer(this.httpServer, this.nodeManager);
+    createWebSocketServer(this.httpServer, this.nodeManager, this.hostStateStreamBroker);
   }
 
   private setupErrorHandling(): void {
@@ -205,6 +208,7 @@ class Server {
         logger.info(`Environment: ${config.nodeEnv}`);
         logger.info('Express trust proxy setting', { trustProxy: config.trustProxy });
         logger.info(`WebSocket endpoint: ws://localhost:${config.port}/ws/node`);
+        logger.info(`Mobile host stream endpoint: ws://localhost:${config.port}/ws/mobile/hosts`);
       });
 
       // Graceful shutdown
@@ -232,6 +236,7 @@ class Server {
 
       // Shutdown node manager
       this.nodeManager.shutdown();
+      this.hostStateStreamBroker.shutdown();
 
       // Close database
       await db.close();
