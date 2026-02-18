@@ -287,6 +287,23 @@ describe('NodeManager unit branches', () => {
     expect(internals.sanitizeLogPayload(Symbol('sym'))).toContain('Symbol(sym)');
   });
 
+  it('emits scan-complete events when node scan completion is reported', async () => {
+    const scanComplete = jest.fn();
+    nodeManager.on('scan-complete', scanComplete);
+
+    await (nodeManager as unknown as {
+      handleScanComplete: (data: { nodeId: string; hostCount: number }) => Promise<void>;
+    }).handleScanComplete({
+      nodeId: 'node-a',
+      hostCount: 12,
+    });
+
+    expect(scanComplete).toHaveBeenCalledWith({
+      nodeId: 'node-a',
+      hostCount: 12,
+    });
+  });
+
   it('handles heartbeat interval paths: stale-node processing and interval-level errors', async () => {
     jest.useFakeTimers();
     nodeManager.shutdown();

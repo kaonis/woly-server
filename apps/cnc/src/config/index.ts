@@ -129,6 +129,8 @@ export const config: ServerConfig = {
   scheduleWorkerEnabled: getEnvBoolean('SCHEDULE_WORKER_ENABLED', true),
   schedulePollIntervalMs: getEnvNumber('SCHEDULE_POLL_INTERVAL_MS', 60000),
   scheduleBatchSize: getEnvNumber('SCHEDULE_BATCH_SIZE', 25),
+  webhookRetryBaseDelayMs: getEnvNumber('WEBHOOK_RETRY_BASE_DELAY_MS', 1000),
+  webhookDeliveryTimeoutMs: getEnvNumber('WEBHOOK_DELIVERY_TIMEOUT_MS', 5000),
   logLevel: getEnvVar('LOG_LEVEL', 'info'),
 };
 
@@ -179,6 +181,14 @@ if (!Number.isFinite(config.schedulePollIntervalMs) || config.schedulePollInterv
 
 if (!Number.isFinite(config.scheduleBatchSize) || config.scheduleBatchSize <= 0) {
   throw new Error('SCHEDULE_BATCH_SIZE must be a finite number > 0');
+}
+
+if (!Number.isFinite(config.webhookRetryBaseDelayMs) || config.webhookRetryBaseDelayMs <= 0) {
+  throw new Error('WEBHOOK_RETRY_BASE_DELAY_MS must be a finite number > 0');
+}
+
+if (!Number.isFinite(config.webhookDeliveryTimeoutMs) || config.webhookDeliveryTimeoutMs <= 0) {
+  throw new Error('WEBHOOK_DELIVERY_TIMEOUT_MS must be a finite number > 0');
 }
 
 export default config;

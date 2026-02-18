@@ -81,6 +81,13 @@ jest.mock('../services/wakeScheduleWorker', () => ({
   stopWakeScheduleWorker: jest.fn(),
 }));
 
+jest.mock('../services/webhookDispatcher', () => ({
+  WebhookDispatcher: jest.fn().mockImplementation(() => ({
+    start: jest.fn(),
+    shutdown: jest.fn(),
+  })),
+}));
+
 jest.mock('../services/runtimeMetrics', () => ({
   runtimeMetrics: {
     reset: jest.fn(),
@@ -124,6 +131,7 @@ import {
   stopHostStatusHistoryPruning,
 } from '../services/hostStatusHistoryRetention';
 import { startWakeScheduleWorker, stopWakeScheduleWorker } from '../services/wakeScheduleWorker';
+import { WebhookDispatcher } from '../services/webhookDispatcher';
 import { prometheusContentType, renderPrometheusMetrics } from '../services/promMetrics';
 
 describe('server bootstrap and wiring', () => {
@@ -250,6 +258,10 @@ describe('server bootstrap and wiring', () => {
         batchSize: 10,
       }),
     );
+    const dispatcherInstance = (WebhookDispatcher as jest.Mock).mock.results[0]?.value as {
+      start: jest.Mock;
+    };
+    expect(dispatcherInstance.start).toHaveBeenCalledTimes(1);
     expect(listenSpy).toHaveBeenCalledWith(8080, expect.any(Function));
     expect(setupGracefulShutdownSpy).toHaveBeenCalledTimes(1);
   });
@@ -286,6 +298,9 @@ describe('server bootstrap and wiring', () => {
     const hostStateStreamBroker = (
       server as unknown as { hostStateStreamBroker: { shutdown: jest.Mock } }
     ).hostStateStreamBroker;
+    const webhookDispatcher = (
+      server as unknown as { webhookDispatcher: { shutdown: jest.Mock } }
+    ).webhookDispatcher;
     const exitSpy = jest.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
 
     (server as unknown as { setupGracefulShutdown: () => void }).setupGracefulShutdown();
@@ -298,6 +313,7 @@ describe('server bootstrap and wiring', () => {
     expect(stopWakeScheduleWorker).toHaveBeenCalledTimes(1);
     expect(nodeManager.shutdown).toHaveBeenCalledTimes(1);
     expect(hostStateStreamBroker.shutdown).toHaveBeenCalledTimes(1);
+    expect(webhookDispatcher.shutdown).toHaveBeenCalledTimes(1);
     expect(mockedDb.close).toHaveBeenCalledTimes(1);
     expect(exitSpy).toHaveBeenCalledWith(0);
     exitSpy.mockRestore();

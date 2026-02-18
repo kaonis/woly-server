@@ -11,8 +11,14 @@ import type {
   HostPingResult as ProtocolHostPingResult,
   HostPortScanResult as ProtocolHostPortScanResult,
   HostPortScanResponse as ProtocolHostPortScanResponse,
+  CreateWebhookRequest as ProtocolCreateWebhookRequest,
   NodeMetadata as ProtocolNodeMetadata,
   ScheduleFrequency as ProtocolScheduleFrequency,
+  WebhookDeliveriesResponse as ProtocolWebhookDeliveriesResponse,
+  WebhookDeliveryLog as ProtocolWebhookDeliveryLog,
+  WebhookEventType as ProtocolWebhookEventType,
+  WebhooksResponse as ProtocolWebhooksResponse,
+  WebhookSubscription as ProtocolWebhookSubscription,
   WakeVerificationResult as ProtocolWakeVerificationResult,
 } from '@kaonis/woly-protocol';
 
@@ -117,6 +123,13 @@ export interface HostUptimeSummary {
   currentStatus: 'awake' | 'asleep';
 }
 
+export type WebhookEventType = ProtocolWebhookEventType;
+export type WebhookSubscription = ProtocolWebhookSubscription;
+export type CreateWebhookRequest = ProtocolCreateWebhookRequest;
+export type WebhooksResponse = ProtocolWebhooksResponse;
+export type WebhookDeliveryLog = ProtocolWebhookDeliveryLog;
+export type WebhookDeliveriesResponse = ProtocolWebhookDeliveriesResponse;
+
 export interface HostPingResponse {
   target: string;
   checkedAt: string;
@@ -190,5 +203,7 @@ export interface ServerConfig {
   scheduleWorkerEnabled: boolean;
   schedulePollIntervalMs: number;
   scheduleBatchSize: number;
+  webhookRetryBaseDelayMs: number;
+  webhookDeliveryTimeoutMs: number;
   logLevel: string;
 }

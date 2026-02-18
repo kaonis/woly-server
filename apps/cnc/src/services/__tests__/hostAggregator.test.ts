@@ -946,6 +946,47 @@ describe('HostAggregator', () => {
   });
 
   describe('status history and uptime analytics', () => {
+    it('emits host-status-transition when status changes', async () => {
+      const transitionSpy = jest.fn();
+      hostAggregator.on('host-status-transition', transitionSpy);
+
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-1',
+        location: 'Test Location',
+        host: {
+          name: 'transition-host',
+          mac: 'AA:BB:CC:DD:EE:6A',
+          ip: '192.168.1.106',
+          status: 'asleep' as const,
+          lastSeen: '2026-02-18T10:00:00.000Z',
+          discovered: 1,
+          pingResponsive: 0,
+        },
+      });
+
+      await hostAggregator.onHostUpdated({
+        nodeId: 'test-node-1',
+        location: 'Test Location',
+        host: {
+          name: 'transition-host',
+          mac: 'AA:BB:CC:DD:EE:6A',
+          ip: '192.168.1.106',
+          status: 'awake' as const,
+          lastSeen: '2026-02-18T10:05:00.000Z',
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      expect(transitionSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hostFqn: 'transition-host@Test%20Location-test-node-1',
+          oldStatus: 'asleep',
+          newStatus: 'awake',
+        }),
+      );
+    });
+
     it('records status transitions on rediscovery updates', async () => {
       await hostAggregator.onHostDiscovered({
         nodeId: 'test-node-1',

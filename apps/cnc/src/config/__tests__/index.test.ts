@@ -50,6 +50,8 @@ describe('config parsing and validation', () => {
       SCHEDULE_WORKER_ENABLED: 'false',
       SCHEDULE_POLL_INTERVAL_MS: '45000',
       SCHEDULE_BATCH_SIZE: '10',
+      WEBHOOK_RETRY_BASE_DELAY_MS: '2000',
+      WEBHOOK_DELIVERY_TIMEOUT_MS: '8000',
       OFFLINE_COMMAND_TTL_MS: '120000',
     });
 
@@ -62,6 +64,8 @@ describe('config parsing and validation', () => {
     expect(config.scheduleWorkerEnabled).toBe(false);
     expect(config.schedulePollIntervalMs).toBe(45000);
     expect(config.scheduleBatchSize).toBe(10);
+    expect(config.webhookRetryBaseDelayMs).toBe(2000);
+    expect(config.webhookDeliveryTimeoutMs).toBe(8000);
     expect(config.offlineCommandTtlMs).toBe(120000);
   });
 
@@ -145,5 +149,21 @@ describe('config parsing and validation', () => {
         HOST_STATUS_HISTORY_RETENTION_DAYS: '-1',
       }),
     ).rejects.toThrow('HOST_STATUS_HISTORY_RETENTION_DAYS must be a finite number >= 0');
+  });
+
+  it('throws when webhook retry base delay is not greater than zero', async () => {
+    await expect(
+      loadConfig({
+        WEBHOOK_RETRY_BASE_DELAY_MS: '0',
+      }),
+    ).rejects.toThrow('WEBHOOK_RETRY_BASE_DELAY_MS must be a finite number > 0');
+  });
+
+  it('throws when webhook delivery timeout is not greater than zero', async () => {
+    await expect(
+      loadConfig({
+        WEBHOOK_DELIVERY_TIMEOUT_MS: '0',
+      }),
+    ).rejects.toThrow('WEBHOOK_DELIVERY_TIMEOUT_MS must be a finite number > 0');
   });
 });

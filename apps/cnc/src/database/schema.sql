@@ -91,6 +91,29 @@ CREATE INDEX IF NOT EXISTS idx_wake_schedules_owner_sub ON wake_schedules(owner_
 CREATE INDEX IF NOT EXISTS idx_wake_schedules_host_fqn ON wake_schedules(host_fqn);
 CREATE INDEX IF NOT EXISTS idx_wake_schedules_owner_host ON wake_schedules(owner_sub, host_fqn);
 
+-- Webhooks table
+CREATE TABLE IF NOT EXISTS webhooks (
+    id VARCHAR(255) PRIMARY KEY,
+    url TEXT NOT NULL,
+    events JSONB NOT NULL,
+    secret TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Webhook delivery log table
+CREATE TABLE IF NOT EXISTS webhook_delivery_logs (
+    id BIGSERIAL PRIMARY KEY,
+    webhook_id VARCHAR(255) NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+    event_type VARCHAR(64) NOT NULL,
+    attempt INTEGER NOT NULL CHECK (attempt >= 1),
+    status VARCHAR(20) NOT NULL CHECK (status IN ('success', 'failed')),
+    response_status INTEGER,
+    error TEXT,
+    payload JSONB NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_nodes_status ON nodes(status);
 CREATE INDEX IF NOT EXISTS idx_nodes_last_heartbeat ON nodes(last_heartbeat);
@@ -101,6 +124,9 @@ CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_location ON aggregated_hosts(loc
 CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_fqn ON aggregated_hosts(fully_qualified_name);
 CREATE INDEX IF NOT EXISTS idx_host_status_history_host_changed_at ON host_status_history(host_fqn, changed_at);
 CREATE INDEX IF NOT EXISTS idx_host_status_history_changed_at ON host_status_history(changed_at);
+CREATE INDEX IF NOT EXISTS idx_webhooks_created_at ON webhooks(created_at);
+CREATE INDEX IF NOT EXISTS idx_webhook_delivery_logs_webhook_id ON webhook_delivery_logs(webhook_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_delivery_logs_created_at ON webhook_delivery_logs(created_at);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -129,5 +155,10 @@ CREATE TRIGGER update_commands_updated_at
 
 CREATE TRIGGER update_wake_schedules_updated_at
     BEFORE UPDATE ON wake_schedules
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_webhooks_updated_at
+    BEFORE UPDATE ON webhooks
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();

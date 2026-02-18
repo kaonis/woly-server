@@ -1,4 +1,5 @@
 import {
+  createWebhookRequestSchema,
   cncCapabilitiesResponseSchema,
   cncCapabilityDescriptorSchema,
   cncRateLimitDescriptorSchema,
@@ -11,6 +12,11 @@ import {
   hostSchedulesResponseSchema,
   hostUptimeSummarySchema,
   hostWakeScheduleSchema,
+  webhookDeliveriesResponseSchema,
+  webhookDeliveryLogSchema,
+  webhookEventTypeSchema,
+  webhooksResponseSchema,
+  webhookSubscriptionSchema,
   hostSchema,
   hostStateStreamEventSchema,
   HOST_STATE_STREAM_MUTATING_EVENT_TYPES,
@@ -818,6 +824,117 @@ describe('hostUptimeSummarySchema', () => {
         currentStatus: 'awake',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('webhookEventTypeSchema', () => {
+  it('accepts supported webhook event types', () => {
+    expect(webhookEventTypeSchema.safeParse('host.awake').success).toBe(true);
+    expect(webhookEventTypeSchema.safeParse('scan.complete').success).toBe(true);
+  });
+
+  it('rejects unknown webhook event types', () => {
+    expect(webhookEventTypeSchema.safeParse('host.updated').success).toBe(false);
+  });
+});
+
+describe('createWebhookRequestSchema', () => {
+  it('accepts valid webhook create payloads', () => {
+    expect(
+      createWebhookRequestSchema.safeParse({
+        url: 'https://example.com/hooks/woly',
+        events: ['host.awake', 'host.asleep'],
+        secret: 'shared-secret',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects duplicate events', () => {
+    expect(
+      createWebhookRequestSchema.safeParse({
+        url: 'https://example.com/hooks/woly',
+        events: ['host.awake', 'host.awake'],
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('webhookSubscriptionSchema', () => {
+  it('accepts valid webhook subscription payloads', () => {
+    expect(
+      webhookSubscriptionSchema.safeParse({
+        id: 'webhook-1',
+        url: 'https://example.com/hooks/woly',
+        events: ['host.awake'],
+        hasSecret: true,
+        createdAt: '2026-02-18T20:00:00.000Z',
+        updatedAt: '2026-02-18T20:00:00.000Z',
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('webhooksResponseSchema', () => {
+  it('accepts list response payloads', () => {
+    expect(
+      webhooksResponseSchema.safeParse({
+        webhooks: [
+          {
+            id: 'webhook-1',
+            url: 'https://example.com/hooks/woly',
+            events: ['host.awake'],
+            hasSecret: false,
+            createdAt: '2026-02-18T20:00:00.000Z',
+            updatedAt: '2026-02-18T20:00:00.000Z',
+          },
+        ],
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('webhookDeliveryLogSchema', () => {
+  it('accepts valid delivery log payloads', () => {
+    expect(
+      webhookDeliveryLogSchema.safeParse({
+        id: 1,
+        webhookId: 'webhook-1',
+        eventType: 'host.awake',
+        attempt: 2,
+        status: 'failed',
+        responseStatus: 503,
+        error: 'HTTP 503',
+        payload: {
+          event: 'host.awake',
+        },
+        createdAt: '2026-02-18T20:00:00.000Z',
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('webhookDeliveriesResponseSchema', () => {
+  it('accepts delivery log list payloads', () => {
+    expect(
+      webhookDeliveriesResponseSchema.safeParse({
+        webhookId: 'webhook-1',
+        deliveries: [
+          {
+            id: 1,
+            webhookId: 'webhook-1',
+            eventType: 'host.awake',
+            attempt: 1,
+            status: 'success',
+            responseStatus: 204,
+            error: null,
+            payload: {
+              event: 'host.awake',
+            },
+            createdAt: '2026-02-18T20:00:00.000Z',
+          },
+        ],
+      }).success
+    ).toBe(true);
   });
 });
 

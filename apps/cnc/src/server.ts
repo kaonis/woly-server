@@ -20,6 +20,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { reconcileCommandsOnStartup, startCommandPruning, stopCommandPruning } from './services/commandReconciler';
 import { startHostStatusHistoryPruning, stopHostStatusHistoryPruning } from './services/hostStatusHistoryRetention';
 import { startWakeScheduleWorker, stopWakeScheduleWorker } from './services/wakeScheduleWorker';
+import { WebhookDispatcher } from './services/webhookDispatcher';
 import { specs } from './swagger';
 import { runtimeMetrics } from './services/runtimeMetrics';
 import { CNC_VERSION } from './utils/cncVersion';
@@ -37,6 +38,7 @@ export class Server {
   private nodeManager: NodeManager;
   private commandRouter: CommandRouter;
   private hostStateStreamBroker: HostStateStreamBroker;
+  private webhookDispatcher: WebhookDispatcher;
 
   constructor() {
     this.app = express();
@@ -46,6 +48,7 @@ export class Server {
     this.nodeManager = new NodeManager(this.hostAggregator);
     this.commandRouter = new CommandRouter(this.nodeManager, this.hostAggregator);
     this.hostStateStreamBroker = new HostStateStreamBroker(this.hostAggregator);
+    this.webhookDispatcher = new WebhookDispatcher(this.hostAggregator, this.nodeManager);
     this.hostStateStreamBroker.subscribeToCommandRouter(this.commandRouter);
     this.setupMiddleware();
     this.setupRoutes();
@@ -210,6 +213,9 @@ export class Server {
         batchSize: config.scheduleBatchSize,
       });
 
+      // Start webhook event subscriptions
+      this.webhookDispatcher.start();
+
       // Start HTTP server
       this.httpServer.listen(config.port, () => {
         logger.info(`Server listening on port ${config.port}`);
@@ -246,6 +252,7 @@ export class Server {
       // Shutdown node manager
       this.nodeManager.shutdown();
       this.hostStateStreamBroker.shutdown();
+      this.webhookDispatcher.shutdown();
 
       // Close database
       await db.close();
