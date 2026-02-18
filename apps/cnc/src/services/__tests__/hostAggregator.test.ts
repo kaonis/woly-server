@@ -129,6 +129,84 @@ describe('HostAggregator', () => {
       expect(host!.status).toBe('asleep');
     });
 
+    it('emits host-updated on rediscovery when meaningful fields change', async () => {
+      const hostUpdated = jest.fn();
+      hostAggregator.on('host-updated', hostUpdated);
+
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-1',
+        location: 'Test Location',
+        host: {
+          name: 'rediscovery-stream-host',
+          mac: 'AA:BB:CC:DD:EE:88',
+          ip: '192.168.1.188',
+          status: 'awake' as const,
+          lastSeen: '2026-02-18T10:00:00.000Z',
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-1',
+        location: 'Test Location',
+        host: {
+          name: 'rediscovery-stream-host',
+          mac: 'AA:BB:CC:DD:EE:88',
+          ip: '192.168.1.188',
+          status: 'asleep' as const,
+          lastSeen: '2026-02-18T10:05:00.000Z',
+          discovered: 1,
+          pingResponsive: 0,
+        },
+      });
+
+      expect(hostUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nodeId: 'test-node-1',
+          host: expect.objectContaining({
+            name: 'rediscovery-stream-host',
+            status: 'asleep',
+          }),
+        })
+      );
+    });
+
+    it('does not emit host-updated on rediscovery when only lastSeen changes', async () => {
+      const hostUpdated = jest.fn();
+      hostAggregator.on('host-updated', hostUpdated);
+
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-1',
+        location: 'Test Location',
+        host: {
+          name: 'rediscovery-lastseen-host',
+          mac: 'AA:BB:CC:DD:EE:89',
+          ip: '192.168.1.189',
+          status: 'awake' as const,
+          lastSeen: '2026-02-18T10:00:00.000Z',
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-1',
+        location: 'Test Location',
+        host: {
+          name: 'rediscovery-lastseen-host',
+          mac: 'AA:BB:CC:DD:EE:89',
+          ip: '192.168.1.189',
+          status: 'awake' as const,
+          lastSeen: '2026-02-18T10:05:00.000Z',
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      expect(hostUpdated).not.toHaveBeenCalled();
+    });
+
     it('should persist host notes/tags metadata', async () => {
       await hostAggregator.onHostDiscovered({
         nodeId: 'test-node-1',

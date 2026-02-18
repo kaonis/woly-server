@@ -396,6 +396,48 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
     );
   }
 
+  private hasMeaningfulHostStateChange(
+    previous: AggregatedHostRow,
+    next: Host,
+    location: string
+  ): boolean {
+    if (previous.name !== next.name) {
+      return true;
+    }
+
+    if (previous.mac !== next.mac) {
+      return true;
+    }
+
+    if (previous.ip !== next.ip) {
+      return true;
+    }
+
+    if (previous.status !== next.status) {
+      return true;
+    }
+
+    if ((previous.discovered ?? 0) !== (next.discovered ?? 1)) {
+      return true;
+    }
+
+    if ((previous.pingResponsive ?? null) !== (next.pingResponsive ?? null)) {
+      return true;
+    }
+
+    if ((previous.notes ?? null) !== (next.notes ?? null)) {
+      return true;
+    }
+
+    if (previous.location !== location) {
+      return true;
+    }
+
+    const previousTags = previous.tags ?? [];
+    const nextTags = next.tags ?? [];
+    return JSON.stringify(previousTags) !== JSON.stringify(nextTags);
+  }
+
   /**
    * Reconcile and update/insert a host using MAC-first reconciliation.
    * Returns true if host was reconciled by MAC or name, false if it's a new host.
@@ -404,7 +446,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
     nodeId: string,
     host: Host,
     location: string
-  ): Promise<{ reconciled: boolean; wasRenamed: boolean }> {
+  ): Promise<{ reconciled: boolean; wasRenamed: boolean; previousHost: AggregatedHostRow | null }> {
     // Reconcile by stable identifier first (MAC). Names can change due to renames or flaky hostname resolution.
     const existingByMac =
       host.mac && typeof host.mac === 'string'
@@ -428,17 +470,17 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
       await this.updateHostRowById(existingByMac.id, nodeId, host, location);
       await this.deleteOtherHostsByNodeAndMac(nodeId, host.mac, existingByMac.id);
 
-      return { reconciled: true, wasRenamed };
+      return { reconciled: true, wasRenamed, previousHost: existingByMac };
     }
 
     // Check if host already exists for this node by name (fallback).
     const existingByName = await this.findHostRowByNodeAndName(nodeId, host.name);
     if (existingByName) {
       await this.updateHostRowById(existingByName.id, nodeId, host, location);
-      return { reconciled: true, wasRenamed: false };
+      return { reconciled: true, wasRenamed: false, previousHost: existingByName };
     }
 
-    return { reconciled: false, wasRenamed: false };
+    return { reconciled: false, wasRenamed: false, previousHost: null };
   }
 
   /**
@@ -450,7 +492,11 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
     const fullyQualifiedName = this.buildFQN(host.name, location, nodeId);
 
     try {
-      const { reconciled, wasRenamed } = await this.reconcileHostByMac(nodeId, host, location);
+      const { reconciled, wasRenamed, previousHost } = await this.reconcileHostByMac(
+        nodeId,
+        host,
+        location
+      );
 
       if (reconciled) {
         const method = wasRenamed ? 'MAC (renamed)' : 'MAC or name';
@@ -463,6 +509,10 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
           newStatus: host.status,
           reconciledBy: method,
         });
+
+        if (previousHost && this.hasMeaningfulHostStateChange(previousHost, host, location)) {
+          this.emit('host-updated', { nodeId, host, fullyQualifiedName });
+        }
         return;
       }
 

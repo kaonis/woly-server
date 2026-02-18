@@ -47,6 +47,7 @@ function createMockSocket(): MockSocket {
 describe('createWebSocketServer', () => {
   const originalMaxConnectionsPerIp = config.wsMaxConnectionsPerIp;
   const originalRequireTls = config.wsRequireTls;
+  const originalTrustProxy = config.trustProxy;
   const mockAuthenticateWsUpgrade = authenticateWsUpgrade as jest.MockedFunction<
     typeof authenticateWsUpgrade
   >;
@@ -62,6 +63,7 @@ describe('createWebSocketServer', () => {
   beforeEach(() => {
     (config as any).wsMaxConnectionsPerIp = 1;
     (config as any).wsRequireTls = false;
+    (config as any).trustProxy = false;
     mockAuthenticateWsUpgrade.mockReturnValue({ kind: 'static-token', token: 'dev-token-home' });
     mockAuthenticateMobileWsUpgrade.mockReturnValue({
       sub: 'operator-mobile',
@@ -81,6 +83,7 @@ describe('createWebSocketServer', () => {
   afterEach(() => {
     (config as any).wsMaxConnectionsPerIp = originalMaxConnectionsPerIp;
     (config as any).wsRequireTls = originalRequireTls;
+    (config as any).trustProxy = originalTrustProxy;
   });
 
   function setupWss() {
@@ -127,14 +130,14 @@ describe('createWebSocketServer', () => {
     const firstSocket = createMockSocket();
     httpServer.emit(
       'upgrade',
-      createUpgradeRequest('10.0.0.8', '203.0.113.1, 198.51.100.2'),
+      createUpgradeRequest('10.0.0.8'),
       firstSocket,
       Buffer.alloc(0)
     );
     firstWs.emit('close');
 
     const secondSocket = createMockSocket();
-    httpServer.emit('upgrade', createUpgradeRequest('10.0.0.99', '203.0.113.1'), secondSocket, Buffer.alloc(0));
+    httpServer.emit('upgrade', createUpgradeRequest('10.0.0.8'), secondSocket, Buffer.alloc(0));
 
     expect(handleUpgradeSpy).toHaveBeenCalledTimes(2);
     expect(nodeManager.handleConnection).toHaveBeenCalledTimes(2);
@@ -198,7 +201,7 @@ describe('createWebSocketServer', () => {
     const nodeSocket = createMockSocket();
     httpServer.emit(
       'upgrade',
-      createUpgradeRequest('10.0.0.11', '203.0.113.77', '/ws/node'),
+      createUpgradeRequest('10.0.0.11', undefined, '/ws/node'),
       nodeSocket,
       Buffer.alloc(0)
     );
@@ -206,7 +209,7 @@ describe('createWebSocketServer', () => {
     const mobileSocket = createMockSocket();
     httpServer.emit(
       'upgrade',
-      createUpgradeRequest('10.0.0.12', '203.0.113.77', '/ws/mobile/hosts'),
+      createUpgradeRequest('10.0.0.11', undefined, '/ws/mobile/hosts'),
       mobileSocket,
       Buffer.alloc(0)
     );
@@ -242,7 +245,35 @@ describe('createWebSocketServer', () => {
     expect(socket.destroy).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores x-forwarded-for when trust proxy is disabled', () => {
+    const { handleUpgradeSpy } = setupWss();
+    const firstWs = new EventEmitter() as unknown as WebSocket;
+    const secondWs = new EventEmitter() as unknown as WebSocket;
+    upgradedSocketsQueue.push(firstWs, secondWs);
+
+    const firstSocket = createMockSocket();
+    httpServer.emit(
+      'upgrade',
+      createUpgradeRequest('10.0.0.50', '198.51.100.50'),
+      firstSocket,
+      Buffer.alloc(0)
+    );
+
+    const secondSocket = createMockSocket();
+    httpServer.emit(
+      'upgrade',
+      createUpgradeRequest('10.0.0.51', '198.51.100.50'),
+      secondSocket,
+      Buffer.alloc(0)
+    );
+
+    expect(handleUpgradeSpy).toHaveBeenCalledTimes(2);
+    expect(secondSocket.write).not.toHaveBeenCalled();
+    expect(secondSocket.destroy).not.toHaveBeenCalled();
+  });
+
   it('uses the first forwarded-for header value when an array is provided', () => {
+    (config as any).trustProxy = true;
     const { handleUpgradeSpy } = setupWss();
     const firstWs = new EventEmitter() as unknown as WebSocket;
     upgradedSocketsQueue.push(firstWs);

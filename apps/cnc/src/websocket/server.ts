@@ -146,19 +146,33 @@ export function createWebSocketServer(
 }
 
 function getClientIp(request: IncomingMessage): string {
-  const forwardedFor = request.headers['x-forwarded-for'];
-  if (typeof forwardedFor === 'string' && forwardedFor.trim().length > 0) {
-    return forwardedFor.split(',')[0].trim();
-  }
+  if (shouldTrustForwardedIpHeaders()) {
+    const forwardedFor = request.headers['x-forwarded-for'];
+    if (typeof forwardedFor === 'string' && forwardedFor.trim().length > 0) {
+      return forwardedFor.split(',')[0].trim();
+    }
 
-  if (Array.isArray(forwardedFor) && forwardedFor.length > 0) {
-    const first = forwardedFor[0]?.trim();
-    if (first) {
-      return first;
+    if (Array.isArray(forwardedFor) && forwardedFor.length > 0) {
+      const first = forwardedFor[0]?.trim();
+      if (first) {
+        return first;
+      }
     }
   }
 
   return request.socket.remoteAddress || 'unknown';
+}
+
+function shouldTrustForwardedIpHeaders(): boolean {
+  if (typeof config.trustProxy === 'boolean') {
+    return config.trustProxy;
+  }
+
+  if (typeof config.trustProxy === 'number') {
+    return Number.isFinite(config.trustProxy) && config.trustProxy > 0;
+  }
+
+  return config.trustProxy.trim().length > 0;
 }
 
 export default createWebSocketServer;
