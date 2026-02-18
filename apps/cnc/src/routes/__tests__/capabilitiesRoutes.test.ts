@@ -97,6 +97,15 @@ describe('Capabilities Routes', () => {
           schedules: expect.objectContaining({ supported: true, persistence: 'backend' }),
           commandStatusStreaming: expect.objectContaining({ supported: false, transport: null }),
         },
+        rateLimits: {
+          strictAuth: expect.objectContaining({ scope: 'ip' }),
+          auth: expect.objectContaining({ scope: 'ip' }),
+          api: expect.objectContaining({ scope: 'ip' }),
+          scheduleSync: expect.objectContaining({ scope: 'ip' }),
+          wsInboundMessages: expect.objectContaining({ scope: 'connection', windowMs: 1000 }),
+          wsConnectionsPerIp: expect.objectContaining({ scope: 'ip', windowMs: null }),
+          macVendorLookup: expect.objectContaining({ scope: 'global', windowMs: 1000 }),
+        },
       });
       expect(response.body.versions.cncApi.toLowerCase()).not.toBe('unknown');
     });

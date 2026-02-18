@@ -47,7 +47,8 @@ function normalizeMac(mac: string): string {
 
 // --- Rate limiting ---
 
-const RATE_LIMIT_MS = 1000; // 1 second between external API calls
+export const MAC_VENDOR_RATE_LIMIT_MS = 1000; // 1 second between external API calls
+export const MAC_VENDOR_RATE_LIMIT_MAX_CALLS = 1;
 let lastRequestTime = 0;
 let requestQueue: Promise<unknown> = Promise.resolve();
 
@@ -80,8 +81,8 @@ export async function lookupMacVendor(mac: string): Promise<MacVendorResponse> {
     // Rate limiting
     const now = Date.now();
     const timeSinceLast = now - lastRequestTime;
-    if (timeSinceLast < RATE_LIMIT_MS) {
-      const waitTime = RATE_LIMIT_MS - timeSinceLast;
+    if (timeSinceLast < MAC_VENDOR_RATE_LIMIT_MS) {
+      const waitTime = MAC_VENDOR_RATE_LIMIT_MS - timeSinceLast;
       logger.debug('Throttling MAC vendor request', { mac, waitTime });
       await new Promise((resolve) => setTimeout(resolve, waitTime));
     }

@@ -1,6 +1,8 @@
 import {
   cncCapabilitiesResponseSchema,
   cncCapabilityDescriptorSchema,
+  cncRateLimitDescriptorSchema,
+  cncRateLimitsSchema,
   createHostWakeScheduleRequestSchema,
   deleteHostWakeScheduleResponseSchema,
   hostPortScanResponseSchema,
@@ -213,6 +215,55 @@ describe('cncCapabilityDescriptorSchema', () => {
   });
 });
 
+describe('cncRateLimitDescriptorSchema', () => {
+  it('accepts rate-limit descriptor with window metadata', () => {
+    expect(
+      cncRateLimitDescriptorSchema.safeParse({
+        maxCalls: 300,
+        windowMs: 900000,
+        scope: 'ip',
+        appliesTo: ['/api/hosts'],
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts concurrent-cap descriptor with null window', () => {
+    expect(
+      cncRateLimitDescriptorSchema.safeParse({
+        maxCalls: 10,
+        windowMs: null,
+        scope: 'ip',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects non-positive maxCalls', () => {
+    expect(
+      cncRateLimitDescriptorSchema.safeParse({
+        maxCalls: 0,
+        windowMs: 1000,
+        scope: 'global',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('cncRateLimitsSchema', () => {
+  it('accepts full CNC rate-limit map', () => {
+    expect(
+      cncRateLimitsSchema.safeParse({
+        strictAuth: { maxCalls: 5, windowMs: 900000, scope: 'ip' },
+        auth: { maxCalls: 10, windowMs: 900000, scope: 'ip' },
+        api: { maxCalls: 300, windowMs: 900000, scope: 'ip' },
+        scheduleSync: { maxCalls: 3000, windowMs: 900000, scope: 'ip' },
+        wsInboundMessages: { maxCalls: 100, windowMs: 1000, scope: 'connection' },
+        wsConnectionsPerIp: { maxCalls: 10, windowMs: null, scope: 'ip' },
+        macVendorLookup: { maxCalls: 1, windowMs: 1000, scope: 'global' },
+      }).success
+    ).toBe(true);
+  });
+});
+
 describe('cncCapabilitiesResponseSchema', () => {
   const capability = { supported: true };
 
@@ -229,6 +280,15 @@ describe('cncCapabilitiesResponseSchema', () => {
           notesTags: capability,
           schedules: { supported: false },
           commandStatusStreaming: { supported: false, transport: null },
+        },
+        rateLimits: {
+          strictAuth: { maxCalls: 5, windowMs: 900000, scope: 'ip' },
+          auth: { maxCalls: 10, windowMs: 900000, scope: 'ip' },
+          api: { maxCalls: 300, windowMs: 900000, scope: 'ip' },
+          scheduleSync: { maxCalls: 3000, windowMs: 900000, scope: 'ip' },
+          wsInboundMessages: { maxCalls: 100, windowMs: 1000, scope: 'connection' },
+          wsConnectionsPerIp: { maxCalls: 10, windowMs: null, scope: 'ip' },
+          macVendorLookup: { maxCalls: 1, windowMs: 1000, scope: 'global' },
         },
       }).success
     ).toBe(true);

@@ -31,6 +31,18 @@ describe('buildCncCapabilitiesResponse', () => {
     expect(payload.versions.cncApi).toEqual(expect.any(String));
     expect(payload.versions.cncApi.trim().length).toBeGreaterThan(0);
     expect(payload.versions.protocol).toBe(PROTOCOL_VERSION);
+    expect(payload.rateLimits).toMatchObject({
+      strictAuth: expect.objectContaining({ maxCalls: expect.any(Number), windowMs: expect.any(Number) }),
+      auth: expect.objectContaining({ maxCalls: expect.any(Number), windowMs: expect.any(Number) }),
+      api: expect.objectContaining({ maxCalls: expect.any(Number), windowMs: expect.any(Number) }),
+      scheduleSync: expect.objectContaining({ maxCalls: expect.any(Number), windowMs: expect.any(Number) }),
+      wsInboundMessages: expect.objectContaining({
+        maxCalls: expect.any(Number),
+        windowMs: 1000,
+      }),
+      wsConnectionsPerIp: expect.objectContaining({ maxCalls: expect.any(Number), windowMs: null }),
+      macVendorLookup: expect.objectContaining({ maxCalls: 1, windowMs: 1000 }),
+    });
     expect(cncCapabilitiesResponseSchema.safeParse(payload).success).toBe(true);
   });
 

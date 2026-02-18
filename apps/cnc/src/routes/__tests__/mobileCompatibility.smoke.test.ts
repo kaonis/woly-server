@@ -433,6 +433,15 @@ describe('Mobile API compatibility smoke checks', () => {
           schedules: { supported: true, persistence: 'backend' },
           commandStatusStreaming: { supported: false, transport: null },
         },
+        rateLimits: {
+          strictAuth: { scope: 'ip' },
+          auth: { scope: 'ip' },
+          api: { scope: 'ip' },
+          scheduleSync: { scope: 'ip' },
+          wsInboundMessages: { scope: 'connection', windowMs: 1000 },
+          wsConnectionsPerIp: { scope: 'ip', windowMs: null },
+          macVendorLookup: { scope: 'global', windowMs: 1000 },
+        },
       });
     });
 

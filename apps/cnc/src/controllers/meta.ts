@@ -7,6 +7,7 @@ import { PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from '@kaonis/woly-prot
 import { CncCapabilitiesResponse } from '../types';
 import { CNC_VERSION } from '../utils/cncVersion';
 import logger from '../utils/logger';
+import { buildCncRateLimits } from '../services/capabilityRateLimits';
 
 const FALLBACK_CNC_API_VERSION = '0.0.0';
 const FALLBACK_PROTOCOL_VERSION = (() => {
@@ -80,6 +81,7 @@ export function buildCncCapabilitiesResponse(
       protocol,
     },
     capabilities: capabilityMatrix,
+    rateLimits: buildCncRateLimits(),
   };
 }
 
