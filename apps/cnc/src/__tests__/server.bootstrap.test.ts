@@ -13,6 +13,7 @@ jest.mock('../config', () => ({
     scheduleWorkerEnabled: true,
     schedulePollIntervalMs: 1000,
     scheduleBatchSize: 10,
+    enabledPlugins: ['webhook'],
   },
 }));
 
@@ -81,10 +82,17 @@ jest.mock('../services/wakeScheduleWorker', () => ({
   stopWakeScheduleWorker: jest.fn(),
 }));
 
-jest.mock('../services/webhookDispatcher', () => ({
-  WebhookDispatcher: jest.fn().mockImplementation(() => ({
+jest.mock('../services/pluginEventBridge', () => ({
+  PluginEventBridge: jest.fn().mockImplementation(() => ({
     start: jest.fn(),
     shutdown: jest.fn(),
+  })),
+}));
+
+jest.mock('../services/plugins/pluginManager', () => ({
+  PluginManager: jest.fn().mockImplementation(() => ({
+    start: jest.fn().mockResolvedValue(undefined),
+    shutdown: jest.fn().mockResolvedValue(undefined),
   })),
 }));
 
@@ -131,7 +139,8 @@ import {
   stopHostStatusHistoryPruning,
 } from '../services/hostStatusHistoryRetention';
 import { startWakeScheduleWorker, stopWakeScheduleWorker } from '../services/wakeScheduleWorker';
-import { WebhookDispatcher } from '../services/webhookDispatcher';
+import { PluginEventBridge } from '../services/pluginEventBridge';
+import { PluginManager } from '../services/plugins/pluginManager';
 import { prometheusContentType, renderPrometheusMetrics } from '../services/promMetrics';
 
 describe('server bootstrap and wiring', () => {
@@ -258,10 +267,14 @@ describe('server bootstrap and wiring', () => {
         batchSize: 10,
       }),
     );
-    const dispatcherInstance = (WebhookDispatcher as jest.Mock).mock.results[0]?.value as {
+    const pluginManagerInstance = (PluginManager as jest.Mock).mock.results[0]?.value as {
       start: jest.Mock;
     };
-    expect(dispatcherInstance.start).toHaveBeenCalledTimes(1);
+    const pluginEventBridgeInstance = (PluginEventBridge as jest.Mock).mock.results[0]?.value as {
+      start: jest.Mock;
+    };
+    expect(pluginManagerInstance.start).toHaveBeenCalledTimes(1);
+    expect(pluginEventBridgeInstance.start).toHaveBeenCalledTimes(1);
     expect(listenSpy).toHaveBeenCalledWith(8080, expect.any(Function));
     expect(setupGracefulShutdownSpy).toHaveBeenCalledTimes(1);
   });
@@ -298,9 +311,12 @@ describe('server bootstrap and wiring', () => {
     const hostStateStreamBroker = (
       server as unknown as { hostStateStreamBroker: { shutdown: jest.Mock } }
     ).hostStateStreamBroker;
-    const webhookDispatcher = (
-      server as unknown as { webhookDispatcher: { shutdown: jest.Mock } }
-    ).webhookDispatcher;
+    const pluginEventBridge = (
+      server as unknown as { pluginEventBridge: { shutdown: jest.Mock } }
+    ).pluginEventBridge;
+    const pluginManager = (
+      server as unknown as { pluginManager: { shutdown: jest.Mock } }
+    ).pluginManager;
     const exitSpy = jest.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
 
     (server as unknown as { setupGracefulShutdown: () => void }).setupGracefulShutdown();
@@ -313,7 +329,8 @@ describe('server bootstrap and wiring', () => {
     expect(stopWakeScheduleWorker).toHaveBeenCalledTimes(1);
     expect(nodeManager.shutdown).toHaveBeenCalledTimes(1);
     expect(hostStateStreamBroker.shutdown).toHaveBeenCalledTimes(1);
-    expect(webhookDispatcher.shutdown).toHaveBeenCalledTimes(1);
+    expect(pluginEventBridge.shutdown).toHaveBeenCalledTimes(1);
+    expect(pluginManager.shutdown).toHaveBeenCalledTimes(1);
     expect(mockedDb.close).toHaveBeenCalledTimes(1);
     expect(exitSpy).toHaveBeenCalledWith(0);
     exitSpy.mockRestore();

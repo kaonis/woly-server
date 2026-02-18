@@ -129,6 +129,10 @@ export const config: ServerConfig = {
   scheduleWorkerEnabled: getEnvBoolean('SCHEDULE_WORKER_ENABLED', true),
   schedulePollIntervalMs: getEnvNumber('SCHEDULE_POLL_INTERVAL_MS', 60000),
   scheduleBatchSize: getEnvNumber('SCHEDULE_BATCH_SIZE', 25),
+  enabledPlugins: getEnvVarOptional('CNC_PLUGINS', 'webhook')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean),
   webhookRetryBaseDelayMs: getEnvNumber('WEBHOOK_RETRY_BASE_DELAY_MS', 1000),
   webhookDeliveryTimeoutMs: getEnvNumber('WEBHOOK_DELIVERY_TIMEOUT_MS', 5000),
   logLevel: getEnvVar('LOG_LEVEL', 'info'),

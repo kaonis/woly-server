@@ -216,6 +216,7 @@ export interface ServerConfig {
   scheduleWorkerEnabled: boolean;
   schedulePollIntervalMs: number;
   scheduleBatchSize: number;
+  enabledPlugins: string[];
   webhookRetryBaseDelayMs: number;
   webhookDeliveryTimeoutMs: number;
   logLevel: string;

@@ -1,4 +1,3 @@
-import { EventEmitter } from 'events';
 import { WebhookDispatcher } from '../webhookDispatcher';
 import WebhookModel from '../../models/Webhook';
 
@@ -28,45 +27,28 @@ describe('WebhookDispatcher', () => {
     jest.useRealTimers();
   });
 
-  it('maps host status transitions to host.awake/host.asleep webhook events', async () => {
-    const hostAggregator = new EventEmitter();
-    const nodeManager = new EventEmitter();
+  it('skips delivery when no webhook targets are configured for event', async () => {
+    const fetchMock = jest.fn() as unknown as typeof fetch;
+    mockedWebhookModel.listTargetsByEvent.mockResolvedValue([] as never);
 
-    const dispatcher = new WebhookDispatcher(hostAggregator as never, nodeManager as never, {
-      fetchImpl: jest.fn() as unknown as typeof fetch,
+    const dispatcher = new WebhookDispatcher({
+      fetchImpl: fetchMock,
       retryBaseDelayMs: 10,
       deliveryTimeoutMs: 1000,
     });
 
-    const dispatchSpy = jest
-      .spyOn(dispatcher as unknown as { dispatch: (...args: unknown[]) => Promise<void> }, 'dispatch')
-      .mockResolvedValue(undefined);
-
-    dispatcher.start();
-
-    hostAggregator.emit('host-status-transition', {
+    await dispatcher.dispatchEvent('host.awake', {
       hostFqn: 'desktop@home-node',
       oldStatus: 'asleep',
       newStatus: 'awake',
       changedAt: '2026-02-18T20:00:00.000Z',
     });
 
-    expect(dispatchSpy).toHaveBeenCalledWith(
-      'host.awake',
-      expect.objectContaining({
-        hostFqn: 'desktop@home-node',
-        oldStatus: 'asleep',
-        newStatus: 'awake',
-      }),
-    );
-
-    dispatcher.shutdown();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockedWebhookModel.recordDelivery).not.toHaveBeenCalled();
   });
 
   it('delivers webhook payloads with HMAC signature and logs success', async () => {
-    const hostAggregator = new EventEmitter();
-    const nodeManager = new EventEmitter();
-
     const fetchMock = jest.fn(async () => ({
       ok: true,
       status: 204,
@@ -81,15 +63,13 @@ describe('WebhookDispatcher', () => {
       },
     ] as never);
 
-    const dispatcher = new WebhookDispatcher(hostAggregator as never, nodeManager as never, {
+    const dispatcher = new WebhookDispatcher({
       fetchImpl: fetchMock,
       retryBaseDelayMs: 10,
       deliveryTimeoutMs: 1000,
     });
 
-    await (dispatcher as unknown as {
-      dispatch: (eventType: string, data: Record<string, unknown>) => Promise<void>;
-    }).dispatch('host.awake', {
+    await dispatcher.dispatchEvent('host.awake', {
       hostFqn: 'desktop@home-node',
       oldStatus: 'asleep',
       newStatus: 'awake',
@@ -122,9 +102,6 @@ describe('WebhookDispatcher', () => {
   it('retries failed deliveries with exponential backoff up to success', async () => {
     jest.useFakeTimers();
 
-    const hostAggregator = new EventEmitter();
-    const nodeManager = new EventEmitter();
-
     const fetchMock = jest
       .fn()
       .mockResolvedValueOnce({ ok: false, status: 503 })
@@ -139,15 +116,13 @@ describe('WebhookDispatcher', () => {
       },
     ] as never);
 
-    const dispatcher = new WebhookDispatcher(hostAggregator as never, nodeManager as never, {
+    const dispatcher = new WebhookDispatcher({
       fetchImpl: fetchMock,
       retryBaseDelayMs: 25,
       deliveryTimeoutMs: 1000,
     });
 
-    await (dispatcher as unknown as {
-      dispatch: (eventType: string, data: Record<string, unknown>) => Promise<void>;
-    }).dispatch('scan.complete', {
+    await dispatcher.dispatchEvent('scan.complete', {
       nodeId: 'node-1',
       hostCount: 3,
     });

@@ -50,6 +50,7 @@ describe('config parsing and validation', () => {
       SCHEDULE_WORKER_ENABLED: 'false',
       SCHEDULE_POLL_INTERVAL_MS: '45000',
       SCHEDULE_BATCH_SIZE: '10',
+      CNC_PLUGINS: 'webhook, custom-plugin,',
       WEBHOOK_RETRY_BASE_DELAY_MS: '2000',
       WEBHOOK_DELIVERY_TIMEOUT_MS: '8000',
       OFFLINE_COMMAND_TTL_MS: '120000',
@@ -64,6 +65,7 @@ describe('config parsing and validation', () => {
     expect(config.scheduleWorkerEnabled).toBe(false);
     expect(config.schedulePollIntervalMs).toBe(45000);
     expect(config.scheduleBatchSize).toBe(10);
+    expect(config.enabledPlugins).toEqual(['webhook', 'custom-plugin']);
     expect(config.webhookRetryBaseDelayMs).toBe(2000);
     expect(config.webhookDeliveryTimeoutMs).toBe(8000);
     expect(config.offlineCommandTtlMs).toBe(120000);
