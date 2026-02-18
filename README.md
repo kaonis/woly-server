@@ -255,6 +255,7 @@ Manual operations and rollback criteria are documented in:
 - [docs/CI_MANUAL_OPERATIONS.md](docs/CI_MANUAL_OPERATIONS.md)
 - [docs/CI_MANUAL_REVIEW_LOG.md](docs/CI_MANUAL_REVIEW_LOG.md)
 - [docs/CROSS_SERVICE_E2E_SMOKE.md](docs/CROSS_SERVICE_E2E_SMOKE.md)
+- [docs/ESLINT_WARNING_RATCHET.md](docs/ESLINT_WARNING_RATCHET.md)
 
 Main workflow definition:
 
