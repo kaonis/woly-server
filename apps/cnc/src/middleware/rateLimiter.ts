@@ -57,8 +57,9 @@ function isHealthEndpoint(path: string): boolean {
 }
 
 function isHostScheduleRoute(req: Request): boolean {
-  const path = req.originalUrl || req.path || '';
-  return /\/api\/hosts\/(?:[^/]+\/schedules|schedules\/[^/]+)\/?$/.test(path);
+  const rawPath = req.originalUrl || req.path || '';
+  const path = rawPath.split('?')[0];
+  return /\/api\/(?:hosts\/(?:[^/]+\/schedules|schedules\/[^/]+)|schedules(?:\/[^/]+)?)\/?$/.test(path);
 }
 
 /**

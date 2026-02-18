@@ -45,6 +45,8 @@ jest.mock('../../models/Node', () => ({
 jest.mock('../../models/HostSchedule', () => ({
   __esModule: true,
   default: {
+    listAll: jest.fn(),
+    findById: jest.fn(),
     listByHostFqn: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
@@ -67,6 +69,36 @@ describe('Mobile API compatibility smoke checks', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedHostScheduleModel.listAll.mockResolvedValue([
+      {
+        id: 'schedule-1',
+        hostFqn: 'Office-Mac@Home',
+        hostName: 'Office-Mac',
+        hostMac: '00:11:22:33:44:55',
+        scheduledTime: '2026-02-16T09:00:00.000Z',
+        frequency: 'daily',
+        enabled: true,
+        notifyOnWake: true,
+        timezone: 'UTC',
+        createdAt: '2026-02-15T00:00:00.000Z',
+        updatedAt: '2026-02-15T00:00:00.000Z',
+        nextTrigger: '2026-02-16T09:00:00.000Z',
+      },
+    ]);
+    mockedHostScheduleModel.findById.mockResolvedValue({
+      id: 'schedule-1',
+      hostFqn: 'Office-Mac@Home',
+      hostName: 'Office-Mac',
+      hostMac: '00:11:22:33:44:55',
+      scheduledTime: '2026-02-16T09:00:00.000Z',
+      frequency: 'daily',
+      enabled: true,
+      notifyOnWake: true,
+      timezone: 'UTC',
+      createdAt: '2026-02-15T00:00:00.000Z',
+      updatedAt: '2026-02-15T00:00:00.000Z',
+      nextTrigger: '2026-02-16T09:00:00.000Z',
+    });
     mockedHostScheduleModel.listByHostFqn.mockResolvedValue([
       {
         id: 'schedule-1',
@@ -236,6 +268,7 @@ describe('Mobile API compatibility smoke checks', () => {
         .set('Authorization', `Bearer ${operatorJwt}`);
 
       expect(response.status).toBe(200);
+      expect(typeof response.headers.etag).toBe('string');
       expect(Array.isArray(response.body.hosts)).toBe(true);
       expect(response.body.hosts[0]).toMatchObject({
         name: 'Office-Mac',
@@ -244,6 +277,23 @@ describe('Mobile API compatibility smoke checks', () => {
         status: 'awake',
         fullyQualifiedName: 'Office-Mac@Home',
       });
+    });
+
+    it('returns 304 for hosts when If-None-Match matches ETag', async () => {
+      const first = await request(app)
+        .get('/api/hosts')
+        .set('Authorization', `Bearer ${operatorJwt}`);
+
+      expect(first.status).toBe(200);
+      expect(typeof first.headers.etag).toBe('string');
+
+      const cached = await request(app)
+        .get('/api/hosts')
+        .set('Authorization', `Bearer ${operatorJwt}`)
+        .set('If-None-Match', first.headers.etag as string);
+
+      expect(cached.status).toBe(304);
+      expect(cached.text).toBe('');
     });
 
     it('returns auth error envelope when JWT is missing', async () => {
@@ -476,6 +526,34 @@ describe('Mobile API compatibility smoke checks', () => {
       expect(parsed.success).toBe(true);
     });
 
+    it('returns aggregated schedule payload from /api/schedules', async () => {
+      const response = await request(app)
+        .get('/api/schedules')
+        .set('Authorization', `Bearer ${operatorJwt}`);
+
+      expect(response.status).toBe(200);
+      expect(typeof response.headers.etag).toBe('string');
+      const parsed = hostSchedulesResponseSchema.safeParse(response.body);
+      expect(parsed.success).toBe(true);
+    });
+
+    it('returns 304 for /api/schedules when If-None-Match matches ETag', async () => {
+      const first = await request(app)
+        .get('/api/schedules')
+        .set('Authorization', `Bearer ${operatorJwt}`);
+
+      expect(first.status).toBe(200);
+      expect(typeof first.headers.etag).toBe('string');
+
+      const cached = await request(app)
+        .get('/api/schedules')
+        .set('Authorization', `Bearer ${operatorJwt}`)
+        .set('If-None-Match', first.headers.etag as string);
+
+      expect(cached.status).toBe(304);
+      expect(cached.text).toBe('');
+    });
+
     it('accepts create payload compatible with protocol request schema', async () => {
       const payload = createHostWakeScheduleRequestSchema.parse({
         scheduledTime: '2026-02-17T09:00:00.000Z',
@@ -522,6 +600,16 @@ describe('Mobile API compatibility smoke checks', () => {
 
     it('returns auth error envelope when JWT is missing', async () => {
       const response = await request(app).get('/api/hosts/Office-Mac%40Home/schedules');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns auth error envelope for /api/schedules when JWT is missing', async () => {
+      const response = await request(app).get('/api/schedules');
 
       expect(response.status).toBe(401);
       expect(response.body).toMatchObject({

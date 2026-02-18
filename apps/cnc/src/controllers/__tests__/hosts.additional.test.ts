@@ -13,8 +13,10 @@ jest.mock('../../utils/logger', () => ({
 
 function createMockResponse(): Response {
   const res = {} as Response;
+  res.setHeader = jest.fn().mockReturnValue(res);
   res.status = jest.fn().mockReturnValue(res);
   res.json = jest.fn().mockReturnValue(res);
+  res.end = jest.fn().mockReturnValue(res);
   return res;
 }
 
@@ -31,7 +33,7 @@ function createMockRequest(options?: {
     query: options?.query ?? {},
     body: options?.body ?? {},
     correlationId: options?.correlationId,
-    header: jest.fn((name: string) => headers[name]),
+    header: jest.fn((name: string) => headers[name] ?? headers[name.toLowerCase()]),
   } as unknown as Request;
 }
 
@@ -122,6 +124,29 @@ describe('HostsController additional branches', () => {
         error: 'Internal Server Error',
         message: 'Failed to retrieve hosts',
       });
+    });
+
+    it('returns 304 when If-None-Match matches current hosts payload etag', async () => {
+      hostAggregator.getAllHosts.mockResolvedValue([{ name: 'host-c' }]);
+      hostAggregator.getStats.mockResolvedValue({ total: 1, awake: 1, asleep: 0, byLocation: {} });
+
+      const initialReq = createMockRequest();
+      const initialRes = createMockResponse();
+      await controller.getHosts(initialReq, initialRes);
+
+      const etagCall = (initialRes.setHeader as jest.Mock).mock.calls.find(
+        (call) => call[0] === 'ETag',
+      );
+      expect(etagCall).toBeDefined();
+      const etag = etagCall?.[1];
+
+      const cachedReq = createMockRequest({ headers: { 'if-none-match': etag } });
+      const cachedRes = createMockResponse();
+      await controller.getHosts(cachedReq, cachedRes);
+
+      expect(cachedRes.status).toHaveBeenCalledWith(304);
+      expect(cachedRes.end).toHaveBeenCalled();
+      expect(cachedRes.json).not.toHaveBeenCalled();
     });
   });
 

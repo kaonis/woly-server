@@ -9,6 +9,7 @@ import { hostStatusSchema } from '@kaonis/woly-protocol';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
 import { lookupMacVendor, MAC_ADDRESS_PATTERN } from '../services/macVendorService';
+import { createJsonEtag, isIfNoneMatchSatisfied } from '../utils/httpCache';
 import logger from '../utils/logger';
 
 // Validation schema for updateHost request body
@@ -211,6 +212,8 @@ export class HostsController {
    *                     $ref: '#/components/schemas/Host'
    *                 stats:
    *                   $ref: '#/components/schemas/HostStats'
+   *       304:
+   *         description: Not Modified (If-None-Match matched current ETag)
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
    *       500:
@@ -230,11 +233,19 @@ export class HostsController {
       }
 
       const stats = await this.hostAggregator.getStats();
-
-      res.json({
+      const payload = {
         hosts,
         stats,
-      });
+      };
+      const etag = createJsonEtag(payload);
+      res.setHeader('ETag', etag);
+
+      if (isIfNoneMatchSatisfied(req.header('if-none-match'), etag)) {
+        res.status(304).end();
+        return;
+      }
+
+      res.json(payload);
     } catch (error) {
       logger.error('Failed to get hosts', { ...toLogError(error) });
       res.status(500).json({

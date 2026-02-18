@@ -207,6 +207,29 @@ export class HostScheduleModel {
     }
   }
 
+  static async listAll(options: { enabled?: boolean } = {}): Promise<HostWakeSchedule[]> {
+    await this.ensureTable();
+
+    if (options.enabled === undefined) {
+      const result = await db.query<HostScheduleRow>(
+        `SELECT *
+         FROM host_wake_schedules
+         ORDER BY created_at DESC`,
+      );
+      return result.rows.map(mapRow);
+    }
+
+    const result = await db.query<HostScheduleRow>(
+      `SELECT *
+       FROM host_wake_schedules
+       WHERE enabled = $1
+       ORDER BY created_at DESC`,
+      [isSqlite ? (options.enabled ? 1 : 0) : options.enabled],
+    );
+
+    return result.rows.map(mapRow);
+  }
+
   static async listByHostFqn(hostFqn: string): Promise<HostWakeSchedule[]> {
     await this.ensureTable();
     const result = await db.query<HostScheduleRow>(

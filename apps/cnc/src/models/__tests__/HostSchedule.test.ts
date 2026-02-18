@@ -155,6 +155,39 @@ describe('HostScheduleModel', () => {
     expect(found?.notifyOnWake).toBe(true);
   });
 
+  it('lists all schedules and supports enabled filtering', async () => {
+    const enabled = await HostScheduleModel.create({
+      hostFqn: 'enabled@dc',
+      hostName: 'enabled',
+      hostMac: '80:81:82:83:84:85',
+      scheduledTime: '2026-02-20T08:00:00.000Z',
+      frequency: 'daily',
+      enabled: true,
+      notifyOnWake: true,
+      timezone: 'UTC',
+    });
+    const disabled = await HostScheduleModel.create({
+      hostFqn: 'disabled@dc',
+      hostName: 'disabled',
+      hostMac: '90:91:92:93:94:95',
+      scheduledTime: '2026-02-20T08:00:00.000Z',
+      frequency: 'daily',
+      enabled: false,
+      notifyOnWake: true,
+      timezone: 'UTC',
+    });
+
+    const all = await HostScheduleModel.listAll();
+    const onlyEnabled = await HostScheduleModel.listAll({ enabled: true });
+    const onlyDisabled = await HostScheduleModel.listAll({ enabled: false });
+
+    expect(all.map((schedule) => schedule.id)).toEqual(expect.arrayContaining([enabled.id, disabled.id]));
+    expect(onlyEnabled).toHaveLength(1);
+    expect(onlyEnabled[0].id).toBe(enabled.id);
+    expect(onlyDisabled).toHaveLength(1);
+    expect(onlyDisabled[0].id).toBe(disabled.id);
+  });
+
   it('returns null when findById does not exist', async () => {
     const schedule = await HostScheduleModel.findById('missing-id');
     expect(schedule).toBeNull();

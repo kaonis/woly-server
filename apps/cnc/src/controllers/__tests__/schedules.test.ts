@@ -6,6 +6,8 @@ import HostScheduleModel from '../../models/HostSchedule';
 jest.mock('../../models/HostSchedule', () => ({
   __esModule: true,
   default: {
+    listAll: jest.fn(),
+    findById: jest.fn(),
     listByHostFqn: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
@@ -25,18 +27,25 @@ jest.mock('../../utils/logger', () => ({
 
 function createMockResponse(): Response {
   const res = {} as Response;
+  res.setHeader = jest.fn().mockReturnValue(res);
   res.status = jest.fn().mockReturnValue(res);
   res.json = jest.fn().mockReturnValue(res);
+  res.end = jest.fn().mockReturnValue(res);
   return res;
 }
 
 function createMockRequest(options?: {
   params?: Record<string, string>;
+  query?: Record<string, unknown>;
   body?: Record<string, unknown>;
+  headers?: Record<string, string | undefined>;
 }): Request {
+  const headers = options?.headers ?? {};
   return {
     params: options?.params ?? {},
+    query: options?.query ?? {},
     body: options?.body ?? {},
+    header: jest.fn((name: string) => headers[name] ?? headers[name.toLowerCase()]),
   } as unknown as Request;
 }
 
@@ -62,6 +71,7 @@ describe('SchedulesController', () => {
 
   let hostAggregator: {
     getHostByFQN: jest.Mock;
+    getHostsByNode: jest.Mock;
   };
   let controller: SchedulesController;
 
@@ -69,8 +79,127 @@ describe('SchedulesController', () => {
     jest.clearAllMocks();
     hostAggregator = {
       getHostByFQN: jest.fn(),
+      getHostsByNode: jest.fn(),
     };
     controller = new SchedulesController(hostAggregator as unknown as never);
+  });
+
+  describe('listSchedules', () => {
+    it('returns all schedules by default', async () => {
+      mockedHostScheduleModel.listAll.mockResolvedValue([sampleSchedule()]);
+      const req = createMockRequest();
+      const res = createMockResponse();
+
+      await controller.listSchedules(req, res);
+
+      expect(mockedHostScheduleModel.listAll).toHaveBeenCalledWith({});
+      expect(res.setHeader).toHaveBeenCalledWith('ETag', expect.any(String));
+      expect(res.json).toHaveBeenCalledWith({
+        schedules: [sampleSchedule()],
+      });
+    });
+
+    it('supports enabled query filtering', async () => {
+      mockedHostScheduleModel.listAll.mockResolvedValue([sampleSchedule()]);
+      const req = createMockRequest({ query: { enabled: 'true' } });
+      const res = createMockResponse();
+
+      await controller.listSchedules(req, res);
+
+      expect(mockedHostScheduleModel.listAll).toHaveBeenCalledWith({ enabled: true });
+    });
+
+    it('supports nodeId filtering via host lookup', async () => {
+      mockedHostScheduleModel.listAll.mockResolvedValue([
+        sampleSchedule({ id: 'schedule-1', hostFqn: 'office@home' }),
+        sampleSchedule({ id: 'schedule-2', hostFqn: 'lab@home' }),
+      ]);
+      hostAggregator.getHostsByNode.mockResolvedValue([
+        { fullyQualifiedName: 'office@home' },
+      ]);
+      const req = createMockRequest({ query: { nodeId: 'node-1' } });
+      const res = createMockResponse();
+
+      await controller.listSchedules(req, res);
+
+      expect(hostAggregator.getHostsByNode).toHaveBeenCalledWith('node-1');
+      expect(res.json).toHaveBeenCalledWith({
+        schedules: [sampleSchedule({ id: 'schedule-1', hostFqn: 'office@home' })],
+      });
+    });
+
+    it('returns 400 for invalid enabled query values', async () => {
+      const req = createMockRequest({ query: { enabled: 'invalid' } });
+      const res = createMockResponse();
+
+      await controller.listSchedules(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Bad Request',
+        message: 'Invalid enabled query. Use enabled=true or enabled=false',
+      });
+      expect(mockedHostScheduleModel.listAll).not.toHaveBeenCalled();
+    });
+
+    it('returns 304 when If-None-Match matches current schedule payload etag', async () => {
+      mockedHostScheduleModel.listAll.mockResolvedValue([sampleSchedule()]);
+
+      const initialReq = createMockRequest();
+      const initialRes = createMockResponse();
+      await controller.listSchedules(initialReq, initialRes);
+      const etagCall = (initialRes.setHeader as jest.Mock).mock.calls.find((call) => call[0] === 'ETag');
+      expect(etagCall).toBeDefined();
+      const etag = etagCall?.[1];
+
+      const cachedReq = createMockRequest({ headers: { 'if-none-match': etag } });
+      const cachedRes = createMockResponse();
+      await controller.listSchedules(cachedReq, cachedRes);
+
+      expect(cachedRes.status).toHaveBeenCalledWith(304);
+      expect(cachedRes.end).toHaveBeenCalled();
+      expect(cachedRes.json).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 when listAll throws', async () => {
+      mockedHostScheduleModel.listAll.mockRejectedValue(new Error('db failure'));
+      const req = createMockRequest();
+      const res = createMockResponse();
+
+      await controller.listSchedules(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Internal Server Error',
+        message: 'Failed to list schedules',
+      });
+    });
+  });
+
+  describe('getSchedule', () => {
+    it('returns 404 when schedule does not exist', async () => {
+      mockedHostScheduleModel.findById.mockResolvedValue(null);
+      const req = createMockRequest({ params: { id: 'missing-id' } });
+      const res = createMockResponse();
+
+      await controller.getSchedule(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Not Found',
+        message: 'Schedule missing-id not found',
+      });
+    });
+
+    it('returns schedule when id exists', async () => {
+      mockedHostScheduleModel.findById.mockResolvedValue(sampleSchedule());
+      const req = createMockRequest({ params: { id: 'schedule-1' } });
+      const res = createMockResponse();
+
+      await controller.getSchedule(req, res);
+
+      expect(res.json).toHaveBeenCalledWith(sampleSchedule());
+    });
   });
 
   describe('listHostSchedules', () => {
