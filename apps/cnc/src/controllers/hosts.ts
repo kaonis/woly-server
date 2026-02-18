@@ -361,8 +361,19 @@ export class HostsController {
           ? idempotencyKeyHeader.trim()
           : null;
 
-      const routeOptions: { idempotencyKey: string | null; correlationId?: string } = {
+      // Parse optional wake verification request from query string or body
+      const verifyParam = req.query.verify ?? (req.body as Record<string, unknown> | undefined)?.verify;
+      const verify = verifyParam === 'true' || verifyParam === true
+        ? { timeoutMs: 120_000, pollIntervalMs: 3_000 }
+        : null;
+
+      const routeOptions: {
+        idempotencyKey: string | null;
+        correlationId?: string;
+        verify?: { timeoutMs: number; pollIntervalMs: number } | null;
+      } = {
         idempotencyKey,
+        verify,
       };
       if (correlationId) {
         routeOptions.correlationId = correlationId;

@@ -55,6 +55,24 @@ export interface NodeRegistration {
 
 export type CommandState = 'queued' | 'sent' | 'acknowledged' | 'failed' | 'timed_out';
 
+// --- Wake verification ---
+
+export type WakeVerificationStatus = 'pending' | 'confirmed' | 'timeout' | 'failed';
+
+export interface WakeVerificationResult {
+  status: WakeVerificationStatus;
+  attempts: number;
+  elapsedMs: number;
+  source?: 'arp' | 'ping';
+  startedAt: string;
+  confirmedAt?: string | null;
+}
+
+export interface WakeVerifyOptions {
+  timeoutMs: number;
+  pollIntervalMs: number;
+}
+
 // --- Error shape ---
 
 export interface ErrorResponse {
@@ -104,6 +122,7 @@ export interface CncCapabilitiesResponse {
     schedules: CncCapabilityDescriptor;
     hostStateStreaming?: CncCapabilityDescriptor;
     commandStatusStreaming: CncCapabilityDescriptor;
+    wakeVerification?: CncCapabilityDescriptor;
   };
   rateLimits?: CncRateLimits;
 }
@@ -200,6 +219,7 @@ export const HOST_STATE_STREAM_MUTATING_EVENT_TYPES = [
   'node.online',
   'node.offline',
   'node.status_changed',
+  'wake.verified',
 ] as const;
 
 export const HOST_STATE_STREAM_NON_MUTATING_EVENT_TYPES = [
@@ -257,6 +277,7 @@ export type NodeMessage =
         error?: string;
         hostPing?: HostPingResult;
         hostPortScan?: HostPortScanResult;
+        wakeVerification?: WakeVerificationResult;
         timestamp: Date;
       };
     };
@@ -271,7 +292,7 @@ export interface RegisteredCommandData {
 
 export type CncCommand =
   | { type: 'registered'; data: RegisteredCommandData }
-  | { type: 'wake'; commandId: string; data: { hostName: string; mac: string } }
+  | { type: 'wake'; commandId: string; data: { hostName: string; mac: string; verify?: WakeVerifyOptions } }
   | { type: 'scan'; commandId: string; data: { immediate: boolean } }
   | {
       type: 'scan-host-ports';
@@ -346,6 +367,22 @@ export const hostPingResultSchema: z.ZodType<HostPingResult> = z.object({
   checkedAt: z.string().min(1),
 });
 
+export const wakeVerificationStatusSchema = z.enum(['pending', 'confirmed', 'timeout', 'failed']);
+
+export const wakeVerificationResultSchema: z.ZodType<WakeVerificationResult> = z.object({
+  status: wakeVerificationStatusSchema,
+  attempts: z.number().int().nonnegative(),
+  elapsedMs: z.number().int().nonnegative(),
+  source: z.enum(['arp', 'ping']).optional(),
+  startedAt: z.string().min(1),
+  confirmedAt: z.string().min(1).nullable().optional(),
+});
+
+export const wakeVerifyOptionsSchema: z.ZodType<WakeVerifyOptions> = z.object({
+  timeoutMs: z.number().int().positive(),
+  pollIntervalMs: z.number().int().positive(),
+});
+
 export const commandStateSchema = z.enum([
   'queued',
   'sent',
@@ -399,6 +436,7 @@ export const cncCapabilitiesResponseSchema: z.ZodType<CncCapabilitiesResponse> =
     schedules: cncCapabilityDescriptorSchema,
     hostStateStreaming: cncCapabilityDescriptorSchema.optional(),
     commandStatusStreaming: cncCapabilityDescriptorSchema,
+    wakeVerification: cncCapabilityDescriptorSchema.optional(),
   }),
   rateLimits: cncRateLimitsSchema.optional(),
 });
@@ -520,6 +558,7 @@ const commandResultPayloadSchema = z.object({
   error: z.string().optional(),
   hostPing: hostPingResultSchema.optional(),
   hostPortScan: hostPortScanResultSchema.optional(),
+  wakeVerification: wakeVerificationResultSchema.optional(),
   timestamp: z.coerce.date(),
 });
 
@@ -593,6 +632,7 @@ export const inboundCncCommandSchema: z.ZodType<CncCommand> = z.discriminatedUni
     data: z.object({
       hostName: z.string().min(1),
       mac: z.string().min(1),
+      verify: wakeVerifyOptionsSchema.optional(),
     }),
   }),
   z.object({

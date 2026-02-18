@@ -6,7 +6,7 @@ import { HostAggregator } from './hostAggregator';
 import logger from '../utils/logger';
 import { CommandModel } from '../models/Command';
 import config from '../config';
-import type { HostStatus } from '@kaonis/woly-protocol';
+import type { HostStatus, WakeVerifyOptions } from '@kaonis/woly-protocol';
 import { runtimeMetrics } from './runtimeMetrics';
 
 type DispatchCommand = Extract<CncCommand, { commandId: string }>;
@@ -60,6 +60,12 @@ export class CommandRouter extends EventEmitter {
     correlationId: string | null;
     commandType: DispatchCommand['type'];
   }>;
+  /**
+   * Maps commandId → FQN for wake commands awaiting async verification.
+   * Populated after the initial wake ack resolves; consumed when the
+   * node-agent sends a follow-up command-result containing wakeVerification data.
+   */
+  private readonly wakeVerificationCommands = new Map<string, string>();
   readonly commandTimeout: number;
   readonly maxRetries: number;
   readonly retryBaseDelayMs: number;
@@ -90,7 +96,11 @@ export class CommandRouter extends EventEmitter {
    */
   async routeWakeCommand(
     fqn: string,
-    options?: { idempotencyKey?: string | null; correlationId?: string | null }
+    options?: {
+      idempotencyKey?: string | null;
+      correlationId?: string | null;
+      verify?: WakeVerifyOptions | null;
+    }
   ): Promise<WakeupResponse> {
     logger.info(`Routing wake command for ${fqn}`);
 
@@ -110,14 +120,16 @@ export class CommandRouter extends EventEmitter {
       throw new Error(`Node ${nodeId} (${location}) is offline`);
     }
 
-    // Create command
+    // Create command — include verify options if requested
     const commandId = this.generateCommandId();
+    const verify = options?.verify ?? null;
     const command: DispatchCommand = {
       type: 'wake',
       commandId,
       data: {
         hostName: hostname,
-        mac: host.mac
+        mac: host.mac,
+        ...(verify ? { verify } : {}),
       }
     };
 
@@ -132,13 +144,37 @@ export class CommandRouter extends EventEmitter {
       throw new Error(result.error || 'Wake command failed');
     }
 
-    return {
+    // Track this command for wake verification correlation
+    if (verify) {
+      this.trackWakeVerificationCommand(commandId, fqn);
+    }
+
+    const response: WakeupResponse = {
       success: true,
       message: `Wake-on-LAN packet sent to ${fqn}`,
       nodeId,
       location,
       correlationId: result.correlationId ?? correlationId ?? undefined,
     };
+
+    if (verify) {
+      response.wakeVerification = {
+        status: 'pending',
+        startedAt: new Date().toISOString(),
+      };
+    }
+
+    return response;
+  }
+
+  /**
+   * Track a wake command that is awaiting async verification.
+   * Called after the initial ack resolves so the follow-up command-result
+   * (containing wakeVerification data) can be correlated back to the FQN.
+   */
+  private trackWakeVerificationCommand(commandId: string, fqn: string): void {
+    this.wakeVerificationCommands.set(commandId, fqn);
+    logger.debug('Tracking wake verification command', { commandId, fqn });
   }
 
   /**
@@ -607,6 +643,25 @@ export class CommandRouter extends EventEmitter {
     }
 
     if (!pending) {
+      // Check if this is a follow-up wake verification result
+      const verificationFqn = this.wakeVerificationCommands.get(result.commandId);
+      if (verificationFqn && result.wakeVerification) {
+        this.wakeVerificationCommands.delete(result.commandId);
+        logger.info('Wake verification follow-up received', {
+          commandId: result.commandId,
+          fqn: verificationFqn,
+          status: result.wakeVerification.status,
+          attempts: result.wakeVerification.attempts,
+          elapsedMs: result.wakeVerification.elapsedMs,
+        });
+        this.emit('wake-verification-complete', {
+          commandId: result.commandId,
+          fullyQualifiedName: verificationFqn,
+          wakeVerification: result.wakeVerification,
+        });
+        return;
+      }
+
       logger.warn(`Received result for unknown command: ${result.commandId}`);
       return;
     }
@@ -766,6 +821,7 @@ export class CommandRouter extends EventEmitter {
       }
     }
     this.pendingCommands.clear();
+    this.wakeVerificationCommands.clear();
     this.nodeManager.off('command-result', this.boundHandleCommandResult);
     this.removeAllListeners();
   }

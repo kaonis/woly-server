@@ -254,6 +254,104 @@ describe('CommandRouter', () => {
     });
   });
 
+  describe('wake verification follow-up handling', () => {
+    it('emits wake-verification-complete when follow-up result arrives for tracked command', async () => {
+      const router = commandRouter as unknown as {
+        wakeVerificationCommands: Map<string, string>;
+        handleCommandResult: (result: {
+          commandId: string;
+          success: boolean;
+          timestamp: Date;
+          wakeVerification?: {
+            status: string;
+            attempts: number;
+            elapsedMs: number;
+            source?: string;
+            startedAt: string;
+            confirmedAt?: string | null;
+          };
+        }) => void;
+      };
+
+      // Track a wake verification command
+      router.wakeVerificationCommands.set('cmd-verify-1', 'office-pc@home');
+
+      const eventPromise = new Promise<Record<string, unknown>>((resolve) => {
+        commandRouter.on('wake-verification-complete', (payload) => {
+          resolve(payload as Record<string, unknown>);
+        });
+      });
+
+      // Simulate follow-up verification result arriving
+      router.handleCommandResult({
+        commandId: 'cmd-verify-1',
+        success: true,
+        timestamp: new Date(),
+        wakeVerification: {
+          status: 'confirmed',
+          attempts: 8,
+          elapsedMs: 24000,
+          source: 'ping',
+          startedAt: '2026-02-18T00:00:00.000Z',
+          confirmedAt: '2026-02-18T00:00:24.000Z',
+        },
+      });
+
+      // Wait for the event to be emitted (applyCommandResult is async)
+      await new Promise((r) => setImmediate(r));
+      const payload = await eventPromise;
+
+      expect(payload).toMatchObject({
+        commandId: 'cmd-verify-1',
+        fullyQualifiedName: 'office-pc@home',
+        wakeVerification: {
+          status: 'confirmed',
+          attempts: 8,
+          elapsedMs: 24000,
+          source: 'ping',
+        },
+      });
+
+      // Command should be removed from tracking map
+      expect(router.wakeVerificationCommands.has('cmd-verify-1')).toBe(false);
+    });
+
+    it('does not emit wake-verification-complete for untracked commands', async () => {
+      const router = commandRouter as unknown as {
+        handleCommandResult: (result: {
+          commandId: string;
+          success: boolean;
+          timestamp: Date;
+        }) => void;
+      };
+
+      const listener = jest.fn();
+      commandRouter.on('wake-verification-complete', listener);
+
+      router.handleCommandResult({
+        commandId: 'cmd-unknown',
+        success: true,
+        timestamp: new Date(),
+      });
+
+      await new Promise((r) => setImmediate(r));
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('clears wake verification tracking on cleanup', () => {
+      const router = commandRouter as unknown as {
+        wakeVerificationCommands: Map<string, string>;
+      };
+
+      router.wakeVerificationCommands.set('cmd-a', 'host-a@loc');
+      router.wakeVerificationCommands.set('cmd-b', 'host-b@loc');
+
+      commandRouter.cleanup();
+
+      expect(router.wakeVerificationCommands.size).toBe(0);
+    });
+  });
+
   describe('exponential backoff', () => {
     it('should calculate backoff delay with exponential growth', () => {
       // Access the private method via type assertion for testing

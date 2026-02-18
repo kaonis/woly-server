@@ -1,8 +1,9 @@
 import { EventEmitter } from 'events';
 import { isIP } from 'node:net';
-import type { CommandState } from '@kaonis/woly-protocol';
+import type { CommandState, WakeVerificationResult, WakeVerificationStatus } from '@kaonis/woly-protocol';
 import { cncClient } from './cncClient';
 import { agentConfig, validateAgentConfig } from '../config/agent';
+import { config } from '../config';
 import { logger } from '../utils/logger';
 import { CncCommand, Host, NodeMessage } from '../types';
 import HostDatabase from './hostDatabase';
@@ -30,7 +31,7 @@ type HostEventMessage = Extract<
 type CommandResultMessage = Extract<NodeMessage, { type: 'command-result' }>;
 type CommandResultPayload = Pick<
   CommandResultMessage['data'],
-  'success' | 'message' | 'error' | 'hostPing' | 'hostPortScan'
+  'success' | 'message' | 'error' | 'hostPing' | 'hostPortScan' | 'wakeVerification'
 >;
 
 type ValidatedUpdateHostData = {
@@ -133,6 +134,7 @@ export class AgentService extends EventEmitter {
   private readonly bufferedCommandResults: Map<string, CommandResultMessage> = new Map();
   private hostUpdateDebounceTimer: NodeJS.Timeout | null = null;
   private hostEventFlushTimer: NodeJS.Timeout | null = null;
+  private readonly activeWakeVerifications: Map<string, { timer: NodeJS.Timeout }> = new Map();
 
   constructor() {
     super();
@@ -207,6 +209,7 @@ export class AgentService extends EventEmitter {
     }
 
     logger.info('Stopping agent service');
+    this.cancelAllWakeVerifications();
     this.clearHostEventTimers();
     cncClient.disconnect();
     this.isRunning = false;
@@ -904,9 +907,9 @@ export class AgentService extends EventEmitter {
    */
   private async handleWakeCommand(command: WakeCommand): Promise<void> {
     const { commandId, data } = command;
-    const { hostName, mac } = data;
+    const { hostName, mac, verify } = data;
 
-    logger.info('Received wake command from C&C', { commandId, hostName, mac });
+    logger.info('Received wake command from C&C', { commandId, hostName, mac, verify: !!verify });
 
     await this.executeCommandWithReliability(command, async () => {
       if (!this.hostDb) {
@@ -938,11 +941,174 @@ export class AgentService extends EventEmitter {
 
       logger.info('Wake command completed', { commandId, hostName });
 
+      // If verify options are present, schedule async wake verification (fire-and-forget).
+      const verifyOptions = verify ?? null;
+      if (verifyOptions) {
+        const startedAt = new Date().toISOString();
+        this.scheduleWakeVerification(commandId, hostName, host?.ip ?? null, verifyOptions, startedAt);
+      }
+
+      const wakeVerification: WakeVerificationResult | undefined = verifyOptions
+        ? {
+            status: 'pending',
+            attempts: 0,
+            elapsedMs: 0,
+            startedAt: new Date().toISOString(),
+            confirmedAt: null,
+          }
+        : undefined;
+
       return {
         success: true,
         message: `Wake-on-LAN packet sent to ${host?.name || hostName} (${targetMac})`,
+        wakeVerification,
       };
     });
+  }
+
+  /**
+   * Schedule an async wake verification loop. Runs in the background and sends
+   * a follow-up command-result when the host is confirmed awake or the timeout expires.
+   */
+  private scheduleWakeVerification(
+    commandId: string,
+    hostName: string,
+    hostIp: string | null,
+    options: { timeoutMs: number; pollIntervalMs: number },
+    startedAt: string,
+  ): void {
+    // Prevent duplicate verifications for the same command
+    if (this.activeWakeVerifications.has(commandId)) {
+      logger.warn('Wake verification already in progress', { commandId });
+      return;
+    }
+
+    const timeoutMs = Math.min(
+      Math.max(options.timeoutMs, 1_000),
+      config.wakeVerificationCnc.timeoutMs,
+    );
+    const pollIntervalMs = Math.min(
+      Math.max(options.pollIntervalMs, 500),
+      10_000,
+    );
+
+    logger.info('Starting wake verification', { commandId, hostName, timeoutMs, pollIntervalMs });
+
+    // Use a setTimeout as a safety net to clean up if the loop doesn't finish
+    const safetyTimer = setTimeout(() => {
+      this.activeWakeVerifications.delete(commandId);
+    }, timeoutMs + 5_000);
+
+    this.activeWakeVerifications.set(commandId, { timer: safetyTimer });
+
+    // Fire-and-forget async loop
+    void this.runWakeVerificationLoop(commandId, hostName, hostIp, {
+      timeoutMs,
+      pollIntervalMs,
+      startedAt,
+    }).finally(() => {
+      clearTimeout(safetyTimer);
+      this.activeWakeVerifications.delete(commandId);
+    });
+  }
+
+  /**
+   * Internal polling loop for wake verification.
+   * Checks host status in DB and via ping until confirmed awake or timeout.
+   */
+  private async runWakeVerificationLoop(
+    commandId: string,
+    hostName: string,
+    hostIp: string | null,
+    opts: { timeoutMs: number; pollIntervalMs: number; startedAt: string },
+  ): Promise<void> {
+    const { timeoutMs, pollIntervalMs, startedAt } = opts;
+    const deadline = Date.now() + timeoutMs;
+    let attempts = 0;
+
+    const sendResult = (status: WakeVerificationStatus, source?: 'arp' | 'ping') => {
+      const result: WakeVerificationResult = {
+        status,
+        attempts,
+        elapsedMs: Math.max(0, Date.now() - (Date.now() - timeoutMs + (deadline - Date.now()))),
+        startedAt,
+        confirmedAt: status === 'confirmed' ? new Date().toISOString() : null,
+        source,
+      };
+      // Recalculate elapsedMs correctly
+      result.elapsedMs = Math.max(0, Date.now() + timeoutMs - deadline);
+
+      this.sendCommandResult('wake', commandId, {
+        success: status === 'confirmed',
+        message:
+          status === 'confirmed'
+            ? `Host '${hostName}' confirmed awake via ${source ?? 'unknown'}`
+            : status === 'timeout'
+              ? `Wake verification timed out after ${timeoutMs}ms`
+              : `Wake verification failed`,
+        wakeVerification: result,
+      });
+    };
+
+    while (Date.now() < deadline) {
+      attempts += 1;
+
+      try {
+        // Check 1: Is the host already marked awake in local DB?
+        if (this.hostDb) {
+          const host = await this.hostDb.getHost(hostName);
+          if (host?.status === 'awake') {
+            logger.info('Wake verification confirmed via database', { commandId, hostName, attempts });
+            sendResult('confirmed', 'arp');
+            return;
+          }
+          // Use the host's IP if we didn't have one originally
+          if (!hostIp && host?.ip) {
+            hostIp = host.ip;
+          }
+        }
+
+        // Check 2: Active ping probe
+        if (hostIp) {
+          const alive = await networkDiscovery.isHostAlive(hostIp);
+          if (alive) {
+            logger.info('Wake verification confirmed via ping', { commandId, hostName, hostIp, attempts });
+            sendResult('confirmed', 'ping');
+            return;
+          }
+        }
+      } catch (error) {
+        logger.warn('Wake verification poll error', {
+          commandId,
+          hostName,
+          attempt: attempts,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      // Wait before next poll, but don't overshoot deadline
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        break;
+      }
+      await new Promise<void>((resolve) =>
+        setTimeout(resolve, Math.min(pollIntervalMs, remainingMs)),
+      );
+    }
+
+    logger.info('Wake verification timed out', { commandId, hostName, attempts, timeoutMs });
+    sendResult('timeout');
+  }
+
+  /**
+   * Cancel all active wake verifications. Called during shutdown.
+   */
+  public cancelAllWakeVerifications(): void {
+    for (const [commandId, entry] of this.activeWakeVerifications) {
+      clearTimeout(entry.timer);
+      logger.debug('Cancelled wake verification on shutdown', { commandId });
+    }
+    this.activeWakeVerifications.clear();
   }
 
   /**

@@ -19,6 +19,9 @@ import {
   outboundNodeMessageSchema,
   updateHostWakeScheduleRequestSchema,
   inboundCncCommandSchema,
+  wakeVerificationStatusSchema,
+  wakeVerificationResultSchema,
+  wakeVerifyOptionsSchema,
   PROTOCOL_VERSION,
 } from '../index';
 
@@ -188,6 +191,135 @@ describe('errorResponseSchema', () => {
 });
 
 // ---------------------------------------------------------------------------
+// wakeVerificationStatusSchema / wakeVerificationResultSchema / wakeVerifyOptionsSchema
+// ---------------------------------------------------------------------------
+
+describe('wakeVerificationStatusSchema', () => {
+  it.each(['pending', 'confirmed', 'timeout', 'failed'])('accepts "%s"', (status) => {
+    expect(wakeVerificationStatusSchema.safeParse(status).success).toBe(true);
+  });
+
+  it('rejects unknown verification status', () => {
+    expect(wakeVerificationStatusSchema.safeParse('cancelled').success).toBe(false);
+  });
+
+  it('rejects empty string', () => {
+    expect(wakeVerificationStatusSchema.safeParse('').success).toBe(false);
+  });
+});
+
+describe('wakeVerificationResultSchema', () => {
+  const validResult = {
+    status: 'confirmed',
+    attempts: 8,
+    elapsedMs: 24000,
+    source: 'ping',
+    startedAt: '2026-02-18T00:00:00.000Z',
+    confirmedAt: '2026-02-18T00:00:24.000Z',
+  };
+
+  it('accepts a valid confirmed wake verification result', () => {
+    expect(wakeVerificationResultSchema.safeParse(validResult).success).toBe(true);
+  });
+
+  it('accepts a timeout result with null confirmedAt', () => {
+    expect(
+      wakeVerificationResultSchema.safeParse({
+        ...validResult,
+        status: 'timeout',
+        confirmedAt: null,
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts a pending result without optional fields', () => {
+    expect(
+      wakeVerificationResultSchema.safeParse({
+        status: 'pending',
+        attempts: 0,
+        elapsedMs: 0,
+        startedAt: '2026-02-18T00:00:00.000Z',
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts source "arp"', () => {
+    expect(
+      wakeVerificationResultSchema.safeParse({
+        ...validResult,
+        source: 'arp',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects invalid source value', () => {
+    expect(
+      wakeVerificationResultSchema.safeParse({
+        ...validResult,
+        source: 'icmp',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects negative attempts', () => {
+    expect(
+      wakeVerificationResultSchema.safeParse({
+        ...validResult,
+        attempts: -1,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects negative elapsedMs', () => {
+    expect(
+      wakeVerificationResultSchema.safeParse({
+        ...validResult,
+        elapsedMs: -100,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects missing startedAt', () => {
+    const { startedAt: _, ...noStartedAt } = validResult;
+    expect(wakeVerificationResultSchema.safeParse(noStartedAt).success).toBe(false);
+  });
+});
+
+describe('wakeVerifyOptionsSchema', () => {
+  it('accepts valid verify options', () => {
+    expect(
+      wakeVerifyOptionsSchema.safeParse({
+        timeoutMs: 120000,
+        pollIntervalMs: 3000,
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects non-positive timeoutMs', () => {
+    expect(
+      wakeVerifyOptionsSchema.safeParse({
+        timeoutMs: 0,
+        pollIntervalMs: 3000,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects non-positive pollIntervalMs', () => {
+    expect(
+      wakeVerifyOptionsSchema.safeParse({
+        timeoutMs: 120000,
+        pollIntervalMs: 0,
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects missing fields', () => {
+    expect(wakeVerifyOptionsSchema.safeParse({ timeoutMs: 120000 }).success).toBe(false);
+    expect(wakeVerifyOptionsSchema.safeParse({ pollIntervalMs: 3000 }).success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // cncCapabilityDescriptorSchema / cncCapabilitiesResponseSchema
 // ---------------------------------------------------------------------------
 
@@ -298,6 +430,26 @@ describe('cncCapabilitiesResponseSchema', () => {
     ).toBe(true);
   });
 
+  it('accepts capabilities payload with optional wakeVerification', () => {
+    expect(
+      cncCapabilitiesResponseSchema.safeParse({
+        mode: 'cnc',
+        versions: {
+          cncApi: '1.0.0',
+          protocol: '1.3.0',
+        },
+        capabilities: {
+          scan: capability,
+          notesTags: capability,
+          schedules: capability,
+          hostStateStreaming: { supported: true, transport: 'websocket' },
+          commandStatusStreaming: { supported: false, transport: null },
+          wakeVerification: { supported: true, transport: 'websocket' },
+        },
+      }).success
+    ).toBe(true);
+  });
+
   it('rejects non-cnc mode', () => {
     expect(
       cncCapabilitiesResponseSchema.safeParse({
@@ -367,6 +519,27 @@ describe('hostStateStreamEventSchema', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it('accepts wake.verified as a valid mutating event', () => {
+    const result = hostStateStreamEventSchema.safeParse({
+      type: 'wake.verified',
+      changed: true,
+      timestamp: '2026-02-18T00:00:00.000Z',
+      payload: {
+        commandId: 'cmd-1',
+        fullyQualifiedName: 'office-pc@home',
+        status: 'confirmed',
+        attempts: 8,
+        elapsedMs: 24000,
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('includes wake.verified in HOST_STATE_STREAM_MUTATING_EVENT_TYPES', () => {
+    expect(HOST_STATE_STREAM_MUTATING_EVENT_TYPES).toContain('wake.verified');
   });
 
   it('rejects unknown host-state stream event types', () => {
@@ -801,6 +974,47 @@ describe('outboundNodeMessageSchema', () => {
       expect(outboundNodeMessageSchema.safeParse(msg).success).toBe(true);
     });
 
+    it('accepts command result with wake verification payload', () => {
+      const msg = {
+        type: 'command-result' as const,
+        data: {
+          nodeId: 'node-1',
+          commandId: 'cmd-wake-verify-1',
+          success: true,
+          wakeVerification: {
+            status: 'confirmed',
+            attempts: 8,
+            elapsedMs: 24000,
+            source: 'ping',
+            startedAt: '2026-02-18T00:00:00.000Z',
+            confirmedAt: '2026-02-18T00:00:24.000Z',
+          },
+          timestamp: new Date().toISOString(),
+        },
+      };
+      expect(outboundNodeMessageSchema.safeParse(msg).success).toBe(true);
+    });
+
+    it('accepts command result with timeout wake verification', () => {
+      const msg = {
+        type: 'command-result' as const,
+        data: {
+          nodeId: 'node-1',
+          commandId: 'cmd-wake-verify-2',
+          success: true,
+          wakeVerification: {
+            status: 'timeout',
+            attempts: 40,
+            elapsedMs: 120000,
+            startedAt: '2026-02-18T00:00:00.000Z',
+            confirmedAt: null,
+          },
+          timestamp: new Date().toISOString(),
+        },
+      };
+      expect(outboundNodeMessageSchema.safeParse(msg).success).toBe(true);
+    });
+
     it('rejects command result without commandId', () => {
       const msg = {
         type: 'command-result' as const,
@@ -884,6 +1098,28 @@ describe('inboundCncCommandSchema', () => {
         data: { hostName: 'office-pc', mac: 'AA:BB:CC:DD:EE:FF' },
       };
       expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(false);
+    });
+
+    it('accepts wake command with verify options', () => {
+      const cmd = {
+        type: 'wake' as const,
+        commandId: 'cmd-verify-1',
+        data: {
+          hostName: 'office-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          verify: { timeoutMs: 120000, pollIntervalMs: 3000 },
+        },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
+    });
+
+    it('accepts wake command without verify options (optional)', () => {
+      const cmd = {
+        type: 'wake' as const,
+        commandId: 'cmd-noverify',
+        data: { hostName: 'office-pc', mac: 'AA:BB:CC:DD:EE:FF' },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
     });
   });
 

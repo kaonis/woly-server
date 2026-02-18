@@ -47,6 +47,15 @@ describe('CapabilitiesController', () => {
     });
   });
 
+  it('includes wakeVerification capability in capabilities response', () => {
+    const response = buildCncCapabilitiesResponse();
+    expect(response.capabilities.wakeVerification).toEqual({
+      supported: true,
+      transport: 'websocket',
+      note: expect.any(String),
+    });
+  });
+
   it('falls back and logs warnings when versions are invalid', () => {
     const fallbackProtocol = Array.isArray(SUPPORTED_PROTOCOL_VERSIONS)
       ? (SUPPORTED_PROTOCOL_VERSIONS.find((version) => typeof version === 'string' && version.trim()) ?? '1.0.0')

@@ -13,6 +13,7 @@ import type {
   HostPortScanResponse as ProtocolHostPortScanResponse,
   NodeMetadata as ProtocolNodeMetadata,
   ScheduleFrequency as ProtocolScheduleFrequency,
+  WakeVerificationResult as ProtocolWakeVerificationResult,
 } from '@kaonis/woly-protocol';
 
 // Node Types
@@ -61,6 +62,7 @@ export interface CommandResult {
   error?: string;
   hostPing?: ProtocolHostPingResult;
   hostPortScan?: ProtocolHostPortScanResult;
+  wakeVerification?: ProtocolWakeVerificationResult;
   timestamp: Date;
   correlationId?: string;
 }
@@ -86,6 +88,7 @@ export type HostPingResult = ProtocolHostPingResult;
 export type HostPortScanResponse = ProtocolHostPortScanResponse;
 export type ScheduleFrequency = ProtocolScheduleFrequency;
 export type HostWakeSchedule = ProtocolHostWakeSchedule;
+export type WakeVerificationResult = ProtocolWakeVerificationResult;
 
 export interface HostPingResponse {
   target: string;
@@ -103,6 +106,10 @@ export interface WakeupResponse {
   nodeId: string;
   location: string;
   correlationId?: string;
+  wakeVerification?: {
+    status: 'pending';
+    startedAt: string;
+  };
 }
 
 export interface CommandRecord {

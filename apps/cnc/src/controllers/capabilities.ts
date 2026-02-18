@@ -62,6 +62,11 @@ const capabilityMatrix: CncCapabilitiesResponse['capabilities'] = {
     transport: null,
     note: 'Dedicated frontend-facing stream is planned alongside kaonis/woly#311.',
   },
+  wakeVerification: {
+    supported: true,
+    transport: 'websocket',
+    note: 'Post-WoL verification results stream as wake.verified events on /ws/mobile/hosts. Request with ?verify=true on the wake endpoint.',
+  },
 };
 
 export function buildCncCapabilitiesResponse(
