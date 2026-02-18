@@ -15,7 +15,9 @@
 
 import {
   createHostWakeScheduleRequestSchema,
+  HOST_STATE_STREAM_MUTATING_EVENT_TYPES,
   hostSchedulesResponseSchema,
+  hostStateStreamEventSchema,
   hostWakeScheduleSchema,
   inboundCncCommandSchema,
   outboundNodeMessageSchema,
@@ -324,6 +326,65 @@ describe('Cross-repo protocol contract', () => {
           expect(roundTrip.data.data.hostPortScan?.openPorts).toHaveLength(2);
         }
       });
+    });
+  });
+
+  describe('Mobile host-state stream event encoding/decoding', () => {
+    it('successfully round-trips mutating host-state events', () => {
+      const event = {
+        type: HOST_STATE_STREAM_MUTATING_EVENT_TYPES[0],
+        changed: true as const,
+        timestamp: new Date().toISOString(),
+        payload: {
+          nodeId: 'node-lab-01',
+          hostName: 'workstation-01',
+          status: 'awake',
+        },
+      };
+
+      const result = hostStateStreamEventSchema.safeParse(event);
+      expect(result.success).toBe(true);
+
+      const roundTrip = hostStateStreamEventSchema.safeParse(
+        JSON.parse(JSON.stringify(event)),
+      );
+      expect(roundTrip.success).toBe(true);
+      if (roundTrip.success) {
+        expect(roundTrip.data.changed).toBe(true);
+      }
+    });
+
+    it('successfully round-trips non-mutating connected events without changed flag', () => {
+      const event = {
+        type: 'connected' as const,
+        timestamp: new Date().toISOString(),
+        payload: {
+          subscriber: 'mobile-client',
+        },
+      };
+
+      const result = hostStateStreamEventSchema.safeParse(event);
+      expect(result.success).toBe(true);
+
+      const roundTrip = hostStateStreamEventSchema.safeParse(
+        JSON.parse(JSON.stringify(event)),
+      );
+      expect(roundTrip.success).toBe(true);
+      if (roundTrip.success) {
+        expect(roundTrip.data.type).toBe('connected');
+        expect(roundTrip.data.changed ?? false).toBe(false);
+      }
+    });
+
+    it('rejects non-mutating events marked as changed', () => {
+      const event = {
+        type: 'heartbeat' as const,
+        changed: true,
+        timestamp: new Date().toISOString(),
+      };
+
+      const result = hostStateStreamEventSchema.safeParse(event);
+      expect(result.success).toBe(false);
     });
   });
 

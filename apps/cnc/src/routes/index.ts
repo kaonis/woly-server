@@ -12,6 +12,7 @@ import { MetaController } from '../controllers/meta';
 import { NodeManager } from '../services/nodeManager';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
+import type { HostStateStreamBroker } from '../services/hostStateStreamBroker';
 import { runtimeMetrics } from '../services/runtimeMetrics';
 import { authenticateJwt, authorizeRoles } from '../middleware/auth';
 import { apiLimiter, scheduleSyncLimiter, strictAuthLimiter } from '../middleware/rateLimiter';
@@ -23,13 +24,19 @@ export function createRoutes(
   nodeManager: NodeManager,
   hostAggregator: HostAggregator,
   commandRouter: CommandRouter,
+  hostStateStreamBroker?: HostStateStreamBroker,
 ): Router {
   const router = Router();
   router.use(assignCorrelationId);
 
   // Controllers
   const nodesController = new NodesController(nodeManager);
-  const adminController = new AdminController(hostAggregator, nodeManager, commandRouter);
+  const adminController = new AdminController(
+    hostAggregator,
+    nodeManager,
+    commandRouter,
+    hostStateStreamBroker,
+  );
   const hostsController = new HostsController(hostAggregator, commandRouter);
   const schedulesController = new SchedulesController(hostAggregator);
   const authController = new AuthController();

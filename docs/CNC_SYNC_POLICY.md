@@ -68,3 +68,13 @@ Each CNC feature PR must include:
 ## 7. Review Pass Requirement
 
 Every PR must complete a final review pass before merge (peer review preferred; self-review required at minimum), and all review comments/threads must be resolved with follow-up commits or explicit rationale.
+
+## 8. Host-State Stream Semantics (Singleton Mobile Clients)
+
+The mobile app now maintains a single shared app-level host stream connection (see `kaonis/woly#401` / merged `kaonis/woly#402`). Backend and protocol behavior must follow this contract:
+
+- Transport: `GET /api/capabilities` advertises `hostStateStreaming.transport=websocket` and `routes=['/ws/mobile/hosts']`.
+- Invalidating event classes: any `host.*`, `hosts.*`, or `node.*` event is mutating and should trigger host-list invalidation/refetch in clients.
+- Non-mutating event classes: connection lifecycle/keepalive style events (`connected`, `heartbeat`, `keepalive`, `ping`, `pong`) must not trigger host invalidation.
+- Reconnect behavior: clients should reconnect on transient disconnects and then refetch current host state; stream events are not guaranteed replay buffers.
+- Payload model: events are **mixed deltas/summaries** (not authoritative snapshots). Canonical state remains `GET /api/hosts`; stream events are invalidation hints.

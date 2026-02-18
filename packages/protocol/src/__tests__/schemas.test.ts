@@ -9,6 +9,9 @@ import {
   hostSchedulesResponseSchema,
   hostWakeScheduleSchema,
   hostSchema,
+  hostStateStreamEventSchema,
+  HOST_STATE_STREAM_MUTATING_EVENT_TYPES,
+  HOST_STATE_STREAM_NON_MUTATING_EVENT_TYPES,
   hostStatusSchema,
   scheduleFrequencySchema,
   commandStateSchema,
@@ -311,6 +314,69 @@ describe('cncCapabilitiesResponseSchema', () => {
         },
       }).success
     ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hostStateStreamEventSchema
+// ---------------------------------------------------------------------------
+
+describe('hostStateStreamEventSchema', () => {
+  it('accepts mutating host-state stream events with changed=true', () => {
+    const result = hostStateStreamEventSchema.safeParse({
+      type: HOST_STATE_STREAM_MUTATING_EVENT_TYPES[0],
+      changed: true,
+      timestamp: '2026-02-18T00:00:00.000Z',
+      payload: { nodeId: 'node-1', hostName: 'office-pc' },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts non-mutating stream events with optional changed=false', () => {
+    const connected = hostStateStreamEventSchema.safeParse({
+      type: 'connected',
+      timestamp: '2026-02-18T00:00:00.000Z',
+      payload: { subscriber: 'mobile-client' },
+    });
+    expect(connected.success).toBe(true);
+
+    const keepalive = hostStateStreamEventSchema.safeParse({
+      type: HOST_STATE_STREAM_NON_MUTATING_EVENT_TYPES[1],
+      changed: false,
+      timestamp: '2026-02-18T00:00:01.000Z',
+    });
+    expect(keepalive.success).toBe(true);
+  });
+
+  it('rejects mutating events when changed flag is not true', () => {
+    const result = hostStateStreamEventSchema.safeParse({
+      type: 'host.updated',
+      changed: false,
+      timestamp: '2026-02-18T00:00:00.000Z',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects non-mutating events when changed flag is true', () => {
+    const result = hostStateStreamEventSchema.safeParse({
+      type: 'heartbeat',
+      changed: true,
+      timestamp: '2026-02-18T00:00:00.000Z',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects unknown host-state stream event types', () => {
+    const result = hostStateStreamEventSchema.safeParse({
+      type: 'custom.event',
+      changed: true,
+      timestamp: '2026-02-18T00:00:00.000Z',
+    });
+
+    expect(result.success).toBe(false);
   });
 });
 

@@ -55,7 +55,7 @@ const capabilityMatrix: CncCapabilitiesResponse['capabilities'] = {
     supported: true,
     transport: 'websocket',
     routes: ['/ws/mobile/hosts'],
-    note: 'Server-initiated host state change events are streamed to authenticated mobile clients.',
+    note: 'Server-initiated host and node state deltas stream over WebSocket (`host.*`, `hosts.*`, `node.*`). Non-mutating `connected`/`heartbeat` style events MUST NOT trigger host refetch.',
   },
   commandStatusStreaming: {
     supported: false,

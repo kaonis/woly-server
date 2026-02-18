@@ -14,6 +14,7 @@
 - `CncCapabilitiesResponse` / `CncCapabilityDescriptor` — CNC mode feature negotiation response
 - `HostPort` / `HostPortScanResponse` — CNC host port-scan API DTOs
 - `HostWakeSchedule`, `CreateHostWakeScheduleRequest`, `UpdateHostWakeScheduleRequest`, `ScheduleFrequency` — CNC schedules API DTOs
+- `HostStateStreamEvent` and related event-type unions/constants — mobile host-state stream event contract (`mutating` vs `non-mutating` classes)
 - `NodeMetadata` — Agent platform/version/network info
 - `NodeRegistration` — Registration payload sent by nodes
 - `NodeMessage` — Discriminated union of all node → C&C messages
@@ -30,6 +31,7 @@
 - `cncCapabilitiesResponseSchema` / `cncCapabilityDescriptorSchema` — Validates CNC capabilities payload
 - `hostPortSchema` / `hostPortScanResponseSchema` — Validates host port scan payloads
 - `hostWakeScheduleSchema` / `hostSchedulesResponseSchema` / `createHostWakeScheduleRequestSchema` / `updateHostWakeScheduleRequestSchema` — Validates schedules payloads
+- `hostStateStreamEventSchema` — Validates mobile host-state stream events
 - `outboundNodeMessageSchema` — Validates `NodeMessage` at runtime
 - `inboundCncCommandSchema` — Validates `CncCommand` at runtime
 
@@ -115,6 +117,7 @@ The package includes schema validation tests in `src/__tests__/schemas.test.ts`.
 This package is published to npm only when external consumers (for example, mobile app releases) require updated protocol contracts.
 
 Before publishing, follow the readiness and rollback runbook:
+
 - [`docs/PROTOCOL_PUBLISH_WORKFLOW.md`](../../docs/PROTOCOL_PUBLISH_WORKFLOW.md)
 
 ### Quick Start (Recommended)
@@ -164,6 +167,7 @@ This package includes comprehensive contract tests to ensure protocol compatibil
 ### Documentation
 
 See [docs/PROTOCOL_COMPATIBILITY.md](../../docs/PROTOCOL_COMPATIBILITY.md) for:
+
 - Versioning policy and semantic versioning rules
 - Runtime version negotiation
 - Breaking change workflow

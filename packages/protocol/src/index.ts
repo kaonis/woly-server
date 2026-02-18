@@ -189,6 +189,55 @@ export interface HostPortScanResult {
   openPorts: HostPort[];
 }
 
+// --- Mobile host-state stream event types ---
+
+export const HOST_STATE_STREAM_MUTATING_EVENT_TYPES = [
+  'host.discovered',
+  'host.updated',
+  'host.removed',
+  'hosts.changed',
+  'hosts.snapshot',
+  'node.online',
+  'node.offline',
+  'node.status_changed',
+] as const;
+
+export const HOST_STATE_STREAM_NON_MUTATING_EVENT_TYPES = [
+  'connected',
+  'heartbeat',
+  'keepalive',
+  'ping',
+  'pong',
+] as const;
+
+export type HostStateStreamMutatingEventType =
+  typeof HOST_STATE_STREAM_MUTATING_EVENT_TYPES[number];
+
+export type HostStateStreamNonMutatingEventType =
+  typeof HOST_STATE_STREAM_NON_MUTATING_EVENT_TYPES[number];
+
+export type HostStateStreamEventType =
+  | HostStateStreamMutatingEventType
+  | HostStateStreamNonMutatingEventType;
+
+export interface HostStateStreamMutatingEvent {
+  type: HostStateStreamMutatingEventType;
+  changed: true;
+  timestamp: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface HostStateStreamNonMutatingEvent {
+  type: HostStateStreamNonMutatingEventType;
+  changed?: false;
+  timestamp: string;
+  payload?: Record<string, unknown>;
+}
+
+export type HostStateStreamEvent =
+  | HostStateStreamMutatingEvent
+  | HostStateStreamNonMutatingEvent;
+
 // --- WebSocket message types ---
 
 export type NodeMessage =
@@ -375,6 +424,31 @@ export const hostPortScanResponseSchema: z.ZodType<HostPortScanResponse> = z.obj
   message: z.string().min(1).optional(),
   correlationId: z.string().min(1).optional(),
 });
+
+const hostStateStreamPayloadSchema = z.record(z.string(), z.unknown());
+
+const hostStateStreamMutatingEventTypeSchema: z.ZodType<HostStateStreamMutatingEventType> = z.enum(
+  HOST_STATE_STREAM_MUTATING_EVENT_TYPES
+);
+
+const hostStateStreamNonMutatingEventTypeSchema: z.ZodType<HostStateStreamNonMutatingEventType> = z.enum(
+  HOST_STATE_STREAM_NON_MUTATING_EVENT_TYPES
+);
+
+export const hostStateStreamEventSchema: z.ZodType<HostStateStreamEvent> = z.union([
+  z.object({
+    type: hostStateStreamMutatingEventTypeSchema,
+    changed: z.literal(true),
+    timestamp: z.string().datetime(),
+    payload: hostStateStreamPayloadSchema.optional(),
+  }),
+  z.object({
+    type: hostStateStreamNonMutatingEventTypeSchema,
+    changed: z.literal(false).optional(),
+    timestamp: z.string().datetime(),
+    payload: hostStateStreamPayloadSchema.optional(),
+  }),
+]);
 
 export const scheduleFrequencySchema = z.enum(['once', 'daily', 'weekly', 'weekdays', 'weekends']);
 
