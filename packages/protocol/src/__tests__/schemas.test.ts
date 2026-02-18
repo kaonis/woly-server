@@ -1514,6 +1514,66 @@ describe('inboundCncCommandSchema', () => {
     });
   });
 
+  describe('sleep-host', () => {
+    it('accepts valid sleep-host command', () => {
+      const cmd = {
+        type: 'sleep-host' as const,
+        commandId: 'cmd-sleep-1',
+        data: {
+          hostName: 'office-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.20',
+          confirmation: 'sleep' as const,
+        },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
+    });
+
+    it('rejects sleep-host with mismatched confirmation token', () => {
+      const cmd = {
+        type: 'sleep-host' as const,
+        commandId: 'cmd-sleep-2',
+        data: {
+          hostName: 'office-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.20',
+          confirmation: 'shutdown',
+        },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(false);
+    });
+  });
+
+  describe('shutdown-host', () => {
+    it('accepts valid shutdown-host command', () => {
+      const cmd = {
+        type: 'shutdown-host' as const,
+        commandId: 'cmd-shutdown-1',
+        data: {
+          hostName: 'office-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.20',
+          confirmation: 'shutdown' as const,
+        },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
+    });
+
+    it('rejects shutdown-host with mismatched confirmation token', () => {
+      const cmd = {
+        type: 'shutdown-host' as const,
+        commandId: 'cmd-shutdown-2',
+        data: {
+          hostName: 'office-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.20',
+          confirmation: 'sleep',
+        },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(false);
+    });
+  });
+
   describe('ping', () => {
     it('accepts valid ping', () => {
       const cmd = {

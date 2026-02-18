@@ -1,12 +1,12 @@
 import { EventEmitter } from 'events';
 import { randomUUID } from 'crypto';
-import { CncCommand, CommandResult, HostPingResponse, WakeupResponse } from '../types';
+import { CncCommand, CommandResult, HostPingResponse, HostPowerResponse, WakeupResponse } from '../types';
 import { NodeManager } from './nodeManager';
 import { HostAggregator } from './hostAggregator';
 import logger from '../utils/logger';
 import { CommandModel } from '../models/Command';
 import config from '../config';
-import type { HostStatus, WakeVerifyOptions } from '@kaonis/woly-protocol';
+import type { HostPowerAction, HostStatus, WakeVerifyOptions } from '@kaonis/woly-protocol';
 import { runtimeMetrics } from './runtimeMetrics';
 import type { CommandRecord } from '../types';
 
@@ -22,6 +22,7 @@ interface HostUpdateData {
   status?: HostStatus;
   notes?: string | null;
   tags?: string[];
+  powerControl?: Extract<DispatchCommand, { type: 'update-host' }>['data']['powerControl'];
 }
 
 type PingHostCommandResult = {
@@ -262,6 +263,89 @@ export class CommandRouter extends EventEmitter {
     };
   }
 
+  async routeSleepHostCommand(
+    fqn: string,
+    options?: { idempotencyKey?: string | null; correlationId?: string | null }
+  ): Promise<HostPowerResponse> {
+    return this.routeHostPowerCommand('sleep', fqn, options);
+  }
+
+  async routeShutdownHostCommand(
+    fqn: string,
+    options?: { idempotencyKey?: string | null; correlationId?: string | null }
+  ): Promise<HostPowerResponse> {
+    return this.routeHostPowerCommand('shutdown', fqn, options);
+  }
+
+  private async routeHostPowerCommand(
+    action: HostPowerAction,
+    fqn: string,
+    options?: { idempotencyKey?: string | null; correlationId?: string | null }
+  ): Promise<HostPowerResponse> {
+    logger.info(`Routing ${action} command for ${fqn}`);
+
+    const { location } = this.parseFQN(fqn);
+    const host = await this.hostAggregator.getHostByFQN(fqn);
+    if (!host) {
+      throw new Error(`Host not found: ${fqn}`);
+    }
+
+    const nodeId = host.nodeId;
+    const nodeStatus = await this.nodeManager.getNodeStatus(nodeId);
+    if (nodeStatus !== 'online') {
+      throw new Error(`Node ${nodeId} (${location}) is offline`);
+    }
+
+    const commandId = this.generateCommandId();
+    const command: DispatchCommand = action === 'sleep'
+      ? {
+          type: 'sleep-host',
+          commandId,
+          data: {
+            hostName: host.name,
+            mac: host.mac,
+            ip: host.ip,
+            confirmation: 'sleep',
+          },
+        }
+      : {
+          type: 'shutdown-host',
+          commandId,
+          data: {
+            hostName: host.name,
+            mac: host.mac,
+            ip: host.ip,
+            confirmation: 'shutdown',
+          },
+        };
+
+    const correlationId = options?.correlationId ?? null;
+    const result = await this.executeCommand(nodeId, command, {
+      idempotencyKey: options?.idempotencyKey ?? null,
+      correlationId,
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || `${action} command failed`);
+    }
+
+    const response: HostPowerResponse = {
+      success: true,
+      action,
+      message: result.message ?? `${action} command executed for ${fqn}`,
+      nodeId,
+      location,
+      commandId: result.commandId,
+      correlationId: result.correlationId ?? correlationId ?? undefined,
+    };
+
+    if (result.state) {
+      response.state = result.state;
+    }
+
+    return response;
+  }
+
   /**
    * Route a scan command to a specific node
    * 
@@ -486,6 +570,12 @@ export class CommandRouter extends EventEmitter {
         status: hostData.status ?? host.status,
         notes: hostData.notes !== undefined ? hostData.notes : host.notes,
         tags: hostData.tags !== undefined ? hostData.tags : host.tags,
+        ...(hostData.powerControl !== undefined || host.powerControl !== undefined
+          ? {
+              powerControl:
+                hostData.powerControl !== undefined ? hostData.powerControl : host.powerControl,
+            }
+          : {}),
       },
     };
 

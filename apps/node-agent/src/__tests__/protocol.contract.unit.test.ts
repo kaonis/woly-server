@@ -44,6 +44,21 @@ describe('Protocol contract', () => {
     expect(inboundCncCommandSchema.safeParse(inbound).success).toBe(true);
   });
 
+  it('decodes valid inbound shutdown-host command payload', () => {
+    const inbound = {
+      type: 'shutdown-host' as const,
+      commandId: 'cmd-shutdown-1',
+      data: {
+        hostName: 'office-pc',
+        mac: 'AA:BB:CC:DD:EE:FF',
+        ip: '192.168.1.20',
+        confirmation: 'shutdown' as const,
+      },
+    };
+
+    expect(inboundCncCommandSchema.safeParse(inbound).success).toBe(true);
+  });
+
   it('rejects invalid inbound command payloads', () => {
     const invalidInbound = {
       type: 'wake' as const,

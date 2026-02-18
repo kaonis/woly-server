@@ -14,7 +14,15 @@ interface PendingCommandEntry {
   resolvers: CommandResolver[];
   timeout: NodeJS.Timeout;
   correlationId: string | null;
-  commandType: 'wake' | 'scan' | 'scan-host-ports' | 'update-host' | 'delete-host' | 'ping-host';
+  commandType:
+    | 'wake'
+    | 'scan'
+    | 'scan-host-ports'
+    | 'update-host'
+    | 'delete-host'
+    | 'ping-host'
+    | 'sleep-host'
+    | 'shutdown-host';
 }
 
 interface CommandRouterInternals {
@@ -527,6 +535,75 @@ describe('CommandRouter unit behavior', () => {
       source: 'node-agent',
       correlationId: 'corr-ping',
     });
+    router.cleanup();
+  });
+
+  it('routes sleep-host command with explicit confirmation token', async () => {
+    const { router, hostAggregator, nodeManager } = createRouter();
+    hostAggregator.getHostByFQN.mockResolvedValue({
+      nodeId: 'node-5',
+      name: 'desk-pc',
+      mac: 'AA:BB:CC:DD:EE:FF',
+      ip: '192.168.1.50',
+      status: 'awake',
+    });
+    nodeManager.getNodeStatus.mockResolvedValue('online');
+
+    const executeSpy = jest.spyOn(
+      router as unknown as CommandRouterInternals,
+      'executeCommand'
+    ).mockResolvedValue({
+      commandId: 'cmd-sleep-1',
+      success: true,
+      message: 'Remote sleep command executed for desk-pc',
+      timestamp: new Date(),
+      correlationId: 'corr-sleep',
+    });
+
+    const result = await router.routeSleepHostCommand('desk-pc@Lab', {
+      idempotencyKey: 'sleep-1',
+      correlationId: 'corr-sleep',
+    });
+
+    expect(executeSpy).toHaveBeenCalledWith(
+      'node-5',
+      expect.objectContaining({
+        type: 'sleep-host',
+        data: {
+          hostName: 'desk-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          ip: '192.168.1.50',
+          confirmation: 'sleep',
+        },
+      }),
+      { idempotencyKey: 'sleep-1', correlationId: 'corr-sleep' }
+    );
+    expect(result).toEqual({
+      success: true,
+      action: 'sleep',
+      message: 'Remote sleep command executed for desk-pc',
+      nodeId: 'node-5',
+      location: 'Lab',
+      commandId: 'cmd-sleep-1',
+      correlationId: 'corr-sleep',
+    });
+    router.cleanup();
+  });
+
+  it('routes shutdown-host command and fails fast when node is offline', async () => {
+    const { router, hostAggregator, nodeManager } = createRouter();
+    hostAggregator.getHostByFQN.mockResolvedValue({
+      nodeId: 'node-6',
+      name: 'lab-pc',
+      mac: '11:22:33:44:55:66',
+      ip: '192.168.1.60',
+      status: 'awake',
+    });
+    nodeManager.getNodeStatus.mockResolvedValue('offline');
+
+    await expect(router.routeShutdownHostCommand('lab-pc@Lab')).rejects.toThrow(
+      'Node node-6 (Lab) is offline'
+    );
     router.cleanup();
   });
 

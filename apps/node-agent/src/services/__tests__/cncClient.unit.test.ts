@@ -368,6 +368,66 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     );
   });
 
+  it('dispatches sleep-host commands to the node-agent command handler', async () => {
+    await client.connect();
+
+    const onSleepHost = jest.fn();
+    client.on('command:sleep-host', onSleepHost);
+
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'sleep-host',
+          commandId: 'cmd-sleep-1',
+          data: {
+            hostName: 'PC-01',
+            mac: 'AA:BB:CC:DD:EE:FF',
+            ip: '192.168.1.50',
+            confirmation: 'sleep',
+          },
+        })
+      )
+    );
+
+    expect(onSleepHost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'sleep-host',
+        commandId: 'cmd-sleep-1',
+      })
+    );
+  });
+
+  it('dispatches shutdown-host commands to the node-agent command handler', async () => {
+    await client.connect();
+
+    const onShutdownHost = jest.fn();
+    client.on('command:shutdown-host', onShutdownHost);
+
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'shutdown-host',
+          commandId: 'cmd-shutdown-1',
+          data: {
+            hostName: 'PC-01',
+            mac: 'AA:BB:CC:DD:EE:FF',
+            ip: '192.168.1.50',
+            confirmation: 'shutdown',
+          },
+        })
+      )
+    );
+
+    expect(onShutdownHost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'shutdown-host',
+        commandId: 'cmd-shutdown-1',
+      })
+    );
+  });
+
   it('rejects malformed outbound node messages and logs validation errors', async () => {
     await client.connect();
 

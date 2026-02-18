@@ -2,12 +2,42 @@ import { z } from 'zod';
 
 // --- Protocol versioning ---
 
-export const PROTOCOL_VERSION = '1.3.0' as const;
-export const SUPPORTED_PROTOCOL_VERSIONS: readonly string[] = [PROTOCOL_VERSION, '1.2.0', '1.1.1', '1.0.0'];
+export const PROTOCOL_VERSION = '1.4.0' as const;
+export const SUPPORTED_PROTOCOL_VERSIONS: readonly string[] = [
+  PROTOCOL_VERSION,
+  '1.3.0',
+  '1.2.0',
+  '1.1.1',
+  '1.0.0',
+];
 
 // --- Shared types ---
 
 export type HostStatus = 'awake' | 'asleep';
+export type HostPowerAction = 'sleep' | 'shutdown';
+export type HostPowerPlatform = 'linux' | 'macos' | 'windows';
+export type HostPowerTransport = 'ssh';
+export type HostPowerSshStrictHostKeyChecking = 'enforce' | 'accept-new' | 'off';
+
+export interface HostPowerControlSshConfig {
+  username: string;
+  port?: number;
+  privateKeyPath?: string;
+  strictHostKeyChecking?: HostPowerSshStrictHostKeyChecking;
+}
+
+export interface HostPowerControlCommandOverrides {
+  sleep?: string;
+  shutdown?: string;
+}
+
+export interface HostPowerControlConfig {
+  enabled: boolean;
+  transport: HostPowerTransport;
+  platform: HostPowerPlatform;
+  ssh: HostPowerControlSshConfig;
+  commands?: HostPowerControlCommandOverrides;
+}
 
 /**
  * Canonical host representation shared across all WoLy apps.
@@ -25,6 +55,7 @@ export interface Host {
   pingResponsive?: number | null;
   notes?: string | null;
   tags?: string[];
+  powerControl?: HostPowerControlConfig | null;
   openPorts?: HostPort[];
   portsScannedAt?: string | null;
   portsExpireAt?: string | null;
@@ -398,6 +429,7 @@ export type CncCommand =
         status?: HostStatus;
         notes?: string | null;
         tags?: string[];
+        powerControl?: HostPowerControlConfig | null;
       };
     }
   | { type: 'delete-host'; commandId: string; data: { name: string } }
@@ -408,6 +440,26 @@ export type CncCommand =
         hostName: string;
         mac: string;
         ip: string;
+      };
+    }
+  | {
+      type: 'sleep-host';
+      commandId: string;
+      data: {
+        hostName: string;
+        mac: string;
+        ip: string;
+        confirmation: 'sleep';
+      };
+    }
+  | {
+      type: 'shutdown-host';
+      commandId: string;
+      data: {
+        hostName: string;
+        mac: string;
+        ip: string;
+        confirmation: 'shutdown';
       };
     }
   | { type: 'ping'; data: { timestamp: Date } }
@@ -424,6 +476,30 @@ export const hostPortSchema: z.ZodType<HostPort> = z.object({
   service: z.string().min(1),
 });
 export const wolPortSchema = z.number().int().min(1).max(65535);
+export const hostPowerPlatformSchema = z.enum(['linux', 'macos', 'windows']);
+export const hostPowerSshStrictHostKeyCheckingSchema = z.enum(['enforce', 'accept-new', 'off']);
+export const hostPowerControlSchema: z.ZodType<HostPowerControlConfig> = z
+  .object({
+    enabled: z.boolean(),
+    transport: z.literal('ssh'),
+    platform: hostPowerPlatformSchema,
+    ssh: z
+      .object({
+        username: z.string().min(1).max(255),
+        port: z.number().int().min(1).max(65535).optional(),
+        privateKeyPath: z.string().min(1).max(2048).optional(),
+        strictHostKeyChecking: hostPowerSshStrictHostKeyCheckingSchema.optional(),
+      })
+      .strict(),
+    commands: z
+      .object({
+        sleep: z.string().min(1).max(1024).optional(),
+        shutdown: z.string().min(1).max(1024).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 export const hostSchema = z.object({
   name: z.string().min(1),
@@ -437,6 +513,7 @@ export const hostSchema = z.object({
   pingResponsive: z.number().int().nullable().optional(),
   notes: hostNotesSchema.optional(),
   tags: hostTagsSchema.optional(),
+  powerControl: hostPowerControlSchema.nullable().optional(),
   openPorts: z.array(hostPortSchema).optional(),
   portsScannedAt: z.string().min(1).nullable().optional(),
   portsExpireAt: z.string().min(1).nullable().optional(),
@@ -834,6 +911,7 @@ export const inboundCncCommandSchema: z.ZodType<CncCommand> = z.discriminatedUni
       status: hostStatusSchema.optional(),
       notes: hostNotesSchema.optional(),
       tags: hostTagsSchema.optional(),
+      powerControl: hostPowerControlSchema.nullable().optional(),
     }),
   }),
   z.object({
@@ -850,6 +928,26 @@ export const inboundCncCommandSchema: z.ZodType<CncCommand> = z.discriminatedUni
       hostName: z.string().min(1),
       mac: z.string().min(1),
       ip: z.string().min(1),
+    }),
+  }),
+  z.object({
+    type: z.literal('sleep-host'),
+    commandId: z.string().min(1),
+    data: z.object({
+      hostName: z.string().min(1),
+      mac: z.string().min(1),
+      ip: z.string().min(1),
+      confirmation: z.literal('sleep'),
+    }),
+  }),
+  z.object({
+    type: z.literal('shutdown-host'),
+    commandId: z.string().min(1),
+    data: z.object({
+      hostName: z.string().min(1),
+      mac: z.string().min(1),
+      ip: z.string().min(1),
+      confirmation: z.literal('shutdown'),
     }),
   }),
   z.object({

@@ -6,6 +6,7 @@ import { Host } from '../../types';
 import { validateAgentConfig } from '../../config/agent';
 import * as wakeOnLan from 'wake_on_lan';
 import * as networkDiscovery from '../networkDiscovery';
+import * as hostPowerControl from '../hostPowerControl';
 
 type MockCncClient = {
   send: jest.Mock;
@@ -49,6 +50,10 @@ jest.mock('../networkDiscovery', () => ({
   scanHostOpenPorts: jest.fn(),
 }));
 
+jest.mock('../hostPowerControl', () => ({
+  executeHostPowerAction: jest.fn(),
+}));
+
 describe('AgentService command handlers', () => {
   let service: AgentService;
   let mockCncClient: MockCncClient;
@@ -57,6 +62,7 @@ describe('AgentService command handlers', () => {
     getHost: jest.Mock;
     getHostByMAC: jest.Mock;
     updateHostSeen: jest.Mock;
+    updateHostStatus: jest.Mock;
     updateHost: jest.Mock;
     deleteHost: jest.Mock;
   };
@@ -94,6 +100,7 @@ describe('AgentService command handlers', () => {
       getHost: jest.fn(),
       getHostByMAC: jest.fn(),
       updateHostSeen: jest.fn().mockResolvedValue(undefined),
+      updateHostStatus: jest.fn().mockResolvedValue(undefined),
       updateHost: jest.fn().mockResolvedValue(undefined),
       deleteHost: jest.fn().mockResolvedValue(undefined),
     };
@@ -113,6 +120,9 @@ describe('AgentService command handlers', () => {
     );
     ((networkDiscovery.isHostAlive as unknown) as jest.Mock).mockResolvedValue(true);
     ((networkDiscovery.scanHostOpenPorts as unknown) as jest.Mock).mockResolvedValue([]);
+    ((hostPowerControl.executeHostPowerAction as unknown) as jest.Mock).mockResolvedValue({
+      message: 'Remote sleep command executed for PHANTOM-MBP',
+    });
   });
 
   it('starts and stops agent service lifecycle', async () => {
@@ -972,6 +982,77 @@ describe('AgentService command handlers', () => {
             reachable: true,
             status: 'awake',
           }),
+        }),
+      })
+    );
+  });
+
+  it('handles sleep-host command using host power control settings', async () => {
+    const hostWithPowerControl: Host = {
+      ...sampleHost,
+      powerControl: {
+        enabled: true,
+        transport: 'ssh',
+        platform: 'linux',
+        ssh: {
+          username: 'ops',
+        },
+      },
+    };
+    hostDbMock.getHost
+      .mockResolvedValueOnce(hostWithPowerControl)
+      .mockResolvedValueOnce({ ...hostWithPowerControl, status: 'asleep' });
+
+    await ((service as unknown) as {
+      handleSleepHostCommand: (command: unknown) => Promise<void>;
+    }).handleSleepHostCommand({
+      type: 'sleep-host',
+      commandId: 'cmd-sleep-host',
+      data: {
+        hostName: sampleHost.name,
+        mac: sampleHost.mac,
+        ip: sampleHost.ip,
+        confirmation: 'sleep',
+      },
+    });
+
+    expect(hostPowerControl.executeHostPowerAction).toHaveBeenCalledWith(
+      expect.objectContaining({ name: sampleHost.name }),
+      'sleep'
+    );
+    expect(hostDbMock.updateHostStatus).toHaveBeenCalledWith(sampleHost.name, 'asleep');
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-sleep-host',
+          success: true,
+        }),
+      })
+    );
+  });
+
+  it('rejects shutdown-host command when confirmation token does not match action', async () => {
+    await ((service as unknown) as {
+      handleShutdownHostCommand: (command: unknown) => Promise<void>;
+    }).handleShutdownHostCommand({
+      type: 'shutdown-host',
+      commandId: 'cmd-shutdown-host-invalid',
+      data: {
+        hostName: sampleHost.name,
+        mac: sampleHost.mac,
+        ip: sampleHost.ip,
+        confirmation: 'sleep',
+      },
+    });
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-shutdown-host-invalid',
+          success: false,
+          error: "Invalid shutdown-host payload: confirmation must be 'shutdown'",
         }),
       })
     );

@@ -611,6 +611,52 @@ describe('Cross-repo protocol contract', () => {
       });
     });
 
+    describe('sleep-host command', () => {
+      it('successfully encodes sleep-host commands with confirmation token', () => {
+        const command = {
+          type: 'sleep-host' as const,
+          commandId: 'cmd-sleep-001',
+          data: {
+            hostName: 'desktop-gaming',
+            mac: 'AA:BB:CC:DD:EE:FF',
+            ip: '192.168.1.100',
+            confirmation: 'sleep' as const,
+          },
+        };
+
+        const result = inboundCncCommandSchema.safeParse(command);
+        expect(result.success).toBe(true);
+
+        const roundTrip = inboundCncCommandSchema.safeParse(
+          JSON.parse(JSON.stringify(command)),
+        );
+        expect(roundTrip.success).toBe(true);
+      });
+    });
+
+    describe('shutdown-host command', () => {
+      it('successfully encodes shutdown-host commands with confirmation token', () => {
+        const command = {
+          type: 'shutdown-host' as const,
+          commandId: 'cmd-shutdown-001',
+          data: {
+            hostName: 'desktop-gaming',
+            mac: 'AA:BB:CC:DD:EE:FF',
+            ip: '192.168.1.100',
+            confirmation: 'shutdown' as const,
+          },
+        };
+
+        const result = inboundCncCommandSchema.safeParse(command);
+        expect(result.success).toBe(true);
+
+        const roundTrip = inboundCncCommandSchema.safeParse(
+          JSON.parse(JSON.stringify(command)),
+        );
+        expect(roundTrip.success).toBe(true);
+      });
+    });
+
     describe('ping command', () => {
       it('successfully encodes ping with timestamp coercion', () => {
         const command = {

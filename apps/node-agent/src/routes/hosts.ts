@@ -10,6 +10,8 @@ import {
   hostNameAndMacParamSchema,
   macAddressSchema,
   mergeHostMacSchema,
+  shutdownHostSchema,
+  sleepHostSchema,
   updateHostSchema,
   wakeHostSchema,
 } from '../validators/hostValidator';
@@ -66,6 +68,24 @@ router.post(
   validateRequest(hostNameParamSchema, 'params'),
   validateRequest(wakeHostSchema, 'body'),
   hostsController.wakeUpHost
+);
+
+// Put a host to sleep (dangerous; explicit confirmation required)
+router.post(
+  '/:name/sleep',
+  wakeLimiter,
+  validateRequest(hostNameParamSchema, 'params'),
+  validateRequest(sleepHostSchema, 'body'),
+  hostsController.sleepHost
+);
+
+// Shut down a host (dangerous; explicit confirmation required)
+router.post(
+  '/:name/shutdown',
+  wakeLimiter,
+  validateRequest(hostNameParamSchema, 'params'),
+  validateRequest(shutdownHostSchema, 'body'),
+  hostsController.shutdownHost
 );
 
 // Update a specific host

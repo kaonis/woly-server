@@ -19,6 +19,52 @@ const wolPortSchema = z
   .int('WoL port must be an integer')
   .min(1, 'WoL port must be between 1 and 65535')
   .max(65_535, 'WoL port must be between 1 and 65535');
+const sshPortSchema = z
+  .number()
+  .int('SSH port must be an integer')
+  .min(1, 'SSH port must be between 1 and 65535')
+  .max(65_535, 'SSH port must be between 1 and 65535');
+const hostPowerControlSchema = z
+  .object({
+    enabled: z.boolean(),
+    transport: z.literal('ssh'),
+    platform: z.enum(['linux', 'macos', 'windows']),
+    ssh: z
+      .object({
+        username: z
+          .string()
+          .min(1, 'powerControl.ssh.username is required')
+          .max(255, 'powerControl.ssh.username must not exceed 255 characters')
+          .trim(),
+        port: sshPortSchema.optional(),
+        privateKeyPath: z
+          .string()
+          .min(1, 'powerControl.ssh.privateKeyPath must not be empty')
+          .max(2_048, 'powerControl.ssh.privateKeyPath must not exceed 2048 characters')
+          .trim()
+          .optional(),
+        strictHostKeyChecking: z.enum(['enforce', 'accept-new', 'off']).optional(),
+      })
+      .strict(),
+    commands: z
+      .object({
+        sleep: z
+          .string()
+          .min(1, 'powerControl.commands.sleep must not be empty')
+          .max(1_024, 'powerControl.commands.sleep must not exceed 1024 characters')
+          .trim()
+          .optional(),
+        shutdown: z
+          .string()
+          .min(1, 'powerControl.commands.shutdown must not be empty')
+          .max(1_024, 'powerControl.commands.shutdown must not exceed 1024 characters')
+          .trim()
+          .optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 
 /**
  * Schema for validating MAC address parameter
@@ -36,6 +82,7 @@ export const addHostSchema = z.object({
   mac: z.string().regex(macAddressPattern, 'MAC address must be in format XX:XX:XX:XX:XX:XX or XX-XX-XX-XX-XX-XX'),
   notes: hostNotesSchema.optional(),
   tags: hostTagsSchema.optional(),
+  powerControl: hostPowerControlSchema.nullable().optional(),
 });
 
 /**
@@ -69,6 +116,7 @@ export const updateHostSchema = z
     notes: hostNotesSchema.optional(),
     tags: hostTagsSchema.optional(),
     wolPort: wolPortSchema.optional(),
+    powerControl: hostPowerControlSchema.nullable().optional(),
   })
   .refine((value) =>
       value.name !== undefined ||
@@ -77,8 +125,10 @@ export const updateHostSchema = z
       value.secondaryMacs !== undefined ||
       value.notes !== undefined ||
       value.tags !== undefined ||
-      value.wolPort !== undefined, {
-    message: 'At least one field is required: name, ip, mac, secondaryMacs, notes, tags, or wolPort',
+      value.wolPort !== undefined ||
+      value.powerControl !== undefined, {
+    message:
+      'At least one field is required: name, ip, mac, secondaryMacs, notes, tags, wolPort, or powerControl',
   });
 
 /**
@@ -109,6 +159,18 @@ export const wakeHostSchema = z
   .strict()
   .optional()
   .transform((value) => value ?? {});
+
+export const sleepHostSchema = z
+  .object({
+    confirm: z.literal('sleep'),
+  })
+  .strict();
+
+export const shutdownHostSchema = z
+  .object({
+    confirm: z.literal('shutdown'),
+  })
+  .strict();
 
 /**
  * Schema for validating host name path parameter

@@ -41,6 +41,21 @@ describe('Shared protocol contract', () => {
     expect(inboundCncCommandSchema.safeParse(command).success).toBe(true);
   });
 
+  it('accepts valid sleep-host command payloads', () => {
+    const command = {
+      type: 'sleep-host' as const,
+      commandId: 'cmd-sleep-1',
+      data: {
+        hostName: 'office-pc',
+        mac: 'AA:BB:CC:DD:EE:FF',
+        ip: '192.168.1.20',
+        confirmation: 'sleep' as const,
+      },
+    };
+
+    expect(inboundCncCommandSchema.safeParse(command).success).toBe(true);
+  });
+
   it('rejects malformed wake command payload', () => {
     const invalidCommand = {
       type: 'wake' as const,
