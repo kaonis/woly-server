@@ -97,6 +97,9 @@ export function createRoutes(
     schedulesController.deleteSchedule(req, res),
   );
   router.get('/hosts', (req, res) => hostsController.getHosts(req, res));
+  // IMPORTANT: history/uptime must be registered before the :fqn catch-all
+  router.get('/hosts/:fqn/history', (req, res) => hostsController.getHostHistory(req, res));
+  router.get('/hosts/:fqn/uptime', (req, res) => hostsController.getHostUptime(req, res));
   router.get('/hosts/:fqn', (req, res) => hostsController.getHostByFQN(req, res));
   router.post('/hosts/wakeup/:fqn', (req, res) => hostsController.wakeupHost(req, res));
   router.put('/hosts/:fqn', (req, res) => hostsController.updateHost(req, res));

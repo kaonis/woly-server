@@ -5,6 +5,8 @@
 import type { CommandResult } from '../models/CommandResult';
 import type { Host } from '../models/Host';
 import type { HostStats } from '../models/HostStats';
+import type { HostStatusHistoryResponse } from '../models/HostStatusHistoryResponse';
+import type { HostUptimeSummary } from '../models/HostUptimeSummary';
 import type { HostWakeSchedule } from '../models/HostWakeSchedule';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
@@ -134,6 +136,68 @@ export class HostsService {
                 500: `Internal server error`,
                 503: `Service unavailable (e.g., node offline)`,
                 504: `Command timeout`,
+            },
+        });
+    }
+    /**
+     * Get host status transition history
+     * Returns host awake/asleep transition events for a given time window.
+     * @param fqn
+     * @param from
+     * @param to
+     * @param limit
+     * @returns HostStatusHistoryResponse Host transition history
+     * @throws ApiError
+     */
+    public static getApiHostsHistory(
+        fqn: string,
+        from?: string,
+        to?: string,
+        limit?: number,
+    ): CancelablePromise<HostStatusHistoryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/hosts/{fqn}/history',
+            path: {
+                'fqn': fqn,
+            },
+            query: {
+                'from': from,
+                'to': to,
+                'limit': limit,
+            },
+            errors: {
+                400: `Invalid request parameters`,
+                404: `Resource not found`,
+                500: `Internal server error`,
+            },
+        });
+    }
+    /**
+     * Get host uptime summary
+     * Returns uptime analytics over a relative period (for example 7d).
+     * @param fqn
+     * @param period
+     * @returns HostUptimeSummary Uptime summary
+     * @throws ApiError
+     */
+    public static getApiHostsUptime(
+        fqn: string,
+        period?: string,
+    ): CancelablePromise<HostUptimeSummary> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/hosts/{fqn}/uptime',
+            path: {
+                'fqn': fqn,
+            },
+            query: {
+                'period': period,
+            },
+            errors: {
+                400: `Invalid request parameters`,
+                404: `Resource not found`,
+                500: `Internal server error`,
             },
         });
     }

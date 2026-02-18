@@ -9,6 +9,7 @@ jest.mock('../config', () => ({
     corsOrigins: ['http://allowed.local'],
     commandTimeout: 30000,
     commandRetentionDays: 30,
+    hostStatusHistoryRetentionDays: 30,
     scheduleWorkerEnabled: true,
     schedulePollIntervalMs: 1000,
     scheduleBatchSize: 10,
@@ -70,6 +71,11 @@ jest.mock('../services/commandReconciler', () => ({
   stopCommandPruning: jest.fn(),
 }));
 
+jest.mock('../services/hostStatusHistoryRetention', () => ({
+  startHostStatusHistoryPruning: jest.fn(),
+  stopHostStatusHistoryPruning: jest.fn(),
+}));
+
 jest.mock('../services/wakeScheduleWorker', () => ({
   startWakeScheduleWorker: jest.fn(),
   stopWakeScheduleWorker: jest.fn(),
@@ -113,6 +119,10 @@ import {
   startCommandPruning,
   stopCommandPruning,
 } from '../services/commandReconciler';
+import {
+  startHostStatusHistoryPruning,
+  stopHostStatusHistoryPruning,
+} from '../services/hostStatusHistoryRetention';
 import { startWakeScheduleWorker, stopWakeScheduleWorker } from '../services/wakeScheduleWorker';
 import { prometheusContentType, renderPrometheusMetrics } from '../services/promMetrics';
 
@@ -229,6 +239,10 @@ describe('server bootstrap and wiring', () => {
     expect(mockedDb.connect).toHaveBeenCalledTimes(1);
     expect(reconcileCommandsOnStartup).toHaveBeenCalledWith({ commandTimeoutMs: 30000 });
     expect(startCommandPruning).toHaveBeenCalledWith(30);
+    expect(startHostStatusHistoryPruning).toHaveBeenCalledWith(
+      expect.any(Object),
+      30,
+    );
     expect(startWakeScheduleWorker).toHaveBeenCalledWith(
       expect.objectContaining({
         enabled: true,
@@ -280,6 +294,7 @@ describe('server bootstrap and wiring', () => {
 
     expect(closeSpy).toHaveBeenCalledTimes(1);
     expect(stopCommandPruning).toHaveBeenCalledTimes(1);
+    expect(stopHostStatusHistoryPruning).toHaveBeenCalledTimes(1);
     expect(stopWakeScheduleWorker).toHaveBeenCalledTimes(1);
     expect(nodeManager.shutdown).toHaveBeenCalledTimes(1);
     expect(hostStateStreamBroker.shutdown).toHaveBeenCalledTimes(1);

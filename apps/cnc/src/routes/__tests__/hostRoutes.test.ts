@@ -42,6 +42,8 @@ describe('Host Routes Authentication and Authorization', () => {
       getHostsByNode: jest.fn().mockResolvedValue([]),
       getStats: jest.fn().mockResolvedValue({ total: 0, awake: 0, asleep: 0 }),
       getHostByFQN: jest.fn().mockResolvedValue(null),
+      getHostStatusHistory: jest.fn().mockResolvedValue([]),
+      getHostUptime: jest.fn().mockRejectedValue(new Error('Host node1.example.com not found')),
       updateHost: jest.fn().mockResolvedValue(null),
       deleteHost: jest.fn().mockResolvedValue(false),
     } as unknown as HostAggregator;
@@ -247,6 +249,88 @@ describe('Host Routes Authentication and Authorization', () => {
         .set('Authorization', `Bearer ${token}`);
 
       // Will be 404 since host doesn't exist in mock, but auth passed
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/hosts/:fqn/history', () => {
+    it('returns 401 when no authorization header is provided', async () => {
+      const response = await request(app).get('/api/hosts/node1.example.com/history');
+      expect(response.status).toBe(401);
+    });
+
+    it('returns 403 for unsupported role', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/node1.example.com/history')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(403);
+    });
+
+    it('allows access with valid operator token', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'operator',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/node1.example.com/history')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('GET /api/hosts/:fqn/uptime', () => {
+    it('returns 401 when no authorization header is provided', async () => {
+      const response = await request(app).get('/api/hosts/node1.example.com/uptime');
+      expect(response.status).toBe(401);
+    });
+
+    it('returns 403 for unsupported role', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/node1.example.com/uptime')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(403);
+    });
+
+    it('allows access with valid operator token', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'operator',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/node1.example.com/uptime')
+        .set('Authorization', `Bearer ${token}`);
+
       expect(response.status).toBe(404);
     });
   });

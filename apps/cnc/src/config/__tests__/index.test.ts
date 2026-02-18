@@ -138,4 +138,12 @@ describe('config parsing and validation', () => {
       }),
     ).rejects.toThrow('OFFLINE_COMMAND_TTL_MS must be a finite number > 0');
   });
+
+  it('throws when host status history retention is negative', async () => {
+    await expect(
+      loadConfig({
+        HOST_STATUS_HISTORY_RETENTION_DAYS: '-1',
+      }),
+    ).rejects.toThrow('HOST_STATUS_HISTORY_RETENTION_DAYS must be a finite number >= 0');
+  });
 });

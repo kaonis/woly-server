@@ -43,6 +43,8 @@ describe('HostsController additional branches', () => {
     getAllHosts: jest.Mock;
     getStats: jest.Mock;
     getHostByFQN: jest.Mock;
+    getHostStatusHistory: jest.Mock;
+    getHostUptime: jest.Mock;
     saveHostPortScanSnapshot: jest.Mock;
   };
   let commandRouter: {
@@ -62,6 +64,8 @@ describe('HostsController additional branches', () => {
       getAllHosts: jest.fn(),
       getStats: jest.fn(),
       getHostByFQN: jest.fn(),
+      getHostStatusHistory: jest.fn(),
+      getHostUptime: jest.fn(),
       saveHostPortScanSnapshot: jest.fn().mockResolvedValue(true),
     };
     commandRouter = {
@@ -192,6 +196,140 @@ describe('HostsController additional branches', () => {
         error: 'Internal Server Error',
         message: 'Failed to retrieve host',
       });
+    });
+  });
+
+  describe('getHostHistory', () => {
+    it('returns 400 for invalid history query parameters', async () => {
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        query: { from: 'not-a-date' },
+      });
+      const res = createMockResponse();
+
+      await controller.getHostHistory(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(hostAggregator.getHostByFQN).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when host does not exist', async () => {
+      hostAggregator.getHostByFQN.mockResolvedValue(null);
+
+      const req = createMockRequest({ params: { fqn: 'missing@lab' } });
+      const res = createMockResponse();
+
+      await controller.getHostHistory(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(hostAggregator.getHostStatusHistory).not.toHaveBeenCalled();
+    });
+
+    it('returns history payload when host exists', async () => {
+      hostAggregator.getHostByFQN.mockResolvedValue({ name: 'desktop' });
+      hostAggregator.getHostStatusHistory.mockResolvedValue([
+        {
+          hostFqn: 'desktop@lab',
+          oldStatus: 'asleep',
+          newStatus: 'awake',
+          changedAt: '2026-02-18T10:00:00.000Z',
+        },
+      ]);
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        query: {
+          from: '2026-02-18T09:00:00.000Z',
+          to: '2026-02-18T11:00:00.000Z',
+          limit: '10',
+        },
+      });
+      const res = createMockResponse();
+
+      await controller.getHostHistory(req, res);
+
+      expect(hostAggregator.getHostStatusHistory).toHaveBeenCalledWith('desktop@lab', {
+        from: '2026-02-18T09:00:00.000Z',
+        to: '2026-02-18T11:00:00.000Z',
+        limit: 10,
+      });
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hostFqn: 'desktop@lab',
+          entries: expect.any(Array),
+        }),
+      );
+    });
+
+    it('returns 400 when from is later than to', async () => {
+      hostAggregator.getHostByFQN.mockResolvedValue({ name: 'desktop' });
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        query: {
+          from: '2026-02-18T12:00:00.000Z',
+          to: '2026-02-18T11:00:00.000Z',
+        },
+      });
+      const res = createMockResponse();
+
+      await controller.getHostHistory(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(hostAggregator.getHostStatusHistory).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getHostUptime', () => {
+    it('returns uptime summary for valid period', async () => {
+      hostAggregator.getHostUptime.mockResolvedValue({
+        hostFqn: 'desktop@lab',
+        period: '7d',
+        from: '2026-02-11T10:00:00.000Z',
+        to: '2026-02-18T10:00:00.000Z',
+        uptimePercentage: 98.5,
+        awakeMs: 1000,
+        asleepMs: 100,
+        transitions: 2,
+        currentStatus: 'awake',
+      });
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        query: { period: '7d' },
+      });
+      const res = createMockResponse();
+
+      await controller.getHostUptime(req, res);
+
+      expect(hostAggregator.getHostUptime).toHaveBeenCalledWith('desktop@lab', { period: '7d' });
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ hostFqn: 'desktop@lab' }));
+    });
+
+    it('returns 400 when period format is invalid', async () => {
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        query: { period: 'invalid' },
+      });
+      const res = createMockResponse();
+
+      await controller.getHostUptime(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(hostAggregator.getHostUptime).not.toHaveBeenCalled();
+    });
+
+    it('maps missing host errors to 404', async () => {
+      hostAggregator.getHostUptime.mockRejectedValue(new Error('Host desktop@lab not found'));
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+      });
+      const res = createMockResponse();
+
+      await controller.getHostUptime(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
     });
   });
 

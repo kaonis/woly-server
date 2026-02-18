@@ -37,6 +37,15 @@ CREATE TABLE IF NOT EXISTS aggregated_hosts (
     UNIQUE(node_id, name)
 );
 
+-- Host status transition history
+CREATE TABLE IF NOT EXISTS host_status_history (
+    id SERIAL PRIMARY KEY,
+    host_fqn VARCHAR(512) NOT NULL,
+    old_status VARCHAR(20) NOT NULL CHECK (old_status IN ('awake', 'asleep')),
+    new_status VARCHAR(20) NOT NULL CHECK (new_status IN ('awake', 'asleep')),
+    changed_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- Durable command lifecycle table
 CREATE TABLE IF NOT EXISTS commands (
     id VARCHAR(255) PRIMARY KEY,
@@ -90,6 +99,8 @@ CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_status ON aggregated_hosts(statu
 CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_mac ON aggregated_hosts(mac);
 CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_location ON aggregated_hosts(location);
 CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_fqn ON aggregated_hosts(fully_qualified_name);
+CREATE INDEX IF NOT EXISTS idx_host_status_history_host_changed_at ON host_status_history(host_fqn, changed_at);
+CREATE INDEX IF NOT EXISTS idx_host_status_history_changed_at ON host_status_history(changed_at);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

@@ -191,6 +191,32 @@ export interface DeleteHostWakeScheduleResponse {
   id: string;
 }
 
+export interface HostStatusHistoryEntry {
+  hostFqn: string;
+  oldStatus: HostStatus;
+  newStatus: HostStatus;
+  changedAt: string;
+}
+
+export interface HostStatusHistoryResponse {
+  hostFqn: string;
+  from: string;
+  to: string;
+  entries: HostStatusHistoryEntry[];
+}
+
+export interface HostUptimeSummary {
+  hostFqn: string;
+  period: string;
+  from: string;
+  to: string;
+  uptimePercentage: number;
+  awakeMs: number;
+  asleepMs: number;
+  transitions: number;
+  currentStatus: HostStatus;
+}
+
 export interface HostPingResult {
   hostName: string;
   mac: string;
@@ -545,6 +571,38 @@ export const deleteHostWakeScheduleResponseSchema: z.ZodType<DeleteHostWakeSched
   .object({
     success: z.literal(true),
     id: z.string().min(1),
+  })
+  .strict();
+
+export const hostStatusHistoryEntrySchema: z.ZodType<HostStatusHistoryEntry> = z
+  .object({
+    hostFqn: z.string().min(1),
+    oldStatus: hostStatusSchema,
+    newStatus: hostStatusSchema,
+    changedAt: z.string().datetime(),
+  })
+  .strict();
+
+export const hostStatusHistoryResponseSchema: z.ZodType<HostStatusHistoryResponse> = z
+  .object({
+    hostFqn: z.string().min(1),
+    from: z.string().datetime(),
+    to: z.string().datetime(),
+    entries: z.array(hostStatusHistoryEntrySchema),
+  })
+  .strict();
+
+export const hostUptimeSummarySchema: z.ZodType<HostUptimeSummary> = z
+  .object({
+    hostFqn: z.string().min(1),
+    period: z.string().regex(/^\d+[dhm]$/),
+    from: z.string().datetime(),
+    to: z.string().datetime(),
+    uptimePercentage: z.number().min(0).max(100),
+    awakeMs: z.number().int().nonnegative(),
+    asleepMs: z.number().int().nonnegative(),
+    transitions: z.number().int().nonnegative(),
+    currentStatus: hostStatusSchema,
   })
   .strict();
 

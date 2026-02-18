@@ -91,6 +91,32 @@ export type ScheduleFrequency = ProtocolScheduleFrequency;
 export type HostWakeSchedule = ProtocolHostWakeSchedule;
 export type WakeVerificationResult = ProtocolWakeVerificationResult;
 
+export interface HostStatusHistoryEntry {
+  hostFqn: string;
+  oldStatus: 'awake' | 'asleep';
+  newStatus: 'awake' | 'asleep';
+  changedAt: string;
+}
+
+export interface HostStatusHistoryResponse {
+  hostFqn: string;
+  from: string;
+  to: string;
+  entries: HostStatusHistoryEntry[];
+}
+
+export interface HostUptimeSummary {
+  hostFqn: string;
+  period: string;
+  from: string;
+  to: string;
+  uptimePercentage: number;
+  awakeMs: number;
+  asleepMs: number;
+  transitions: number;
+  currentStatus: 'awake' | 'asleep';
+}
+
 export interface HostPingResponse {
   target: string;
   checkedAt: string;
@@ -158,6 +184,7 @@ export interface ServerConfig {
   commandTimeout: number;
   offlineCommandTtlMs: number;
   commandRetentionDays: number;
+  hostStatusHistoryRetentionDays: number;
   commandMaxRetries: number;
   commandRetryBaseDelayMs: number;
   scheduleWorkerEnabled: boolean;

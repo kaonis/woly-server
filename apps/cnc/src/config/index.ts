@@ -123,6 +123,7 @@ export const config: ServerConfig = {
   commandTimeout: getEnvNumber('COMMAND_TIMEOUT', 30000),
   offlineCommandTtlMs: getEnvNumber('OFFLINE_COMMAND_TTL_MS', 60 * 60 * 1000),
   commandRetentionDays: getEnvNumber('COMMAND_RETENTION_DAYS', 30),
+  hostStatusHistoryRetentionDays: getEnvNumber('HOST_STATUS_HISTORY_RETENTION_DAYS', 30),
   commandMaxRetries: getEnvNumber('COMMAND_MAX_RETRIES', 3),
   commandRetryBaseDelayMs: getEnvNumber('COMMAND_RETRY_BASE_DELAY_MS', 1000),
   scheduleWorkerEnabled: getEnvBoolean('SCHEDULE_WORKER_ENABLED', true),
@@ -166,6 +167,10 @@ if (!Number.isFinite(config.jwtTtlSeconds) || config.jwtTtlSeconds <= 0) {
 
 if (!Number.isFinite(config.offlineCommandTtlMs) || config.offlineCommandTtlMs <= 0) {
   throw new Error('OFFLINE_COMMAND_TTL_MS must be a finite number > 0');
+}
+
+if (!Number.isFinite(config.hostStatusHistoryRetentionDays) || config.hostStatusHistoryRetentionDays < 0) {
+  throw new Error('HOST_STATUS_HISTORY_RETENTION_DAYS must be a finite number >= 0');
 }
 
 if (!Number.isFinite(config.schedulePollIntervalMs) || config.schedulePollIntervalMs <= 0) {
