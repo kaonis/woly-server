@@ -100,6 +100,16 @@ Output goes to `dist/`. Both `main` and `types` in package.json point there.
 - `1.2.x`: Host metadata/scan enrichments (`openPorts`, `portsScannedAt`, `portsExpireAt`), ping/port-scan command/result payloads, and consumer typecheck fixture parity.
 - `1.3.x`: CNC capability-map enrichments (`hostStateStreaming`, optional `rateLimits`) and exported CNC rate-limit descriptor schemas.
 
+## CNC Polling Identity Notes
+
+For CNC polling consumers (`GET /api/hosts`), treat host identity as a key-based contract, not an object-reference contract:
+
+- Prefer `fullyQualifiedName` as the row identity key in UI/state layers.
+- Use (`nodeId`, `mac`) as a fallback key strategy when needed.
+- Do not rely on array index, object reference equality, or JSON property ordering for change detection.
+
+Detailed stability guarantees and non-guarantees are documented in [`docs/PROTOCOL_COMPATIBILITY.md`](../../docs/PROTOCOL_COMPATIBILITY.md#polling-snapshot-contract-cnc-clients).
+
 ## Testing
 
 ```bash

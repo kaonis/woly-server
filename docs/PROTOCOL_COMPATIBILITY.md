@@ -82,6 +82,32 @@ export const PROTOCOL_VERSION = '1.3.0';
 export const SUPPORTED_PROTOCOL_VERSIONS = ['1.3.0', '1.2.0', '1.1.1', '1.0.0'];
 ```
 
+## Polling Snapshot Contract (CNC Clients)
+
+This section clarifies host-list polling expectations for clients consuming `GET /api/hosts` in CNC mode.
+
+### Identity and Diffing
+
+- Preferred host identity key: `fullyQualifiedName` from the aggregated host payload.
+- If a client needs a fallback key, use a composite key (`nodeId`, `mac`) rather than array index.
+- Host rename or location move can change `fullyQualifiedName`; clients should treat that as an identity transition (remove old key, add new key).
+
+### Stability Guarantees
+
+- The protocol guarantees field shapes and required/optional semantics, not object-reference stability.
+- Clients must not assume stable in-memory object identity across polls.
+- Clients should perform key-based diffing and selective field comparison for render optimization.
+
+### Explicit Non-Guarantees
+
+- The protocol does not guarantee array ordering semantics for host snapshots across implementations.
+- The protocol does not require "unchanged host" snapshots to preserve property insertion order or JSON text identity.
+
+### Practical Guidance
+
+- Use conditional requests (`ETag` + `If-None-Match`) where available to avoid unnecessary full-list processing.
+- Treat host-state stream events as invalidation hints; `GET /api/hosts` remains the authoritative polling snapshot source.
+
 ## CI Enforcement
 
 ### Protocol Compatibility Job
