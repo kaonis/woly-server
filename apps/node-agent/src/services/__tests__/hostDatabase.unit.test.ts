@@ -182,6 +182,7 @@ describe('HostDatabase', () => {
       expect(newHost.status).toBe('asleep');
       expect(newHost.discovered).toBe(0);
       expect(newHost.pingResponsive).toBe(null);
+      expect(newHost.wolPort).toBe(9);
       expect(newHost.notes).toBe(null);
       expect(newHost.tags).toEqual([]);
 
@@ -189,6 +190,7 @@ describe('HostDatabase', () => {
       const retrieved = await db.getHost('TestHost');
       expect(retrieved).toBeDefined();
       expect(retrieved?.name).toBe('TestHost');
+      expect(retrieved?.wolPort).toBe(9);
       expect(retrieved?.notes).toBe(null);
       expect(retrieved?.tags).toEqual([]);
     });
@@ -269,6 +271,17 @@ describe('HostDatabase', () => {
       expect(updated).toBeDefined();
       expect(updated?.ip).toBe('192.168.1.211');
       expect(updated?.status).toBe('awake');
+    });
+
+    it('should update host wol port', async () => {
+      await db.addHost('PortUpdate', 'AA:BB:CC:DD:EE:41', '192.168.1.241');
+
+      await db.updateHost('PortUpdate', {
+        wolPort: 7,
+      });
+
+      const updated = await db.getHost('PortUpdate');
+      expect(updated?.wolPort).toBe(7);
     });
 
     it('should emit host-updated when updating a host', async () => {

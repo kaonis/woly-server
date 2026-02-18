@@ -450,6 +450,29 @@ describe('Cross-repo protocol contract', () => {
         }
       });
 
+      it('successfully encodes wake-on-lan command with custom wolPort', () => {
+        const command = {
+          type: 'wake' as const,
+          commandId: 'cmd-wake-port-001',
+          data: {
+            hostName: 'desktop-gaming',
+            mac: 'AA:BB:CC:DD:EE:FF',
+            wolPort: 7,
+          },
+        };
+
+        const result = inboundCncCommandSchema.safeParse(command);
+        expect(result.success).toBe(true);
+
+        const roundTrip = inboundCncCommandSchema.safeParse(
+          JSON.parse(JSON.stringify(command)),
+        );
+        expect(roundTrip.success).toBe(true);
+        if (roundTrip.success && roundTrip.data.type === 'wake') {
+          expect(roundTrip.data.data.wolPort).toBe(7);
+        }
+      });
+
       it('rejects wake command without required mac address', () => {
         const invalidCommand = {
           type: 'wake' as const,
@@ -531,6 +554,7 @@ describe('Cross-repo protocol contract', () => {
             name: 'new-hostname',
             mac: '11:22:33:44:55:66',
             ip: '192.168.1.200',
+            wolPort: 7,
             status: 'awake' as const,
             notes: 'Primary office workstation',
             tags: ['office', 'critical'],

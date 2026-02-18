@@ -84,6 +84,13 @@ const options: swaggerJsdoc.Options = {
               description: 'IP address',
               example: '192.168.1.147',
             },
+            wolPort: {
+              type: 'integer',
+              minimum: 1,
+              maximum: 65535,
+              description: 'Configured Wake-on-LAN UDP destination port',
+              example: 9,
+            },
             status: {
               type: 'string',
               enum: ['awake', 'asleep'],

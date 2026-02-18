@@ -14,6 +14,11 @@ const hostNotesSchema = z
 const hostTagsSchema = z
   .array(z.string().min(1, 'Tags cannot be empty').max(64, 'Tags must not exceed 64 characters').trim())
   .max(32, 'Tags must not exceed 32 entries');
+const wolPortSchema = z
+  .number()
+  .int('WoL port must be an integer')
+  .min(1, 'WoL port must be between 1 and 65535')
+  .max(65_535, 'WoL port must be between 1 and 65535');
 
 /**
  * Schema for validating MAC address parameter
@@ -54,15 +59,28 @@ export const updateHostSchema = z
       .optional(),
     notes: hostNotesSchema.optional(),
     tags: hostTagsSchema.optional(),
+    wolPort: wolPortSchema.optional(),
   })
   .refine((value) =>
       value.name !== undefined ||
       value.ip !== undefined ||
       value.mac !== undefined ||
       value.notes !== undefined ||
-      value.tags !== undefined, {
-    message: 'At least one field is required: name, ip, mac, notes, or tags',
+      value.tags !== undefined ||
+      value.wolPort !== undefined, {
+    message: 'At least one field is required: name, ip, mac, notes, tags, or wolPort',
   });
+
+/**
+ * Schema for validating wake-up request body
+ */
+export const wakeHostSchema = z
+  .object({
+    wolPort: wolPortSchema.optional(),
+  })
+  .strict()
+  .optional()
+  .transform((value) => value ?? {});
 
 /**
  * Schema for validating host name path parameter

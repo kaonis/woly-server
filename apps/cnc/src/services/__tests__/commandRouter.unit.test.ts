@@ -40,6 +40,7 @@ type HostRecord = {
   name: string;
   mac: string;
   ip: string;
+  wolPort?: number;
   status: 'awake' | 'asleep';
   notes?: string | null;
   tags?: string[];
@@ -210,6 +211,7 @@ describe('CommandRouter unit behavior', () => {
           name: 'new-name',
           mac: '00:11:22:33:44:55',
           ip: '10.0.0.10',
+          wolPort: undefined,
           status: 'asleep',
           notes: undefined,
           tags: undefined,
@@ -219,6 +221,44 @@ describe('CommandRouter unit behavior', () => {
         idempotencyKey: null,
         correlationId: null,
       }
+    );
+    router.cleanup();
+  });
+
+  it('routes wake command with explicit wolPort override', async () => {
+    const { router, hostAggregator, nodeManager } = createRouter();
+    hostAggregator.getHostByFQN.mockResolvedValue({
+      nodeId: 'node-1',
+      name: 'desk-pc',
+      mac: 'AA:BB:CC:DD:EE:FF',
+      ip: '192.168.1.10',
+      wolPort: 9,
+      status: 'awake',
+    });
+    nodeManager.getNodeStatus.mockResolvedValue('online');
+
+    const executeSpy = jest.spyOn(router as unknown as CommandRouterInternals, 'executeCommand')
+      .mockResolvedValue({
+        commandId: 'cmd-wake-port-1',
+        success: true,
+        timestamp: new Date(),
+      });
+
+    await router.routeWakeCommand('desk-pc@Home%20Office', {
+      wolPort: 7,
+    });
+
+    expect(executeSpy).toHaveBeenCalledWith(
+      'node-1',
+      expect.objectContaining({
+        type: 'wake',
+        data: expect.objectContaining({
+          hostName: 'desk-pc',
+          mac: 'AA:BB:CC:DD:EE:FF',
+          wolPort: 7,
+        }),
+      }),
+      expect.any(Object)
     );
     router.cleanup();
   });

@@ -16,15 +16,21 @@ import logger from '../utils/logger';
 const ipAddressSchema = z.string().refine((value) => isIP(value) !== 0, {
   message: 'IP address must be a valid IPv4 or IPv6 address',
 });
+const wolPortSchema = z.number().int().min(1).max(65_535);
 
 const updateHostBodySchema = z.object({
   name: z.string().min(1).optional(),
   mac: z.string().regex(MAC_ADDRESS_PATTERN).optional(),
   ip: ipAddressSchema.optional(),
+  wolPort: wolPortSchema.optional(),
   status: hostStatusSchema.optional(),
   notes: z.string().max(2_000).nullable().optional(),
   tags: z.array(z.string().min(1).max(64)).max(32).optional(),
 }).strict();
+
+const wakeupBodySchema = z.object({
+  wolPort: wolPortSchema.optional(),
+}).passthrough();
 
 type RouteUpdateHostData = Parameters<CommandRouter['routeUpdateHostCommand']>[1];
 
@@ -34,6 +40,7 @@ function toRouteUpdateHostData(payload: z.infer<typeof updateHostBodySchema>): R
   if (payload.name !== undefined) hostData.name = payload.name;
   if (payload.mac !== undefined) hostData.mac = payload.mac;
   if (payload.ip !== undefined) hostData.ip = payload.ip;
+  if (payload.wolPort !== undefined) hostData.wolPort = payload.wolPort;
   if (payload.notes !== undefined) hostData.notes = payload.notes;
   if (payload.tags !== undefined) hostData.tags = payload.tags;
   if (payload.status === 'awake' || payload.status === 'asleep') {
@@ -333,6 +340,22 @@ export class HostsController {
    *           type: string
    *         description: Optional idempotency key to prevent duplicate commands
    *         example: unique-request-id-123
+   *     requestBody:
+   *       required: false
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               verify:
+   *                 type: boolean
+   *                 description: Enable asynchronous wake verification for this command
+   *               wolPort:
+   *                 type: integer
+   *                 minimum: 1
+   *                 maximum: 65535
+   *                 description: Optional WoL UDP destination port override for this wake request
+   *                 example: 7
    *     responses:
    *       200:
    *         description: Wake command sent successfully
@@ -361,6 +384,17 @@ export class HostsController {
           ? idempotencyKeyHeader.trim()
           : null;
 
+      const bodyParse = wakeupBodySchema.safeParse(req.body ?? {});
+      if (!bodyParse.success) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid request body',
+          details: bodyParse.error.issues,
+        });
+        return;
+      }
+      const { wolPort } = bodyParse.data;
+
       // Parse optional wake verification request from query string or body
       const verifyParam = req.query.verify ?? (req.body as Record<string, unknown> | undefined)?.verify;
       const verify = verifyParam === 'true' || verifyParam === true
@@ -370,11 +404,15 @@ export class HostsController {
       const routeOptions: {
         idempotencyKey: string | null;
         correlationId?: string;
+        wolPort?: number | null;
         verify?: { timeoutMs: number; pollIntervalMs: number } | null;
       } = {
         idempotencyKey,
         verify,
       };
+      if (wolPort !== undefined) {
+        routeOptions.wolPort = wolPort;
+      }
       if (correlationId) {
         routeOptions.correlationId = correlationId;
       }
@@ -753,6 +791,10 @@ export class HostsController {
  *                 type: string
  *               ip:
  *                 type: string
+ *               wolPort:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 65535
  *               status:
  *                 type: string
  *                 enum: [awake, asleep]

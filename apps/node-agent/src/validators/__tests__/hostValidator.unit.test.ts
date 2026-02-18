@@ -4,6 +4,7 @@ import {
   hostNameParamSchema,
   macAddressSchema,
   updateHostSchema,
+  wakeHostSchema,
 } from '../hostValidator';
 
 describe('hostValidator schemas', () => {
@@ -44,6 +45,7 @@ describe('hostValidator schemas', () => {
       expect(updateHostSchema.safeParse({ mac: 'AA:BB:CC:DD:EE:11' }).success).toBe(true);
       expect(updateHostSchema.safeParse({ notes: null }).success).toBe(true);
       expect(updateHostSchema.safeParse({ tags: ['tag-1'] }).success).toBe(true);
+      expect(updateHostSchema.safeParse({ wolPort: 7 }).success).toBe(true);
     });
 
     it('accepts combined updates', () => {
@@ -75,6 +77,23 @@ describe('hostValidator schemas', () => {
       expect(updateHostSchema.safeParse({ name: '' }).success).toBe(false);
       expect(updateHostSchema.safeParse({ notes: 'x'.repeat(2001) }).success).toBe(false);
       expect(updateHostSchema.safeParse({ tags: [''] }).success).toBe(false);
+      expect(updateHostSchema.safeParse({ wolPort: 0 }).success).toBe(false);
+      expect(updateHostSchema.safeParse({ wolPort: 70000 }).success).toBe(false);
+    });
+  });
+
+  describe('wakeHostSchema', () => {
+    it('accepts empty wake request body', () => {
+      expect(wakeHostSchema.safeParse({}).success).toBe(true);
+    });
+
+    it('accepts wake request with custom wolPort', () => {
+      expect(wakeHostSchema.safeParse({ wolPort: 7 }).success).toBe(true);
+    });
+
+    it('rejects wake request with invalid wolPort', () => {
+      expect(wakeHostSchema.safeParse({ wolPort: 0 }).success).toBe(false);
+      expect(wakeHostSchema.safeParse({ wolPort: 65536 }).success).toBe(false);
     });
   });
 

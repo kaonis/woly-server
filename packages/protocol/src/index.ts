@@ -17,6 +17,7 @@ export interface Host {
   name: string;
   mac: string;
   ip: string;
+  wolPort?: number;
   status: HostStatus;
   lastSeen: string | null;
   discovered: number;
@@ -292,7 +293,11 @@ export interface RegisteredCommandData {
 
 export type CncCommand =
   | { type: 'registered'; data: RegisteredCommandData }
-  | { type: 'wake'; commandId: string; data: { hostName: string; mac: string; verify?: WakeVerifyOptions } }
+  | {
+      type: 'wake';
+      commandId: string;
+      data: { hostName: string; mac: string; wolPort?: number; verify?: WakeVerifyOptions };
+    }
   | { type: 'scan'; commandId: string; data: { immediate: boolean } }
   | {
       type: 'scan-host-ports';
@@ -313,6 +318,7 @@ export type CncCommand =
         name: string;
         mac?: string;
         ip?: string;
+        wolPort?: number;
         status?: HostStatus;
         notes?: string | null;
         tags?: string[];
@@ -341,11 +347,13 @@ export const hostPortSchema: z.ZodType<HostPort> = z.object({
   protocol: z.literal('tcp'),
   service: z.string().min(1),
 });
+export const wolPortSchema = z.number().int().min(1).max(65535);
 
 export const hostSchema = z.object({
   name: z.string().min(1),
   mac: z.string().min(1),
   ip: z.string().min(1),
+  wolPort: wolPortSchema.optional(),
   status: hostStatusSchema,
   lastSeen: z.string().nullable(),
   discovered: z.number().int(),
@@ -632,6 +640,7 @@ export const inboundCncCommandSchema: z.ZodType<CncCommand> = z.discriminatedUni
     data: z.object({
       hostName: z.string().min(1),
       mac: z.string().min(1),
+      wolPort: wolPortSchema.optional(),
       verify: wakeVerifyOptionsSchema.optional(),
     }),
   }),
@@ -661,6 +670,7 @@ export const inboundCncCommandSchema: z.ZodType<CncCommand> = z.discriminatedUni
       name: z.string().min(1),
       mac: z.string().min(1).optional(),
       ip: z.string().min(1).optional(),
+      wolPort: wolPortSchema.optional(),
       status: hostStatusSchema.optional(),
       notes: hostNotesSchema.optional(),
       tags: hostTagsSchema.optional(),

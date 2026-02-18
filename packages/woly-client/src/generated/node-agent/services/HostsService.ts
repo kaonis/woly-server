@@ -114,6 +114,7 @@ export class HostsService {
             name?: string;
             mac?: string;
             ip?: string;
+            wolPort?: number;
             notes?: string | null;
             tags?: Array<string>;
         },

@@ -69,6 +69,14 @@ describe('hostSchema', () => {
     expect(hostSchema.safeParse({ ...validHost, pingResponsive: 1 }).success).toBe(true);
   });
 
+  it('accepts host with custom wolPort', () => {
+    expect(hostSchema.safeParse({ ...validHost, wolPort: 7 }).success).toBe(true);
+  });
+
+  it('rejects host with out-of-range wolPort', () => {
+    expect(hostSchema.safeParse({ ...validHost, wolPort: 70000 }).success).toBe(false);
+  });
+
   it('accepts host with null pingResponsive', () => {
     expect(hostSchema.safeParse({ ...validHost, pingResponsive: null }).success).toBe(true);
   });
@@ -1121,6 +1129,24 @@ describe('inboundCncCommandSchema', () => {
       };
       expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
     });
+
+    it('accepts wake command with custom wolPort', () => {
+      const cmd = {
+        type: 'wake' as const,
+        commandId: 'cmd-custom-port',
+        data: { hostName: 'office-pc', mac: 'AA:BB:CC:DD:EE:FF', wolPort: 7 },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
+    });
+
+    it('rejects wake command with invalid wolPort', () => {
+      const cmd = {
+        type: 'wake' as const,
+        commandId: 'cmd-invalid-port',
+        data: { hostName: 'office-pc', mac: 'AA:BB:CC:DD:EE:FF', wolPort: 0 },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(false);
+    });
   });
 
   describe('scan', () => {
@@ -1193,12 +1219,22 @@ describe('inboundCncCommandSchema', () => {
           name: 'new-name',
           mac: 'AA:BB:CC:DD:EE:FF',
           ip: '192.168.1.50',
+          wolPort: 7,
           status: 'awake' as const,
           notes: 'Renamed workstation',
           tags: ['desk', 'critical'],
         },
       };
       expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
+    });
+
+    it('rejects update with invalid wolPort', () => {
+      const cmd = {
+        type: 'update-host' as const,
+        commandId: 'cmd-1',
+        data: { name: 'pc', wolPort: 65536 },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(false);
     });
 
     it('rejects update with invalid status', () => {

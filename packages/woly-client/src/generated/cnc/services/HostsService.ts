@@ -74,6 +74,7 @@ export class HostsService {
             name?: string;
             mac?: string;
             ip?: string;
+            wolPort?: number;
             status?: 'awake' | 'asleep';
             notes?: string | null;
             tags?: Array<string>;
@@ -141,12 +142,23 @@ export class HostsService {
      * Send a Wake-on-LAN magic packet to the specified host via its managing node
      * @param fqn Fully qualified name (hostname@location)
      * @param idempotencyKey Optional idempotency key to prevent duplicate commands
+     * @param requestBody
      * @returns CommandResult Wake command sent successfully
      * @throws ApiError
      */
     public static postApiHostsWakeup(
         fqn: string,
         idempotencyKey?: string,
+        requestBody?: {
+            /**
+             * Enable asynchronous wake verification for this command
+             */
+            verify?: boolean;
+            /**
+             * Optional WoL UDP destination port override for this wake request
+             */
+            wolPort?: number;
+        },
     ): CancelablePromise<CommandResult> {
         return __request(OpenAPI, {
             method: 'POST',
@@ -157,6 +169,8 @@ export class HostsService {
             headers: {
                 'Idempotency-Key': idempotencyKey,
             },
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 401: `Missing or invalid authentication`,
                 404: `Resource not found`,

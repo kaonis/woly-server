@@ -255,6 +255,49 @@ describe('HostsController additional branches', () => {
       );
     });
 
+    it('passes wolPort override from body to command router', async () => {
+      commandRouter.routeWakeCommand.mockResolvedValue({
+        success: true,
+        message: 'Wake-on-LAN packet sent to desktop@lab',
+        nodeId: 'node-1',
+        location: 'lab',
+      });
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        body: { wolPort: 7 },
+      });
+      const res = createMockResponse();
+
+      await controller.wakeupHost(req, res);
+
+      expect(commandRouter.routeWakeCommand).toHaveBeenCalledWith('desktop@lab', {
+        idempotencyKey: null,
+        verify: null,
+        wolPort: 7,
+      });
+    });
+
+    it('rejects invalid wake request body', async () => {
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        body: { wolPort: 70_000 },
+      });
+      const res = createMockResponse();
+
+      await controller.wakeupHost(req, res);
+
+      expect(commandRouter.routeWakeCommand).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: 'Bad Request',
+          message: 'Invalid request body',
+          details: expect.any(Array),
+        })
+      );
+    });
+
     it('maps timeout errors to 504 and includes correlation id', async () => {
       commandRouter.routeWakeCommand.mockRejectedValue(new Error('Command timeout after 30000ms'));
 

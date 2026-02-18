@@ -96,10 +96,26 @@ class HostDatabase extends EventEmitter {
     return parsed.toISOString();
   }
 
-  private normalizeHostRow(row: Host & { tags?: unknown }): Host {
+  private normalizeWolPort(value: unknown): number {
+    if (typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 65_535) {
+      return value;
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number.parseInt(value, 10);
+      if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65_535) {
+        return parsed;
+      }
+    }
+
+    return 9;
+  }
+
+  private normalizeHostRow(row: Host & { tags?: unknown; wolPort?: unknown }): Host {
     return {
       ...row,
       lastSeen: this.normalizeLastSeen(row.lastSeen),
+      wolPort: this.normalizeWolPort(row.wolPort),
       notes: row.notes ?? null,
       tags: this.parseTags(row.tags, row.name),
     };
@@ -174,6 +190,7 @@ class HostDatabase extends EventEmitter {
       mac text NOT NULL UNIQUE,
       ip text NOT NULL UNIQUE,
       status text NOT NULL,
+      wol_port integer NOT NULL DEFAULT 9,
       lastSeen datetime,
       discovered integer DEFAULT 0,
       pingResponsive integer,
@@ -185,6 +202,13 @@ class HostDatabase extends EventEmitter {
     this.addColumnIfMissing('pingResponsive integer');
     this.addColumnIfMissing('notes text');
     this.addColumnIfMissing("tags text NOT NULL DEFAULT '[]'");
+    this.addColumnIfMissing('wol_port integer NOT NULL DEFAULT 9');
+    try {
+      db.exec('UPDATE hosts SET wol_port = 9 WHERE wol_port IS NULL');
+    } catch (err) {
+      const error = err as Error;
+      logger.warn('Could not normalize wol_port defaults', { error: error.message });
+    }
   }
 
   /**
@@ -195,9 +219,9 @@ class HostDatabase extends EventEmitter {
       const db = this.assertReady();
       const rows = db
         .prepare(
-          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags FROM hosts ORDER BY name'
+          'SELECT name, mac, ip, status, wol_port as wolPort, lastSeen, discovered, pingResponsive, notes, tags FROM hosts ORDER BY name'
         )
-        .all() as Array<Host & { tags?: unknown }>;
+        .all() as Array<Host & { tags?: unknown; wolPort?: unknown }>;
 
       return rows.map((row) => this.normalizeHostRow(row));
     } catch (error) {
@@ -215,9 +239,9 @@ class HostDatabase extends EventEmitter {
       const db = this.assertReady();
       const row = db
         .prepare(
-          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE name = ?'
+          'SELECT name, mac, ip, status, wol_port as wolPort, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE name = ?'
         )
-        .get(name) as (Host & { tags?: unknown }) | undefined;
+        .get(name) as (Host & { tags?: unknown; wolPort?: unknown }) | undefined;
 
       return row ? this.normalizeHostRow(row) : undefined;
     } catch (error) {
@@ -236,9 +260,9 @@ class HostDatabase extends EventEmitter {
       const formattedMac = networkDiscovery.formatMAC(mac);
       const row = db
         .prepare(
-          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE mac = ?'
+          'SELECT name, mac, ip, status, wol_port as wolPort, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE mac = ?'
         )
-        .get(formattedMac) as (Host & { tags?: unknown }) | undefined;
+        .get(formattedMac) as (Host & { tags?: unknown; wolPort?: unknown }) | undefined;
 
       return row ? this.normalizeHostRow(row) : undefined;
     } catch (error) {
@@ -255,24 +279,26 @@ class HostDatabase extends EventEmitter {
     name: string,
     mac: string,
     ip: string,
-    metadata?: { notes?: string | null; tags?: string[] },
+    metadata?: { notes?: string | null; tags?: string[]; wolPort?: number },
     options?: { emitLifecycleEvent?: boolean }
   ): Promise<Host> {
     return new Promise((resolve, reject) => {
-      const sql = `INSERT INTO hosts(name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags)
-                   VALUES(?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 0, NULL, ?, ?)`;
+      const sql = `INSERT INTO hosts(name, mac, ip, status, wol_port, lastSeen, discovered, pingResponsive, notes, tags)
+                   VALUES(?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 0, NULL, ?, ?)`;
       try {
         const db = this.assertReady();
         const formattedMac = networkDiscovery.formatMAC(mac);
         const notes = metadata?.notes ?? null;
         const tags = this.serializeTags(metadata?.tags);
-        db.prepare(sql).run(name, formattedMac, ip, 'asleep', notes, tags);
+        const wolPort = this.normalizeWolPort(metadata?.wolPort);
+        db.prepare(sql).run(name, formattedMac, ip, 'asleep', wolPort, notes, tags);
         logger.info(`Added host: ${name}`);
         const createdHost: Host = {
           name,
           mac: formattedMac,
           ip,
           status: 'asleep',
+          wolPort,
           lastSeen: new Date().toISOString(),
           discovered: 0,
           pingResponsive: null,
@@ -325,7 +351,7 @@ class HostDatabase extends EventEmitter {
    */
   updateHost(
     name: string,
-    updates: Partial<Pick<Host, 'name' | 'mac' | 'ip' | 'status' | 'notes' | 'tags'>>,
+    updates: Partial<Pick<Host, 'name' | 'mac' | 'ip' | 'wolPort' | 'status' | 'notes' | 'tags'>>,
     options?: { emitLifecycleEvent?: boolean }
   ): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -351,6 +377,10 @@ class HostDatabase extends EventEmitter {
         fields.push('ip = ?');
         values.push(updates.ip);
       }
+      if (updates.wolPort !== undefined) {
+        fields.push('wol_port = ?');
+        values.push(this.normalizeWolPort(updates.wolPort));
+      }
       if (updates.status !== undefined) {
         fields.push('status = ?');
         values.push(updates.status);
@@ -371,9 +401,9 @@ class HostDatabase extends EventEmitter {
 
       const existingRow = db
         .prepare(
-          'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE name = ?'
+          'SELECT name, mac, ip, status, wol_port as wolPort, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE name = ?'
         )
-        .get(name) as (Host & { tags?: unknown }) | undefined;
+        .get(name) as (Host & { tags?: unknown; wolPort?: unknown }) | undefined;
       if (!existingRow) {
         reject(new Error(`Host ${name} not found`));
         return;
@@ -385,6 +415,7 @@ class HostDatabase extends EventEmitter {
         (updates.name !== undefined && updates.name !== existing.name) ||
         (normalizedMac !== undefined && normalizedMac !== existing.mac) ||
         (updates.ip !== undefined && updates.ip !== existing.ip) ||
+        (updates.wolPort !== undefined && this.normalizeWolPort(updates.wolPort) !== (existing.wolPort ?? 9)) ||
         (updates.status !== undefined && updates.status !== existing.status) ||
         (updates.notes !== undefined && updates.notes !== (existing.notes ?? null)) ||
         (updates.tags !== undefined &&
@@ -406,9 +437,9 @@ class HostDatabase extends EventEmitter {
           const resolvedName = updates.name ?? name;
           const updatedRow = db
             .prepare(
-              'SELECT name, mac, ip, status, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE name = ?'
+              'SELECT name, mac, ip, status, wol_port as wolPort, lastSeen, discovered, pingResponsive, notes, tags FROM hosts WHERE name = ?'
             )
-            .get(resolvedName) as (Host & { tags?: unknown }) | undefined;
+            .get(resolvedName) as (Host & { tags?: unknown; wolPort?: unknown }) | undefined;
           if (updatedRow && (options?.emitLifecycleEvent ?? true)) {
             this.emit('host-updated', this.normalizeHostRow(updatedRow));
           }

@@ -68,6 +68,7 @@ describe('AgentService command handlers', () => {
     name: 'PHANTOM-MBP',
     mac: 'AA:BB:CC:DD:EE:FF',
     ip: '192.168.1.100',
+    wolPort: 9,
     status: 'awake',
     lastSeen: null,
     discovered: 1,
@@ -108,7 +109,7 @@ describe('AgentService command handlers', () => {
     ((service as unknown) as { hostDb: unknown }).hostDb = hostDbMock;
     ((service as unknown) as { scanOrchestrator: unknown }).scanOrchestrator = scanOrchestratorMock;
     ((wakeOnLan.wake as unknown) as jest.Mock).mockImplementation(
-      (_mac: string, callback: (error: Error | null) => void) => callback(null)
+      (_mac: string, _opts: unknown, callback: (error: Error | null) => void) => callback(null)
     );
     ((networkDiscovery.isHostAlive as unknown) as jest.Mock).mockResolvedValue(true);
     ((networkDiscovery.scanHostOpenPorts as unknown) as jest.Mock).mockResolvedValue([]);
@@ -158,7 +159,7 @@ describe('AgentService command handlers', () => {
       data: { hostName: sampleHost.name, mac: sampleHost.mac },
     });
 
-    expect(wakeOnLan.wake).toHaveBeenCalledWith(sampleHost.mac, expect.any(Function));
+    expect(wakeOnLan.wake).toHaveBeenCalledWith(sampleHost.mac, { port: 9 }, expect.any(Function));
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'command-result',
@@ -175,11 +176,25 @@ describe('AgentService command handlers', () => {
     expect(snapshot.commands.byType.wake.failed).toBe(0);
   });
 
+  it('honors explicit wolPort on wake command payload', async () => {
+    hostDbMock.getHost.mockResolvedValueOnce(sampleHost);
+
+    await ((service as unknown) as {
+      handleWakeCommand: (command: unknown) => Promise<void>;
+    }).handleWakeCommand({
+      type: 'wake',
+      commandId: 'cmd-wake-custom-port',
+      data: { hostName: sampleHost.name, mac: sampleHost.mac, wolPort: 7 },
+    });
+
+    expect(wakeOnLan.wake).toHaveBeenCalledWith(sampleHost.mac, { port: 7 }, expect.any(Function));
+  });
+
   it('sends failure result for wake when wake-on-lan fails', async () => {
     hostDbMock.getHost.mockResolvedValueOnce(undefined);
     hostDbMock.getHostByMAC.mockResolvedValueOnce(undefined);
     ((wakeOnLan.wake as unknown) as jest.Mock).mockImplementation(
-      (_mac: string, callback: (error: Error | null) => void) =>
+      (_mac: string, _opts: unknown, callback: (error: Error | null) => void) =>
         callback(new Error('WOL send failed'))
     );
 
@@ -206,7 +221,7 @@ describe('AgentService command handlers', () => {
   it('sends failure result for wake when wake-on-lan fails for known host', async () => {
     hostDbMock.getHost.mockResolvedValueOnce(sampleHost);
     ((wakeOnLan.wake as unknown) as jest.Mock).mockImplementation(
-      (_mac: string, callback: (error: Error | null) => void) =>
+      (_mac: string, _opts: unknown, callback: (error: Error | null) => void) =>
         callback(new Error('WOL send failed'))
     );
 
@@ -244,7 +259,7 @@ describe('AgentService command handlers', () => {
 
     expect(hostDbMock.getHost).toHaveBeenCalledWith('STALE-NAME');
     expect(hostDbMock.getHostByMAC).toHaveBeenCalledWith(sampleHost.mac);
-    expect(wakeOnLan.wake).toHaveBeenCalledWith(sampleHost.mac, expect.any(Function));
+    expect(wakeOnLan.wake).toHaveBeenCalledWith(sampleHost.mac, { port: 9 }, expect.any(Function));
     expect(mockCncClient.send).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'command-result',
@@ -287,7 +302,7 @@ describe('AgentService command handlers', () => {
     jest.useFakeTimers();
     hostDbMock.getHost.mockResolvedValue(sampleHost);
     ((wakeOnLan.wake as unknown) as jest.Mock).mockImplementation(
-      (_mac: string, callback: (error: Error | null) => void) => callback(new Error('wol transient'))
+      (_mac: string, _opts: unknown, callback: (error: Error | null) => void) => callback(new Error('wol transient'))
     );
 
     const handleWakePromise = ((service as unknown) as {
@@ -588,6 +603,7 @@ describe('AgentService command handlers', () => {
       name: 'RENAMED-HOST',
       mac: undefined,
       ip: '192.168.1.101',
+      wolPort: undefined,
       status: undefined,
       notes: undefined,
       tags: undefined,
@@ -654,6 +670,7 @@ describe('AgentService command handlers', () => {
       name: 'PHANTOM-MBP',
       mac: undefined,
       ip: undefined,
+      wolPort: undefined,
       status: undefined,
       notes: 'Rack 9',
       tags: ['lab', 'primary'],
@@ -770,6 +787,32 @@ describe('AgentService command handlers', () => {
           commandId: 'cmd-update-invalid-tags',
           success: false,
           error: 'Invalid update-host payload: each tag must be between 1 and 64 characters',
+        }),
+      })
+    );
+  });
+
+  it('rejects update-host payload with invalid wolPort', async () => {
+    await ((service as unknown) as {
+      handleUpdateHostCommand: (command: unknown) => Promise<void>;
+    }).handleUpdateHostCommand({
+      type: 'update-host',
+      commandId: 'cmd-update-invalid-wol-port',
+      data: {
+        name: 'PHANTOM-MBP',
+        wolPort: 65536,
+      },
+    });
+
+    expect(hostDbMock.getHost).not.toHaveBeenCalled();
+    expect(hostDbMock.updateHost).not.toHaveBeenCalled();
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-update-invalid-wol-port',
+          success: false,
+          error: 'Invalid update-host payload: wolPort must be between 1 and 65535',
         }),
       })
     );
