@@ -25,6 +25,20 @@ cp apps/cnc/.env.example apps/cnc/.env
 3. Run `npm run build && npm run typecheck && npm run test` to verify
 4. Push and open a PR against `master`
 
+## Git Hooks and Commit Policy
+
+Local hooks are managed by Husky (`npm install` runs `npm run prepare`):
+
+- `pre-commit`: staged secret scan (`gitleaks`) + `lint-staged`.
+- `pre-push`: `npm run prepush:checks` (`typecheck` + related Jest tests).
+- `commit-msg`: commit message linting via `commitlint` (Conventional Commits).
+
+Install `gitleaks` locally so `pre-commit` can run:
+
+```bash
+brew install gitleaks
+```
+
 ## CNC Mode Sync Requirements
 
 For CNC feature work, follow `docs/CNC_SYNC_POLICY.md`.

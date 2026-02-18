@@ -23,6 +23,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "prepush:checks": "node scripts/pre-push-checks.mjs",
+    "secrets:scan:staged": "sh ./scripts/run-gitleaks-staged.sh",
     "dev:node-agent": "turbo run dev --filter=@woly-server/node-agent",
     "dev:cnc": "turbo run dev --filter=@woly-server/cnc",
     "format": "prettier --write .",
