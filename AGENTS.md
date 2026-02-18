@@ -20,6 +20,8 @@ Rules:
 - Do not create implementation branches from stale local refs.
 - Perform all edits, commits, and PR prep from the new worktree.
 - Use `codex/` branch prefixes for Codex-authored branches; non-Codex contributors should use the repo's standard branch prefixes.
+- After merge/completion, remove the temporary worktree to avoid stale local clones:
+  - `git worktree remove ../woly-server-<topic>`
 
 ## Review Pass (Required)
 
