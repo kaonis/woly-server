@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS aggregated_hosts (
     node_id VARCHAR(255) NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     mac VARCHAR(17) NOT NULL,
+    secondary_macs TEXT NOT NULL DEFAULT '[]',
     ip VARCHAR(45) NOT NULL,
     status VARCHAR(20) NOT NULL,
     last_seen TIMESTAMP,

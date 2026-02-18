@@ -435,6 +435,160 @@ describe('Host Routes Authentication and Authorization', () => {
     });
   });
 
+  describe('GET /api/hosts/merge-candidates', () => {
+    it('returns 401 when no authorization header is provided', async () => {
+      const response = await request(app).get('/api/hosts/merge-candidates');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 for unsupported role', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/merge-candidates')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        code: 'AUTH_FORBIDDEN',
+      });
+    });
+
+    it('allows access with valid operator token', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'operator',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .get('/api/hosts/merge-candidates')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('candidates');
+    });
+  });
+
+  describe('PUT /api/hosts/:fqn/merge-mac', () => {
+    it('returns 401 when no authorization header is provided', async () => {
+      const response = await request(app).put('/api/hosts/node1.example.com/merge-mac').send({
+        mac: 'AA:BB:CC:DD:EE:11',
+      });
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 for unsupported role', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .put('/api/hosts/node1.example.com/merge-mac')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ mac: 'AA:BB:CC:DD:EE:11' });
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        code: 'AUTH_FORBIDDEN',
+      });
+    });
+
+    it('allows access with valid operator token', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'operator',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .put('/api/hosts/node1.example.com/merge-mac')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ mac: 'AA:BB:CC:DD:EE:11' });
+
+      // Will be 404 since host doesn't exist in mock, but auth passed
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('DELETE /api/hosts/:fqn/merge-mac/:mac', () => {
+    it('returns 401 when no authorization header is provided', async () => {
+      const response = await request(app).delete('/api/hosts/node1.example.com/merge-mac/AA:BB:CC:DD:EE:11');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        error: 'Unauthorized',
+        code: 'AUTH_UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 for unsupported role', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'viewer',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .delete('/api/hosts/node1.example.com/merge-mac/AA:BB:CC:DD:EE:11')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({
+        code: 'AUTH_FORBIDDEN',
+      });
+    });
+
+    it('allows access with valid operator token', async () => {
+      const token = createToken({
+        sub: 'user-1',
+        role: 'operator',
+        iss: 'test-issuer',
+        aud: 'test-audience',
+        exp: now + 3600,
+        nbf: now - 10,
+      });
+
+      const response = await request(app)
+        .delete('/api/hosts/node1.example.com/merge-mac/AA:BB:CC:DD:EE:11')
+        .set('Authorization', `Bearer ${token}`);
+
+      // Will be 404 since host doesn't exist in mock, but auth passed
+      expect(response.status).toBe(404);
+    });
+  });
+
   describe('POST /api/hosts/scan', () => {
     it('returns 401 when no authorization header is provided', async () => {
       const response = await request(app).post('/api/hosts/scan');

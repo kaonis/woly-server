@@ -559,6 +559,7 @@ describe('Cross-repo protocol contract', () => {
             currentName: 'old-hostname',
             name: 'new-hostname',
             mac: '11:22:33:44:55:66',
+            secondaryMacs: ['AA:BB:CC:DD:EE:FF'],
             ip: '192.168.1.200',
             wolPort: 7,
             status: 'awake' as const,

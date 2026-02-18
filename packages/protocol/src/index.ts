@@ -16,6 +16,7 @@ export type HostStatus = 'awake' | 'asleep';
 export interface Host {
   name: string;
   mac: string;
+  secondaryMacs?: string[];
   ip: string;
   wolPort?: number;
   status: HostStatus;
@@ -391,6 +392,7 @@ export type CncCommand =
         currentName?: string;
         name: string;
         mac?: string;
+        secondaryMacs?: string[];
         ip?: string;
         wolPort?: number;
         status?: HostStatus;
@@ -426,6 +428,7 @@ export const wolPortSchema = z.number().int().min(1).max(65535);
 export const hostSchema = z.object({
   name: z.string().min(1),
   mac: z.string().min(1),
+  secondaryMacs: z.array(z.string().min(1)).max(32).optional(),
   ip: z.string().min(1),
   wolPort: wolPortSchema.optional(),
   status: hostStatusSchema,
@@ -825,6 +828,7 @@ export const inboundCncCommandSchema: z.ZodType<CncCommand> = z.discriminatedUni
       currentName: z.string().min(1).optional(),
       name: z.string().min(1),
       mac: z.string().min(1).optional(),
+      secondaryMacs: z.array(z.string().min(1)).max(32).optional(),
       ip: z.string().min(1).optional(),
       wolPort: wolPortSchema.optional(),
       status: hostStatusSchema.optional(),

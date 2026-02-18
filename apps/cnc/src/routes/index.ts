@@ -92,6 +92,9 @@ export function createRoutes(
   router.get('/hosts/ports/:fqn', (req, res) => hostsController.getHostPorts(req, res));
   router.get('/hosts/scan-ports/:fqn', (req, res) => hostsController.scanHostPorts(req, res));
   router.post('/hosts/scan', (req, res) => hostsController.scanHosts(req, res));
+  router.get('/hosts/merge-candidates', (req, res) => hostsController.getMergeCandidates(req, res));
+  router.put('/hosts/:fqn/merge-mac', (req, res) => hostsController.mergeHostMac(req, res));
+  router.delete('/hosts/:fqn/merge-mac/:mac', (req, res) => hostsController.unmergeHostMac(req, res));
   // IMPORTANT: schedule routes must be registered before the :fqn catch-all
   router.get('/hosts/:fqn/schedules', scheduleSyncLimiter, (req, res) =>
     schedulesController.listHostSchedules(req, res),

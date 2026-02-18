@@ -213,6 +213,48 @@ describe('API Integration Tests', () => {
     });
   });
 
+  describe('Host MAC merge routes', () => {
+    it('should list merge candidates', async () => {
+      await db.addHost('MERGE-CANDIDATE', 'AA:BB:CC:66:66:60', '192.168.66.10');
+      await db.addHost('merge-candidate', 'AA:BB:CC:66:66:61', '192.168.66.20');
+
+      const response = await request(app).get('/hosts/merge-candidates').expect(200);
+      expect(Array.isArray(response.body.candidates)).toBe(true);
+      expect(response.body.candidates.length).toBeGreaterThan(0);
+    });
+
+    it('should merge MAC into target host and optionally delete source host', async () => {
+      await db.addHost('TEST-MERGE-TARGET', 'AA:BB:CC:66:66:70', '192.168.66.70');
+      await db.addHost('TEST-MERGE-SOURCE', 'AA:BB:CC:66:66:71', '192.168.66.71');
+
+      const response = await request(app)
+        .put('/hosts/TEST-MERGE-TARGET/merge-mac')
+        .send({
+          mac: 'AA:BB:CC:66:66:71',
+          sourceHostName: 'TEST-MERGE-SOURCE',
+          deleteSourceHost: true,
+        })
+        .expect(200);
+
+      expect(response.body.mac).toBe('AA:BB:CC:66:66:70');
+      expect(response.body.secondaryMacs).toEqual(['AA:BB:CC:66:66:71']);
+      await request(app).get('/hosts/TEST-MERGE-SOURCE').expect(404);
+    });
+
+    it('should unmerge a secondary MAC from host', async () => {
+      await db.addHost('TEST-UNMERGE', 'AA:BB:CC:66:66:80', '192.168.66.80', {
+        secondaryMacs: ['AA:BB:CC:66:66:81'],
+      });
+
+      const response = await request(app)
+        .delete('/hosts/TEST-UNMERGE/merge-mac/AA:BB:CC:66:66:81')
+        .expect(200);
+
+      expect(response.body.mac).toBe('AA:BB:CC:66:66:80');
+      expect(response.body.secondaryMacs).toBeUndefined();
+    });
+  });
+
   describe('DELETE /hosts/:name', () => {
     beforeEach(async () => {
       try {

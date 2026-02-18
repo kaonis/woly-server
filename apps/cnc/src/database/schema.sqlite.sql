@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS aggregated_hosts (
     node_id TEXT NOT NULL,
     name TEXT NOT NULL,
     mac TEXT NOT NULL,
+    secondary_macs TEXT NOT NULL DEFAULT '[]',
     ip TEXT NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('awake', 'asleep')),
     last_seen DATETIME,

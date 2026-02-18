@@ -21,6 +21,7 @@ const wolPortSchema = z.number().int().min(1).max(65_535);
 const updateHostBodySchema = z.object({
   name: z.string().min(1).optional(),
   mac: z.string().regex(MAC_ADDRESS_PATTERN).optional(),
+  secondaryMacs: z.array(z.string().regex(MAC_ADDRESS_PATTERN)).max(32).optional(),
   ip: ipAddressSchema.optional(),
   wolPort: wolPortSchema.optional(),
   status: hostStatusSchema.optional(),
@@ -42,6 +43,13 @@ const uptimeQuerySchema = z.object({
   period: z.string().regex(/^\d+[dhm]$/).optional(),
 }).passthrough();
 
+const mergeHostMacBodySchema = z.object({
+  mac: z.string().regex(MAC_ADDRESS_PATTERN),
+  makePrimary: z.boolean().optional(),
+  sourceFqn: z.string().min(1).optional(),
+  deleteSourceHost: z.boolean().optional(),
+}).strict();
+
 type RouteUpdateHostData = Parameters<CommandRouter['routeUpdateHostCommand']>[1];
 
 function toRouteUpdateHostData(payload: z.infer<typeof updateHostBodySchema>): RouteUpdateHostData {
@@ -49,6 +57,7 @@ function toRouteUpdateHostData(payload: z.infer<typeof updateHostBodySchema>): R
 
   if (payload.name !== undefined) hostData.name = payload.name;
   if (payload.mac !== undefined) hostData.mac = payload.mac;
+  if (payload.secondaryMacs !== undefined) hostData.secondaryMacs = payload.secondaryMacs;
   if (payload.ip !== undefined) hostData.ip = payload.ip;
   if (payload.wolPort !== undefined) hostData.wolPort = payload.wolPort;
   if (payload.notes !== undefined) hostData.notes = payload.notes;
@@ -197,6 +206,16 @@ export class HostsController {
     } catch (error) {
       logger.warn('Failed to persist host port scan snapshot', { fqn, ...toLogError(error) });
     }
+  }
+
+  private ipv4SubnetHint(ip: string): string | null {
+    const match = /^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/.exec(ip.trim());
+    return match ? `${match[1]}.x/24` : null;
+  }
+
+  private hostHasMac(host: { mac: string; secondaryMacs?: string[] }, mac: string): boolean {
+    const knownMacs = new Set<string>([host.mac, ...(host.secondaryMacs ?? [])]);
+    return knownMacs.has(mac);
   }
 
   /**
@@ -946,6 +965,281 @@ export class HostsController {
 
   /**
    * @swagger
+   * /api/hosts/merge-candidates:
+   *   get:
+   *     summary: List potential duplicate-host merge candidates
+   *     tags: [Hosts]
+   *     responses:
+   *       200:
+   *         description: Candidate pairs detected from aggregated host inventory
+   */
+  async getMergeCandidates(req: Request, res: Response): Promise<void> {
+    try {
+      const hosts = await this.hostAggregator.getAllHosts();
+      const candidates: Array<{
+        targetFqn: string;
+        targetName: string;
+        targetMac: string;
+        targetIp: string;
+        candidateFqn: string;
+        candidateName: string;
+        candidateMac: string;
+        candidateIp: string;
+        nodeId: string;
+        subnetHint: string;
+        reason: 'same_hostname_subnet';
+      }> = [];
+
+      for (let i = 0; i < hosts.length; i += 1) {
+        for (let j = i + 1; j < hosts.length; j += 1) {
+          const first = hosts[i];
+          const second = hosts[j];
+          if (first.nodeId !== second.nodeId) {
+            continue;
+          }
+          if (first.name.trim().toLowerCase() !== second.name.trim().toLowerCase()) {
+            continue;
+          }
+
+          const firstSubnet = this.ipv4SubnetHint(first.ip);
+          const secondSubnet = this.ipv4SubnetHint(second.ip);
+          if (!firstSubnet || !secondSubnet || firstSubnet !== secondSubnet) {
+            continue;
+          }
+
+          const firstKnownMacs = new Set<string>([first.mac, ...(first.secondaryMacs ?? [])]);
+          const secondKnownMacs = new Set<string>([second.mac, ...(second.secondaryMacs ?? [])]);
+          const sharesMac = Array.from(firstKnownMacs).some((knownMac) => secondKnownMacs.has(knownMac));
+          if (sharesMac) {
+            continue;
+          }
+
+          candidates.push({
+            targetFqn: first.fullyQualifiedName,
+            targetName: first.name,
+            targetMac: first.mac,
+            targetIp: first.ip,
+            candidateFqn: second.fullyQualifiedName,
+            candidateName: second.name,
+            candidateMac: second.mac,
+            candidateIp: second.ip,
+            nodeId: first.nodeId,
+            subnetHint: firstSubnet,
+            reason: 'same_hostname_subnet',
+          });
+        }
+      }
+
+      res.json({
+        candidates,
+        generatedAt: new Date().toISOString(),
+        correlationId: req.correlationId ?? undefined,
+      });
+    } catch (error) {
+      logger.error('Failed to list merge candidates', { ...toLogError(error) });
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Failed to list merge candidates',
+        correlationId: req.correlationId ?? undefined,
+      });
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/hosts/{fqn}/merge-mac:
+   *   put:
+   *     summary: Associate an additional MAC address with a host
+   *     tags: [Hosts]
+   */
+  async mergeHostMac(req: Request, res: Response): Promise<void> {
+    try {
+      const fqn = req.params.fqn as string;
+      const parseResult = mergeHostMacBodySchema.safeParse(req.body);
+      if (!parseResult.success) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid request body',
+          details: parseResult.error.issues,
+          correlationId: req.correlationId ?? undefined,
+        });
+        return;
+      }
+
+      const targetHost = await this.hostAggregator.getHostByFQN(fqn);
+      if (!targetHost) {
+        res.status(404).json({
+          error: 'Not Found',
+          message: `Host ${fqn} not found`,
+          correlationId: req.correlationId ?? undefined,
+        });
+        return;
+      }
+
+      const normalizedMac = parseResult.data.mac.trim().toUpperCase().replace(/-/g, ':');
+      let nextPrimaryMac = targetHost.mac;
+      let nextSecondaryMacs = targetHost.secondaryMacs ?? [];
+
+      if (parseResult.data.makePrimary) {
+        nextPrimaryMac = normalizedMac;
+        nextSecondaryMacs = [
+          ...nextSecondaryMacs.filter((candidate) => candidate !== normalizedMac),
+          targetHost.mac,
+        ];
+      } else if (!this.hostHasMac(targetHost, normalizedMac)) {
+        nextSecondaryMacs = [...nextSecondaryMacs, normalizedMac];
+      }
+
+      nextSecondaryMacs = Array.from(
+        new Set(nextSecondaryMacs.filter((candidate) => candidate !== nextPrimaryMac))
+      );
+
+      const idempotencyKeyHeader = req.header('Idempotency-Key');
+      const idempotencyKey =
+        idempotencyKeyHeader && idempotencyKeyHeader.trim().length > 0
+          ? idempotencyKeyHeader.trim()
+          : null;
+      const correlationId = req.correlationId ?? null;
+
+      const updateResult = await this.commandRouter.routeUpdateHostCommand(
+        fqn,
+        { mac: nextPrimaryMac, secondaryMacs: nextSecondaryMacs },
+        { idempotencyKey, correlationId },
+      );
+      if (!updateResult.success) {
+        throw new Error(updateResult.error || 'Failed to merge MAC');
+      }
+
+      if (
+        parseResult.data.deleteSourceHost &&
+        parseResult.data.sourceFqn &&
+        parseResult.data.sourceFqn !== fqn
+      ) {
+        const deleteResult = await this.commandRouter.routeDeleteHostCommand(
+          parseResult.data.sourceFqn,
+          { idempotencyKey: null, correlationId },
+        );
+        if (!deleteResult.success) {
+          throw new Error(deleteResult.error || 'Merged MAC but failed to delete source host');
+        }
+      }
+
+      res.json({
+        success: true,
+        message: 'Host MAC merged successfully',
+        secondaryMacs: nextSecondaryMacs,
+        primaryMac: nextPrimaryMac,
+        commandId: updateResult.commandId,
+        state: updateResult.state,
+        correlationId: updateResult.correlationId ?? correlationId ?? undefined,
+      });
+    } catch (error) {
+      const mapped = mapCommandError(error, 'Failed to merge host MAC');
+      res.status(mapped.statusCode).json({
+        error: mapped.errorTitle,
+        message: mapped.message,
+        correlationId: req.correlationId ?? undefined,
+      });
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/hosts/{fqn}/merge-mac/{mac}:
+   *   delete:
+   *     summary: Remove a merged MAC association from a host (undo)
+   *     tags: [Hosts]
+   */
+  async unmergeHostMac(req: Request, res: Response): Promise<void> {
+    try {
+      const fqn = req.params.fqn as string;
+      const targetHost = await this.hostAggregator.getHostByFQN(fqn);
+      if (!targetHost) {
+        res.status(404).json({
+          error: 'Not Found',
+          message: `Host ${fqn} not found`,
+          correlationId: req.correlationId ?? undefined,
+        });
+        return;
+      }
+
+      const normalizedMac = (req.params.mac as string).trim().toUpperCase().replace(/-/g, ':');
+      if (!MAC_ADDRESS_PATTERN.test(normalizedMac)) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid MAC address format',
+          correlationId: req.correlationId ?? undefined,
+        });
+        return;
+      }
+      const existingSecondary = targetHost.secondaryMacs ?? [];
+
+      let nextPrimaryMac = targetHost.mac;
+      let nextSecondaryMacs = existingSecondary;
+
+      if (normalizedMac === targetHost.mac) {
+        if (existingSecondary.length === 0) {
+          res.status(400).json({
+            error: 'Bad Request',
+            message: 'Cannot unmerge the primary MAC when no secondary MACs exist',
+            correlationId: req.correlationId ?? undefined,
+          });
+          return;
+        }
+        nextPrimaryMac = existingSecondary[0];
+        nextSecondaryMacs = existingSecondary.slice(1);
+      } else if (existingSecondary.includes(normalizedMac)) {
+        nextSecondaryMacs = existingSecondary.filter((candidate) => candidate !== normalizedMac);
+      } else {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: `MAC ${normalizedMac} is not associated with host ${fqn}`,
+          correlationId: req.correlationId ?? undefined,
+        });
+        return;
+      }
+
+      nextSecondaryMacs = Array.from(
+        new Set(nextSecondaryMacs.filter((candidate) => candidate !== nextPrimaryMac))
+      );
+
+      const idempotencyKeyHeader = req.header('Idempotency-Key');
+      const idempotencyKey =
+        idempotencyKeyHeader && idempotencyKeyHeader.trim().length > 0
+          ? idempotencyKeyHeader.trim()
+          : null;
+      const correlationId = req.correlationId ?? null;
+
+      const updateResult = await this.commandRouter.routeUpdateHostCommand(
+        fqn,
+        { mac: nextPrimaryMac, secondaryMacs: nextSecondaryMacs },
+        { idempotencyKey, correlationId },
+      );
+      if (!updateResult.success) {
+        throw new Error(updateResult.error || 'Failed to unmerge MAC');
+      }
+
+      res.json({
+        success: true,
+        message: 'Host MAC unmerged successfully',
+        secondaryMacs: nextSecondaryMacs,
+        primaryMac: nextPrimaryMac,
+        commandId: updateResult.commandId,
+        state: updateResult.state,
+        correlationId: updateResult.correlationId ?? correlationId ?? undefined,
+      });
+    } catch (error) {
+      const mapped = mapCommandError(error, 'Failed to unmerge host MAC');
+      res.status(mapped.statusCode).json({
+        error: mapped.errorTitle,
+        message: mapped.message,
+        correlationId: req.correlationId ?? undefined,
+      });
+    }
+  }
+
+  /**
+   * @swagger
    * /api/hosts/{fqn}:
    *   put:
    *     summary: Update host information
@@ -979,6 +1273,10 @@ export class HostsController {
  *                 type: string
  *               mac:
  *                 type: string
+ *               secondaryMacs:
+ *                 type: array
+ *                 items:
+ *                   type: string
  *               ip:
  *                 type: string
  *               wolPort:

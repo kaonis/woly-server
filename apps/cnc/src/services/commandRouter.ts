@@ -16,6 +16,7 @@ type DispatchCommand = Extract<CncCommand, { commandId: string }>;
 interface HostUpdateData {
   name?: string;
   mac?: string;
+  secondaryMacs?: string[];
   ip?: string;
   wolPort?: number;
   status?: HostStatus;
@@ -479,6 +480,7 @@ export class CommandRouter extends EventEmitter {
         currentName: host.name,
         name: hostData.name ?? host.name,
         mac: hostData.mac ?? host.mac,
+        secondaryMacs: hostData.secondaryMacs ?? host.secondaryMacs,
         ip: hostData.ip ?? host.ip,
         wolPort: hostData.wolPort ?? host.wolPort,
         status: hostData.status ?? host.status,

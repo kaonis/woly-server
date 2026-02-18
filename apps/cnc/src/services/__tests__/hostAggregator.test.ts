@@ -396,6 +396,52 @@ describe('HostAggregator', () => {
       expect(host!.status).toBe('asleep');
     });
 
+    it('should reconcile by any known MAC when incoming primary matches existing secondary MAC', async () => {
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-2',
+        location: 'Home Office',
+        host: {
+          name: 'dual-nic-old',
+          mac: 'AA:BB:CC:DD:EE:41',
+          secondaryMacs: ['AA:BB:CC:DD:EE:42'],
+          ip: '192.168.1.41',
+          status: 'awake' as const,
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      await hostAggregator.onHostUpdated({
+        nodeId: 'test-node-2',
+        location: 'Home Office',
+        host: {
+          name: 'dual-nic-new',
+          mac: 'AA:BB:CC:DD:EE:42',
+          secondaryMacs: ['AA:BB:CC:DD:EE:41'],
+          ip: '192.168.1.42',
+          status: 'asleep' as const,
+          lastSeen: new Date().toISOString(),
+          discovered: 1,
+          pingResponsive: 0,
+        },
+      });
+
+      const old = await hostAggregator.getHostByFQN('dual-nic-old@Home%20Office-test-node-2');
+      expect(old).toBeNull();
+
+      const renamed = await hostAggregator.getHostByFQN('dual-nic-new@Home%20Office-test-node-2');
+      expect(renamed).not.toBeNull();
+      expect(renamed!.mac).toBe('AA:BB:CC:DD:EE:42');
+      expect(renamed!.secondaryMacs).toEqual(['AA:BB:CC:DD:EE:41']);
+
+      const countResult = await db.query<{ count: string | number }>(
+        'SELECT COUNT(*) as count FROM aggregated_hosts WHERE node_id = $1',
+        ['test-node-2']
+      );
+      expect(parseInt(String(countResult.rows[0].count), 10)).toBe(1);
+    });
+
     it('should delete duplicate rename target rows for same node+MAC', async () => {
       const nodeId = 'test-node-2';
       const location = 'Home Office';

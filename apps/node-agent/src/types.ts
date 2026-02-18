@@ -23,6 +23,22 @@ export interface HostsResponse {
   lastScanTime: string | null;
 }
 
+export interface HostMergeCandidate {
+  targetName: string;
+  targetMac: string;
+  targetIp: string;
+  candidateName: string;
+  candidateMac: string;
+  candidateIp: string;
+  subnetHint: string;
+  reason: 'same_hostname_subnet';
+}
+
+export interface HostMergeCandidatesResponse {
+  candidates: HostMergeCandidate[];
+  generatedAt: string;
+}
+
 export interface ScanResponse {
   message: string;
   hostsCount: number;

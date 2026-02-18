@@ -7,7 +7,9 @@ import {
   addHostSchema,
   deleteHostSchema,
   hostNameParamSchema,
+  hostNameAndMacParamSchema,
   macAddressSchema,
+  mergeHostMacSchema,
   updateHostSchema,
   wakeHostSchema,
 } from '../validators/hostValidator';
@@ -34,6 +36,24 @@ router.get(
   '/mac-vendor/:mac',
   validateRequest(macAddressSchema, 'params'),
   hostsController.getMacVendor
+);
+
+// Suggest duplicate hosts that are good merge candidates
+router.get('/merge-candidates', hostsController.getMergeCandidates);
+
+// Merge another MAC into a host
+router.put(
+  '/:name/merge-mac',
+  validateRequest(hostNameParamSchema, 'params'),
+  validateRequest(mergeHostMacSchema, 'body'),
+  hostsController.mergeHostMac
+);
+
+// Undo a MAC merge for a host
+router.delete(
+  '/:name/merge-mac/:mac',
+  validateRequest(hostNameAndMacParamSchema, 'params'),
+  hostsController.unmergeHostMac
 );
 
 // Get a specific host by name

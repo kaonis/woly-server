@@ -38,6 +38,7 @@ type ValidatedUpdateHostData = {
   currentName?: string;
   name: string;
   mac?: string;
+  secondaryMacs?: string[];
   ip?: string;
   wolPort?: number;
   status?: Host['status'];
@@ -1280,6 +1281,7 @@ export class AgentService extends EventEmitter {
       await this.hostDb.updateHost(currentName, {
         name: data.name,
         mac: data.mac,
+        secondaryMacs: data.secondaryMacs,
         ip: data.ip,
         wolPort: data.wolPort,
         status: data.status,
@@ -1421,6 +1423,26 @@ export class AgentService extends EventEmitter {
       mac = normalizedMac.includes('-') ? normalizedMac.replace(/-/g, ':') : normalizedMac;
     }
 
+    let secondaryMacs: string[] | undefined;
+    if (payload.secondaryMacs !== undefined) {
+      if (!Array.isArray(payload.secondaryMacs)) {
+        throw new Error('Invalid update-host payload: secondaryMacs must be an array of strings');
+      }
+      if (payload.secondaryMacs.length > 32) {
+        throw new Error('Invalid update-host payload: secondaryMacs must contain at most 32 entries');
+      }
+      secondaryMacs = payload.secondaryMacs.map((candidate) => {
+        if (typeof candidate !== 'string') {
+          throw new Error('Invalid update-host payload: secondaryMacs must be an array of strings');
+        }
+        const normalized = candidate.trim();
+        if (!MAC_ADDRESS_REGEX.test(normalized)) {
+          throw new Error('Invalid update-host payload: secondaryMacs contains an invalid MAC');
+        }
+        return normalized.includes('-') ? normalized.replace(/-/g, ':') : normalized;
+      });
+    }
+
     let ip: string | undefined;
     if (payload.ip !== undefined) {
       if (typeof payload.ip !== 'string') {
@@ -1492,6 +1514,7 @@ export class AgentService extends EventEmitter {
       currentName,
       name,
       mac,
+      secondaryMacs,
       ip,
       wolPort,
       status,

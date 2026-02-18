@@ -113,6 +113,7 @@ export class HostsService {
         requestBody: {
             name?: string;
             mac?: string;
+            secondaryMacs?: Array<string>;
             ip?: string;
             wolPort?: number;
             notes?: string | null;
@@ -152,6 +153,37 @@ export class HostsService {
             errors: {
                 404: `Host not found`,
             },
+        });
+    }
+    /**
+     * List potential duplicate-host merge candidates
+     * @returns any Candidate pairs detected from local host inventory
+     * @throws ApiError
+     */
+    public static getHostsMergeCandidates(): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/hosts/merge-candidates',
+        });
+    }
+    /**
+     * Associate an additional MAC address with a host
+     * @throws ApiError
+     */
+    public static putHostsMergeMac(): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'PUT',
+            url: '/hosts/{name}/merge-mac',
+        });
+    }
+    /**
+     * Remove a merged MAC association from a host (undo)
+     * @throws ApiError
+     */
+    public static deleteHostsMergeMac(): CancelablePromise<void> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/hosts/{name}/merge-mac/{mac}',
         });
     }
     /**

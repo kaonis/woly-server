@@ -129,6 +129,15 @@ describe('hostSchema', () => {
     ).toBe(true);
   });
 
+  it('accepts host with secondaryMacs', () => {
+    expect(
+      hostSchema.safeParse({
+        ...validHost,
+        secondaryMacs: ['11:22:33:44:55:66', 'AA-BB-CC-DD-EE-11'],
+      }).success
+    ).toBe(true);
+  });
+
   it('rejects host with invalid cached port protocol', () => {
     expect(
       hostSchema.safeParse({
@@ -1419,8 +1428,21 @@ describe('inboundCncCommandSchema', () => {
           ip: '192.168.1.50',
           wolPort: 7,
           status: 'awake' as const,
+          secondaryMacs: ['11:22:33:44:55:66'],
           notes: 'Renamed workstation',
           tags: ['desk', 'critical'],
+        },
+      };
+      expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
+    });
+
+    it('accepts update with secondaryMacs only', () => {
+      const cmd = {
+        type: 'update-host' as const,
+        commandId: 'cmd-1',
+        data: {
+          name: 'pc',
+          secondaryMacs: ['11:22:33:44:55:66'],
         },
       };
       expect(inboundCncCommandSchema.safeParse(cmd).success).toBe(true);
