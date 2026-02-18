@@ -18,6 +18,7 @@ import { createRoutes } from './routes';
 import { createWebSocketServer } from './websocket/server';
 import { errorHandler } from './middleware/errorHandler';
 import { reconcileCommandsOnStartup, startCommandPruning, stopCommandPruning } from './services/commandReconciler';
+import { startHostStatusHistoryPruning, stopHostStatusHistoryPruning } from './services/hostStatusHistoryRetention';
 import { startWakeScheduleWorker, stopWakeScheduleWorker } from './services/wakeScheduleWorker';
 import { specs } from './swagger';
 import { runtimeMetrics } from './services/runtimeMetrics';
@@ -199,6 +200,7 @@ export class Server {
 
       // Start periodic command pruning
       startCommandPruning(config.commandRetentionDays);
+      startHostStatusHistoryPruning(this.hostAggregator, config.hostStatusHistoryRetentionDays);
 
       // Start wake schedule execution worker
       startWakeScheduleWorker({
@@ -236,6 +238,7 @@ export class Server {
 
       // Stop command pruning
       stopCommandPruning();
+      stopHostStatusHistoryPruning();
 
       // Stop wake schedule worker
       stopWakeScheduleWorker();

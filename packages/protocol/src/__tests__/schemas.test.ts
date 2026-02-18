@@ -6,7 +6,10 @@ import {
   createHostWakeScheduleRequestSchema,
   deleteHostWakeScheduleResponseSchema,
   hostPortScanResponseSchema,
+  hostStatusHistoryEntrySchema,
+  hostStatusHistoryResponseSchema,
   hostSchedulesResponseSchema,
+  hostUptimeSummarySchema,
   hostWakeScheduleSchema,
   hostSchema,
   hostStateStreamEventSchema,
@@ -736,6 +739,84 @@ describe('deleteHostWakeScheduleResponseSchema', () => {
         success: false,
         id: 'schedule-1',
       }).success
+    ).toBe(false);
+  });
+});
+
+describe('hostStatusHistoryEntrySchema', () => {
+  it('accepts valid status transition entries', () => {
+    expect(
+      hostStatusHistoryEntrySchema.safeParse({
+        hostFqn: 'desktop@Home%20Office-node-1',
+        oldStatus: 'asleep',
+        newStatus: 'awake',
+        changedAt: '2026-02-18T18:00:00.000Z',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects invalid status values', () => {
+    expect(
+      hostStatusHistoryEntrySchema.safeParse({
+        hostFqn: 'desktop@Home%20Office-node-1',
+        oldStatus: 'unknown',
+        newStatus: 'awake',
+        changedAt: '2026-02-18T18:00:00.000Z',
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('hostStatusHistoryResponseSchema', () => {
+  it('accepts valid host history response payloads', () => {
+    expect(
+      hostStatusHistoryResponseSchema.safeParse({
+        hostFqn: 'desktop@Home%20Office-node-1',
+        from: '2026-02-11T18:00:00.000Z',
+        to: '2026-02-18T18:00:00.000Z',
+        entries: [
+          {
+            hostFqn: 'desktop@Home%20Office-node-1',
+            oldStatus: 'asleep',
+            newStatus: 'awake',
+            changedAt: '2026-02-18T17:00:00.000Z',
+          },
+        ],
+      }).success,
+    ).toBe(true);
+  });
+});
+
+describe('hostUptimeSummarySchema', () => {
+  it('accepts valid uptime summaries', () => {
+    expect(
+      hostUptimeSummarySchema.safeParse({
+        hostFqn: 'desktop@Home%20Office-node-1',
+        period: '7d',
+        from: '2026-02-11T18:00:00.000Z',
+        to: '2026-02-18T18:00:00.000Z',
+        uptimePercentage: 99.5,
+        awakeMs: 604500000,
+        asleepMs: 4500000,
+        transitions: 4,
+        currentStatus: 'awake',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects summaries with invalid uptime percentages', () => {
+    expect(
+      hostUptimeSummarySchema.safeParse({
+        hostFqn: 'desktop@Home%20Office-node-1',
+        period: '7d',
+        from: '2026-02-11T18:00:00.000Z',
+        to: '2026-02-18T18:00:00.000Z',
+        uptimePercentage: 120,
+        awakeMs: 1,
+        asleepMs: 0,
+        transitions: 0,
+        currentStatus: 'awake',
+      }).success,
     ).toBe(false);
   });
 });

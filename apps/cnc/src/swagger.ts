@@ -305,6 +305,112 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        HostStatusHistoryEntry: {
+          type: 'object',
+          properties: {
+            hostFqn: {
+              type: 'string',
+              example: 'workstation@Home%20Office-node-1',
+            },
+            oldStatus: {
+              type: 'string',
+              enum: ['awake', 'asleep'],
+              example: 'asleep',
+            },
+            newStatus: {
+              type: 'string',
+              enum: ['awake', 'asleep'],
+              example: 'awake',
+            },
+            changedAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-18T18:00:00.000Z',
+            },
+          },
+          required: ['hostFqn', 'oldStatus', 'newStatus', 'changedAt'],
+        },
+        HostStatusHistoryResponse: {
+          type: 'object',
+          properties: {
+            hostFqn: {
+              type: 'string',
+              example: 'workstation@Home%20Office-node-1',
+            },
+            from: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-11T18:00:00.000Z',
+            },
+            to: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-18T18:00:00.000Z',
+            },
+            entries: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/HostStatusHistoryEntry',
+              },
+            },
+          },
+          required: ['hostFqn', 'from', 'to', 'entries'],
+        },
+        HostUptimeSummary: {
+          type: 'object',
+          properties: {
+            hostFqn: {
+              type: 'string',
+              example: 'workstation@Home%20Office-node-1',
+            },
+            period: {
+              type: 'string',
+              example: '7d',
+            },
+            from: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-11T18:00:00.000Z',
+            },
+            to: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-18T18:00:00.000Z',
+            },
+            uptimePercentage: {
+              type: 'number',
+              example: 99.25,
+            },
+            awakeMs: {
+              type: 'integer',
+              example: 600000000,
+            },
+            asleepMs: {
+              type: 'integer',
+              example: 4500000,
+            },
+            transitions: {
+              type: 'integer',
+              example: 4,
+            },
+            currentStatus: {
+              type: 'string',
+              enum: ['awake', 'asleep'],
+              example: 'awake',
+            },
+          },
+          required: [
+            'hostFqn',
+            'period',
+            'from',
+            'to',
+            'uptimePercentage',
+            'awakeMs',
+            'asleepMs',
+            'transitions',
+            'currentStatus',
+          ],
+        },
         CapabilitiesResponse: {
           type: 'object',
           properties: {

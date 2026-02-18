@@ -38,6 +38,15 @@ CREATE TABLE IF NOT EXISTS aggregated_hosts (
     UNIQUE(node_id, name)
 );
 
+-- Host status transition history
+CREATE TABLE IF NOT EXISTS host_status_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    host_fqn TEXT NOT NULL,
+    old_status TEXT NOT NULL CHECK(old_status IN ('awake', 'asleep')),
+    new_status TEXT NOT NULL CHECK(new_status IN ('awake', 'asleep')),
+    changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Durable command lifecycle table
 CREATE TABLE IF NOT EXISTS commands (
     id TEXT PRIMARY KEY,
@@ -82,6 +91,8 @@ CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_status ON aggregated_hosts(statu
 CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_mac ON aggregated_hosts(mac);
 CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_location ON aggregated_hosts(location);
 CREATE INDEX IF NOT EXISTS idx_aggregated_hosts_fqn ON aggregated_hosts(fully_qualified_name);
+CREATE INDEX IF NOT EXISTS idx_host_status_history_host_changed_at ON host_status_history(host_fqn, changed_at);
+CREATE INDEX IF NOT EXISTS idx_host_status_history_changed_at ON host_status_history(changed_at);
 CREATE INDEX IF NOT EXISTS idx_commands_node_state ON commands(node_id, state);
 CREATE INDEX IF NOT EXISTS idx_commands_created_at ON commands(created_at);
 CREATE INDEX IF NOT EXISTS idx_wake_schedules_owner_sub ON wake_schedules(owner_sub);

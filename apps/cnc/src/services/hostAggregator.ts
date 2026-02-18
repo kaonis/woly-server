@@ -8,7 +8,7 @@
 import { EventEmitter } from 'events';
 import db from '../database/connection';
 import { logger } from '../utils/logger';
-import { Host, AggregatedHost } from '../types';
+import { Host, AggregatedHost, HostStatusHistoryEntry, HostUptimeSummary } from '../types';
 
 interface HostDiscoveredEvent {
   nodeId: string;
@@ -30,14 +30,23 @@ interface HostRemovedEvent {
 // Internal row type including database ID
 type AggregatedHostRow = AggregatedHost & { id: number };
 type HostPort = NonNullable<Host['openPorts']>[number];
+type HostStatus = Host['status'];
 type AggregatedHostRowRaw = AggregatedHost & {
   tags?: unknown;
   openPorts?: unknown;
   portsScannedAt?: unknown;
   portsExpireAt?: unknown;
 };
+type HostStatusHistoryRow = {
+  hostFqn: string;
+  oldStatus: HostStatus;
+  newStatus: HostStatus;
+  changedAt: string | Date;
+};
 
 const PORT_SCAN_CACHE_TTL_MS = 4 * 60 * 60 * 1000;
+const HISTORY_LIMIT_DEFAULT = 500;
+const HISTORY_LIMIT_MAX = 5_000;
 
 const HOST_SELECT_COLUMNS = `
         ah.node_id as "nodeId",
@@ -212,6 +221,54 @@ export class HostAggregator extends EventEmitter {
     };
   }
 
+  private normalizeHostStatus(value: unknown): HostStatus | null {
+    return value === 'awake' || value === 'asleep' ? value : null;
+  }
+
+  private normalizeChangedAt(value: unknown): string {
+    const normalized = this.normalizeDateValue(value);
+    return normalized ?? new Date().toISOString();
+  }
+
+  private mapStatusHistoryRow(row: HostStatusHistoryRow): HostStatusHistoryEntry | null {
+    const oldStatus = this.normalizeHostStatus(row.oldStatus);
+    const newStatus = this.normalizeHostStatus(row.newStatus);
+    if (!oldStatus || !newStatus) {
+      return null;
+    }
+
+    return {
+      hostFqn: row.hostFqn,
+      oldStatus,
+      newStatus,
+      changedAt: this.normalizeChangedAt(row.changedAt),
+    };
+  }
+
+  private parsePeriodToMs(rawPeriod: string): number | null {
+    const match = /^(\d+)([dhm])$/.exec(rawPeriod.trim().toLowerCase());
+    if (!match) {
+      return null;
+    }
+
+    const amount = Number.parseInt(match[1], 10);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return null;
+    }
+
+    const unit = match[2];
+    if (unit === 'd') {
+      return amount * 24 * 60 * 60 * 1000;
+    }
+    if (unit === 'h') {
+      return amount * 60 * 60 * 1000;
+    }
+    if (unit === 'm') {
+      return amount * 60 * 1000;
+    }
+    return null;
+  }
+
   private isDuplicateColumnError(error: unknown): boolean {
     if (!error || typeof error !== 'object') {
       return false;
@@ -276,6 +333,7 @@ export class HostAggregator extends EventEmitter {
 
     await db.query("UPDATE aggregated_hosts SET tags = '[]' WHERE tags IS NULL");
     await db.query("UPDATE aggregated_hosts SET open_ports = '[]' WHERE open_ports IS NULL");
+    await this.ensureHostStatusHistoryTable();
   }
 
   private async getExistingHostColumns(): Promise<Set<string>> {
@@ -292,6 +350,64 @@ export class HostAggregator extends EventEmitter {
        WHERE table_name = 'aggregated_hosts' AND table_schema = 'public'`
     );
     return new Set(result.rows.map((row) => row.column_name));
+  }
+
+  private async ensureHostStatusHistoryTable(): Promise<void> {
+    const createTableStatement = this.isSqlite
+      ? `CREATE TABLE IF NOT EXISTS host_status_history (
+           id INTEGER PRIMARY KEY AUTOINCREMENT,
+           host_fqn TEXT NOT NULL,
+           old_status TEXT NOT NULL CHECK(old_status IN ('awake', 'asleep')),
+           new_status TEXT NOT NULL CHECK(new_status IN ('awake', 'asleep')),
+           changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+         )`
+      : `CREATE TABLE IF NOT EXISTS host_status_history (
+           id SERIAL PRIMARY KEY,
+           host_fqn VARCHAR(512) NOT NULL,
+           old_status VARCHAR(20) NOT NULL CHECK(old_status IN ('awake', 'asleep')),
+           new_status VARCHAR(20) NOT NULL CHECK(new_status IN ('awake', 'asleep')),
+           changed_at TIMESTAMP NOT NULL DEFAULT NOW()
+         )`;
+
+    await db.query(createTableStatement);
+    await db.query(
+      'CREATE INDEX IF NOT EXISTS idx_host_status_history_host_changed_at ON host_status_history(host_fqn, changed_at)',
+    );
+    await db.query(
+      'CREATE INDEX IF NOT EXISTS idx_host_status_history_changed_at ON host_status_history(changed_at)',
+    );
+  }
+
+  private async recordHostStatusTransition(
+    hostFqn: string,
+    oldStatusCandidate: unknown,
+    newStatusCandidate: unknown,
+    changedAtCandidate?: unknown
+  ): Promise<void> {
+    const oldStatus = this.normalizeHostStatus(oldStatusCandidate);
+    const newStatus = this.normalizeHostStatus(newStatusCandidate);
+
+    if (!oldStatus || !newStatus || oldStatus === newStatus) {
+      return;
+    }
+
+    const changedAt = this.normalizeChangedAt(changedAtCandidate ?? new Date().toISOString());
+
+    try {
+      await db.query(
+        `INSERT INTO host_status_history (host_fqn, old_status, new_status, changed_at)
+         VALUES ($1, $2, $3, $4)`,
+        [hostFqn, oldStatus, newStatus, changedAt],
+      );
+    } catch (error) {
+      logger.warn('Failed to record host status transition history', {
+        hostFqn,
+        oldStatus,
+        newStatus,
+        changedAt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   // Internal row shape used for reconciliation/deduping. External API types do not expose `id`.
@@ -511,6 +627,11 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
         });
 
         if (previousHost && this.hasMeaningfulHostStateChange(previousHost, host, location)) {
+          await this.recordHostStatusTransition(
+            fullyQualifiedName,
+            previousHost.status,
+            host.status,
+          );
           this.emit('host-updated', { nodeId, host, fullyQualifiedName });
         }
         return;
@@ -547,9 +668,14 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
     const fullyQualifiedName = this.buildFQN(host.name, location, nodeId);
 
     try {
-      const { reconciled } = await this.reconcileHostByMac(nodeId, host, location);
+      const { reconciled, previousHost } = await this.reconcileHostByMac(nodeId, host, location);
 
       if (reconciled) {
+        await this.recordHostStatusTransition(
+          fullyQualifiedName,
+          previousHost?.status,
+          host.status,
+        );
         logger.debug('Host updated in aggregated database', {
           nodeId,
           hostName: host.name,
@@ -630,19 +756,27 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
     await this.ensureHostMetadataColumns();
     try {
       const timestamp = this.isSqlite ? 'CURRENT_TIMESTAMP' : 'NOW()';
-      const query = this.isSqlite
-        ? `UPDATE aggregated_hosts
-           SET status = 'asleep', updated_at = ${timestamp}
-           WHERE node_id = $1 AND status = 'awake'`
-        : `UPDATE aggregated_hosts
-           SET status = 'asleep', updated_at = ${timestamp}
-           WHERE node_id = $1 AND status = 'awake'
-           RETURNING name`;
+      const awakeHostsResult = await db.query<{ fullyQualifiedName: string }>(
+        `SELECT fully_qualified_name as "fullyQualifiedName"
+         FROM aggregated_hosts
+         WHERE node_id = $1 AND status = 'awake'`,
+        [nodeId],
+      );
 
-      const result = await db.query(query, [nodeId]);
+      const result = await db.query(
+        `UPDATE aggregated_hosts
+         SET status = 'asleep', updated_at = ${timestamp}
+         WHERE node_id = $1 AND status = 'awake'`,
+        [nodeId],
+      );
 
       const count = result.rowCount || 0;
       if (count > 0) {
+        const changedAt = new Date().toISOString();
+        for (const host of awakeHostsResult.rows) {
+          await this.recordHostStatusTransition(host.fullyQualifiedName, 'awake', 'asleep', changedAt);
+        }
+
         logger.info('Marked node hosts as unreachable', {
           nodeId,
           hostsAffected: count,
@@ -752,6 +886,176 @@ ${HOST_SELECT_COLUMNS}
     } catch (error) {
       logger.error('Failed to get host by FQN', {
         fullyQualifiedName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get status transition history for a host.
+   */
+  async getHostStatusHistory(
+    fullyQualifiedName: string,
+    options?: { from?: string; to?: string; limit?: number }
+  ): Promise<HostStatusHistoryEntry[]> {
+    await this.ensureHostMetadataColumns();
+
+    const whereClauses = ['host_fqn = $1'];
+    const params: unknown[] = [fullyQualifiedName];
+
+    const from = options?.from ? this.normalizeDateValue(options.from) : null;
+    const to = options?.to ? this.normalizeDateValue(options.to) : null;
+    if (from) {
+      params.push(from);
+      whereClauses.push(`changed_at >= $${params.length}`);
+    }
+    if (to) {
+      params.push(to);
+      whereClauses.push(`changed_at <= $${params.length}`);
+    }
+
+    const limitRaw = options?.limit ?? HISTORY_LIMIT_DEFAULT;
+    const limit = Math.max(1, Math.min(limitRaw, HISTORY_LIMIT_MAX));
+    params.push(limit);
+
+    try {
+      const result = await db.query<HostStatusHistoryRow>(
+        `SELECT
+          host_fqn as "hostFqn",
+          old_status as "oldStatus",
+          new_status as "newStatus",
+          changed_at as "changedAt"
+         FROM host_status_history
+         WHERE ${whereClauses.join(' AND ')}
+         ORDER BY changed_at ASC
+         LIMIT $${params.length}`,
+        params,
+      );
+
+      return result.rows
+        .map((row) => this.mapStatusHistoryRow(row))
+        .filter((row): row is HostStatusHistoryEntry => row !== null);
+    } catch (error) {
+      logger.error('Failed to get host status history', {
+        fullyQualifiedName,
+        from,
+        to,
+        limit,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate uptime analytics for a host over a relative period (for example "7d").
+   */
+  async getHostUptime(
+    fullyQualifiedName: string,
+    options?: { period?: string; now?: Date }
+  ): Promise<HostUptimeSummary> {
+    await this.ensureHostMetadataColumns();
+
+    const host = await this.getHostByFQN(fullyQualifiedName);
+    if (!host) {
+      throw new Error(`Host ${fullyQualifiedName} not found`);
+    }
+
+    const period = (options?.period ?? '7d').trim().toLowerCase();
+    const periodMs = this.parsePeriodToMs(period);
+    if (!periodMs) {
+      throw new Error(`Invalid period "${period}". Expected format like 7d, 24h, or 30m.`);
+    }
+
+    const now = options?.now ?? new Date();
+    const to = now.toISOString();
+    const fromDate = new Date(now.getTime() - periodMs);
+    const from = fromDate.toISOString();
+
+    const history = await this.getHostStatusHistory(fullyQualifiedName, {
+      from,
+      to,
+      limit: HISTORY_LIMIT_MAX,
+    });
+
+    const beforeWindowResult = await db.query<HostStatusHistoryRow>(
+      `SELECT
+        host_fqn as "hostFqn",
+        old_status as "oldStatus",
+        new_status as "newStatus",
+        changed_at as "changedAt"
+       FROM host_status_history
+       WHERE host_fqn = $1 AND changed_at < $2
+       ORDER BY changed_at DESC
+       LIMIT 1`,
+      [fullyQualifiedName, from],
+    );
+
+    const beforeWindow = beforeWindowResult.rows[0]
+      ? this.mapStatusHistoryRow(beforeWindowResult.rows[0])
+      : null;
+
+    let cursor = fromDate.getTime();
+    let statusAtCursor: HostStatus =
+      beforeWindow?.newStatus
+      ?? history[0]?.oldStatus
+      ?? host.status;
+    let awakeMs = 0;
+
+    for (const transition of history) {
+      const changedAtMs = new Date(transition.changedAt).getTime();
+      if (!Number.isFinite(changedAtMs)) {
+        continue;
+      }
+
+      const boundedChangedAtMs = Math.min(Math.max(changedAtMs, cursor), now.getTime());
+      if (statusAtCursor === 'awake') {
+        awakeMs += Math.max(0, boundedChangedAtMs - cursor);
+      }
+      cursor = boundedChangedAtMs;
+      statusAtCursor = transition.newStatus;
+    }
+
+    if (statusAtCursor === 'awake') {
+      awakeMs += Math.max(0, now.getTime() - cursor);
+    }
+
+    const totalMs = Math.max(periodMs, 1);
+    const asleepMs = Math.max(0, totalMs - awakeMs);
+    const uptimePercentage = Number(((awakeMs / totalMs) * 100).toFixed(2));
+
+    return {
+      hostFqn: fullyQualifiedName,
+      period,
+      from,
+      to,
+      uptimePercentage,
+      awakeMs,
+      asleepMs,
+      transitions: history.length,
+      currentStatus: host.status,
+    };
+  }
+
+  async pruneHostStatusHistory(retentionDays: number): Promise<number> {
+    await this.ensureHostMetadataColumns();
+    if (retentionDays <= 0) {
+      return 0;
+    }
+
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+
+    try {
+      const result = await db.query(
+        'DELETE FROM host_status_history WHERE changed_at < $1',
+        [cutoff],
+      );
+      return result.rowCount || 0;
+    } catch (error) {
+      logger.error('Failed to prune host status history', {
+        retentionDays,
+        cutoff,
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;

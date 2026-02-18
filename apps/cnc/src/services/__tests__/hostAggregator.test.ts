@@ -19,6 +19,7 @@ describe('HostAggregator', () => {
     hostAggregator = new HostAggregator();
     
     // Clean up test data
+    await db.query('DELETE FROM host_status_history');
     await db.query('DELETE FROM aggregated_hosts WHERE node_id LIKE $1', ['test-node-%']);
     await db.query('DELETE FROM nodes WHERE id LIKE $1', ['test-node-%']);
     
@@ -941,6 +942,109 @@ describe('HostAggregator', () => {
       expect(host!.openPorts).toBeUndefined();
       expect(host!.portsScannedAt).toBeNull();
       expect(host!.portsExpireAt).toBeNull();
+    });
+  });
+
+  describe('status history and uptime analytics', () => {
+    it('records status transitions on rediscovery updates', async () => {
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-1',
+        location: 'Test Location',
+        host: {
+          name: 'history-host',
+          mac: 'AA:BB:CC:DD:EE:70',
+          ip: '192.168.1.170',
+          status: 'asleep' as const,
+          lastSeen: '2026-02-18T10:00:00.000Z',
+          discovered: 1,
+          pingResponsive: 0,
+        },
+      });
+
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-1',
+        location: 'Test Location',
+        host: {
+          name: 'history-host',
+          mac: 'AA:BB:CC:DD:EE:70',
+          ip: '192.168.1.170',
+          status: 'awake' as const,
+          lastSeen: '2026-02-18T10:05:00.000Z',
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      const entries = await hostAggregator.getHostStatusHistory(
+        'history-host@Test%20Location-test-node-1',
+        { limit: 10 },
+      );
+
+      expect(entries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            oldStatus: 'asleep',
+            newStatus: 'awake',
+          }),
+        ]),
+      );
+    });
+
+    it('computes uptime summary for a host period', async () => {
+      await hostAggregator.onHostDiscovered({
+        nodeId: 'test-node-1',
+        location: 'Test Location',
+        host: {
+          name: 'uptime-host',
+          mac: 'AA:BB:CC:DD:EE:71',
+          ip: '192.168.1.171',
+          status: 'awake' as const,
+          lastSeen: '2026-02-18T09:00:00.000Z',
+          discovered: 1,
+          pingResponsive: 1,
+        },
+      });
+
+      await db.query(
+        `INSERT INTO host_status_history (host_fqn, old_status, new_status, changed_at)
+         VALUES ($1, $2, $3, $4), ($1, $3, $2, $5)`,
+        [
+          'uptime-host@Test%20Location-test-node-1',
+          'awake',
+          'asleep',
+          '2026-02-18T08:30:00.000Z',
+          '2026-02-18T09:30:00.000Z',
+        ],
+      );
+
+      const uptime = await hostAggregator.getHostUptime(
+        'uptime-host@Test%20Location-test-node-1',
+        {
+          period: '2h',
+          now: new Date('2026-02-18T10:00:00.000Z'),
+        },
+      );
+
+      expect(uptime.period).toBe('2h');
+      expect(uptime.transitions).toBeGreaterThanOrEqual(1);
+      expect(uptime.uptimePercentage).toBeGreaterThanOrEqual(0);
+      expect(uptime.uptimePercentage).toBeLessThanOrEqual(100);
+      expect(uptime.awakeMs + uptime.asleepMs).toBe(2 * 60 * 60 * 1000);
+    });
+
+    it('prunes old host status history by retention window', async () => {
+      await db.query(
+        `INSERT INTO host_status_history (host_fqn, old_status, new_status, changed_at)
+         VALUES ($1, 'awake', 'asleep', $2), ($1, 'asleep', 'awake', $3)`,
+        [
+          'prune-host@Test%20Location-test-node-1',
+          '2026-01-01T00:00:00.000Z',
+          new Date().toISOString(),
+        ],
+      );
+
+      const deleted = await hostAggregator.pruneHostStatusHistory(7);
+      expect(deleted).toBeGreaterThanOrEqual(1);
     });
   });
 

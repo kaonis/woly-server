@@ -16,8 +16,10 @@
 import {
   createHostWakeScheduleRequestSchema,
   HOST_STATE_STREAM_MUTATING_EVENT_TYPES,
+  hostStatusHistoryResponseSchema,
   hostSchedulesResponseSchema,
   hostStateStreamEventSchema,
+  hostUptimeSummarySchema,
   hostWakeScheduleSchema,
   inboundCncCommandSchema,
   outboundNodeMessageSchema,
@@ -713,6 +715,48 @@ describe('Cross-repo protocol contract', () => {
           timezone: 'UTC',
         }).success,
       ).toBe(true);
+    });
+  });
+
+  describe('Host history and uptime API contracts', () => {
+    it('accepts host history responses used by uptime dashboards', () => {
+      const payload = {
+        hostFqn: 'office-pc@home-node',
+        from: '2026-02-11T08:00:00.000Z',
+        to: '2026-02-18T08:00:00.000Z',
+        entries: [
+          {
+            hostFqn: 'office-pc@home-node',
+            oldStatus: 'asleep',
+            newStatus: 'awake',
+            changedAt: '2026-02-18T07:55:00.000Z',
+          },
+        ],
+      };
+
+      expect(hostStatusHistoryResponseSchema.safeParse(payload).success).toBe(true);
+      expect(hostStatusHistoryResponseSchema.safeParse(JSON.parse(JSON.stringify(payload))).success).toBe(
+        true,
+      );
+    });
+
+    it('accepts uptime summary envelopes for dashboard cards', () => {
+      const payload = {
+        hostFqn: 'office-pc@home-node',
+        period: '7d',
+        from: '2026-02-11T08:00:00.000Z',
+        to: '2026-02-18T08:00:00.000Z',
+        uptimePercentage: 99.71,
+        awakeMs: 602496000,
+        asleepMs: 3024000,
+        transitions: 6,
+        currentStatus: 'awake',
+      };
+
+      expect(hostUptimeSummarySchema.safeParse(payload).success).toBe(true);
+      expect(hostUptimeSummarySchema.safeParse(JSON.parse(JSON.stringify(payload))).success).toBe(
+        true,
+      );
     });
   });
 

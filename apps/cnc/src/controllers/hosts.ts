@@ -32,6 +32,16 @@ const wakeupBodySchema = z.object({
   wolPort: wolPortSchema.optional(),
 }).passthrough();
 
+const historyQuerySchema = z.object({
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+  limit: z.coerce.number().int().min(1).max(5_000).optional(),
+}).passthrough();
+
+const uptimeQuerySchema = z.object({
+  period: z.string().regex(/^\d+[dhm]$/).optional(),
+}).passthrough();
+
 type RouteUpdateHostData = Parameters<CommandRouter['routeUpdateHostCommand']>[1];
 
 function toRouteUpdateHostData(payload: z.infer<typeof updateHostBodySchema>): RouteUpdateHostData {
@@ -313,6 +323,186 @@ export class HostsController {
       res.status(500).json({
         error: 'Internal Server Error',
         message: 'Failed to retrieve host',
+      });
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/hosts/{fqn}/history:
+   *   get:
+   *     summary: Get host status transition history
+   *     description: Returns host awake/asleep transition events for a given time window.
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: query
+   *         name: from
+   *         required: false
+   *         schema:
+   *           type: string
+   *           format: date-time
+   *       - in: query
+   *         name: to
+   *         required: false
+   *         schema:
+   *           type: string
+   *           format: date-time
+   *       - in: query
+   *         name: limit
+   *         required: false
+   *         schema:
+   *           type: integer
+   *           minimum: 1
+   *           maximum: 5000
+   *     responses:
+   *       200:
+   *         description: Host transition history
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/HostStatusHistoryResponse'
+   *       400:
+   *         $ref: '#/components/responses/BadRequest'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
+   */
+  async getHostHistory(req: Request, res: Response): Promise<void> {
+    const fqn = req.params.fqn as string;
+    try {
+      const parsedQuery = historyQuerySchema.safeParse(req.query);
+      if (!parsedQuery.success) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid history query parameters',
+          details: parsedQuery.error.issues,
+        });
+        return;
+      }
+
+      const host = await this.hostAggregator.getHostByFQN(fqn);
+      if (!host) {
+        res.status(404).json({
+          error: 'Not Found',
+          message: `Host ${fqn} not found`,
+        });
+        return;
+      }
+
+      const to = parsedQuery.data.to ?? new Date().toISOString();
+      const toDate = new Date(to);
+      const defaultFromDate = new Date(toDate.getTime() - (7 * 24 * 60 * 60 * 1000));
+      const from = parsedQuery.data.from ?? defaultFromDate.toISOString();
+
+      if (new Date(from).getTime() > toDate.getTime()) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: 'Query parameter "from" must be earlier than or equal to "to"',
+        });
+        return;
+      }
+
+      const entries = await this.hostAggregator.getHostStatusHistory(fqn, {
+        from,
+        to,
+        limit: parsedQuery.data.limit,
+      });
+
+      res.json({
+        hostFqn: fqn,
+        from,
+        to,
+        entries,
+      });
+    } catch (error) {
+      logger.error('Failed to get host history', { fqn, ...toLogError(error) });
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Failed to retrieve host history',
+      });
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/hosts/{fqn}/uptime:
+   *   get:
+   *     summary: Get host uptime summary
+   *     description: Returns uptime analytics over a relative period (for example 7d).
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: query
+   *         name: period
+   *         required: false
+   *         schema:
+   *           type: string
+   *           pattern: '^\\d+[dhm]$'
+   *           example: 7d
+   *     responses:
+   *       200:
+   *         description: Uptime summary
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/HostUptimeSummary'
+   *       400:
+   *         $ref: '#/components/responses/BadRequest'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
+   */
+  async getHostUptime(req: Request, res: Response): Promise<void> {
+    const fqn = req.params.fqn as string;
+    try {
+      const parsedQuery = uptimeQuerySchema.safeParse(req.query);
+      if (!parsedQuery.success) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid uptime query parameters',
+          details: parsedQuery.error.issues,
+        });
+        return;
+      }
+
+      const period = parsedQuery.data.period ?? '7d';
+      const uptime = await this.hostAggregator.getHostUptime(fqn, { period });
+      res.json(uptime);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('not found')) {
+        res.status(404).json({
+          error: 'Not Found',
+          message: error.message,
+        });
+        return;
+      }
+      if (error instanceof Error && error.message.toLowerCase().includes('invalid period')) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: error.message,
+        });
+        return;
+      }
+
+      logger.error('Failed to get host uptime summary', { fqn, ...toLogError(error) });
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Failed to retrieve host uptime',
       });
     }
   }
