@@ -1,0 +1,964 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "WoLy API",
+    "version": "0.0.1",
+    "description": "Wake-on-LAN backend API for managing network hosts and remote wake-up",
+    "contact": {
+      "name": "WoLy Backend",
+      "url": "https://github.com/kaonis/woly-backend"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8082",
+      "description": "Development server"
+    },
+    {
+      "url": "http://{host}:{port}",
+      "description": "Custom server",
+      "variables": {
+        "host": {
+          "default": "localhost",
+          "description": "Server hostname"
+        },
+        "port": {
+          "default": "8082",
+          "description": "Server port"
+        }
+      }
+    }
+  ],
+  "tags": [
+    {
+      "name": "Hosts",
+      "description": "Host management endpoints"
+    },
+    {
+      "name": "Network",
+      "description": "Network discovery and scanning"
+    },
+    {
+      "name": "Wake-on-LAN",
+      "description": "Remote host wake-up operations"
+    },
+    {
+      "name": "Health",
+      "description": "Service health and status"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API Key",
+        "description": "Optional API key authentication (enabled when NODE_API_KEY is set)"
+      }
+    },
+    "schemas": {
+      "Host": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Unique hostname",
+            "example": "PHANTOM-MBP"
+          },
+          "mac": {
+            "type": "string",
+            "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
+            "description": "MAC address",
+            "example": "80:6D:97:60:39:08"
+          },
+          "ip": {
+            "type": "string",
+            "format": "ipv4",
+            "description": "IP address",
+            "example": "192.168.1.147"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["awake", "asleep"],
+            "description": "Current host status",
+            "example": "awake"
+          },
+          "lastSeen": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last time host was detected online",
+            "example": "2025-11-19 09:24:30",
+            "nullable": true
+          },
+          "discovered": {
+            "type": "integer",
+            "description": "Whether host was discovered automatically (1) or added manually (0)",
+            "example": 1
+          },
+          "pingResponsive": {
+            "type": "integer",
+            "description": "ICMP ping responsiveness: 1 (responds), 0 (no response), null (not tested)",
+            "example": 1,
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional operator notes for this host",
+            "example": "Hypervisor host in rack 2",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "description": "Optional tags for filtering/grouping hosts",
+            "items": {
+              "type": "string"
+            },
+            "example": ["infra", "linux"]
+          }
+        },
+        "required": ["name", "mac", "ip", "status"]
+      },
+      "MacVendor": {
+        "type": "object",
+        "properties": {
+          "vendor": {
+            "type": "string",
+            "description": "Manufacturer name",
+            "example": "Apple, Inc."
+          },
+          "mac": {
+            "type": "string",
+            "description": "MAC address queried",
+            "example": "80:6D:97:60:39:08"
+          }
+        }
+      },
+      "HealthCheck": {
+        "type": "object",
+        "properties": {
+          "uptime": {
+            "type": "number",
+            "description": "Server uptime in seconds",
+            "example": 73.876685
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Current timestamp",
+            "example": 1763544894939
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ok", "degraded"],
+            "description": "Overall system status",
+            "example": "ok"
+          },
+          "environment": {
+            "type": "string",
+            "description": "Current environment",
+            "example": "development"
+          },
+          "build": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "string",
+                "description": "Node-agent build version",
+                "example": "0.0.1"
+              },
+              "protocolVersion": {
+                "type": "string",
+                "description": "Active protocol version",
+                "example": "1.0.0"
+              }
+            }
+          },
+          "agent": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": ["standalone", "agent"],
+                "example": "agent"
+              },
+              "authMode": {
+                "type": "string",
+                "enum": ["standalone", "static-token", "session-token"],
+                "example": "session-token"
+              },
+              "connected": {
+                "type": "boolean",
+                "example": true
+              }
+            }
+          },
+          "checks": {
+            "type": "object",
+            "properties": {
+              "database": {
+                "type": "string",
+                "enum": ["healthy", "unhealthy", "unknown"],
+                "example": "healthy"
+              },
+              "networkScan": {
+                "type": "string",
+                "enum": ["running", "idle"],
+                "example": "idle"
+              }
+            }
+          },
+          "telemetry": {
+            "type": "object",
+            "description": "Runtime counters for reconnect/auth/protocol validation and command latency"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code",
+                "example": "VALIDATION_ERROR"
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable error message",
+                "example": "MAC address must be in format XX:XX:XX:XX:XX:XX"
+              },
+              "statusCode": {
+                "type": "integer",
+                "description": "HTTP status code",
+                "example": 400
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Error timestamp",
+                "example": "2025-11-19T09:35:06.541Z"
+              },
+              "path": {
+                "type": "string",
+                "description": "Request path that caused the error",
+                "example": "/hosts/mac-vendor/INVALID"
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Rate limit exceeded",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string",
+                  "example": "Too many requests from this IP"
+                },
+                "retryAfter": {
+                  "type": "string",
+                  "example": "15 minutes"
+                }
+              }
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/hosts": {
+      "get": {
+        "summary": "Get all hosts",
+        "description": "Retrieve a list of all network hosts (both discovered and manually added)",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "List of hosts with scan status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hosts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Host"
+                      }
+                    },
+                    "scanInProgress": {
+                      "type": "boolean",
+                      "description": "Whether a network scan is currently running"
+                    },
+                    "lastScanTime": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true,
+                      "description": "Timestamp of the last completed scan"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - API key required (when NODE_API_KEY is configured)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Add a new host manually",
+        "description": "Manually add a host to the database (not discovered automatically)",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "mac", "ip"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Unique hostname",
+                    "example": "MY-DEVICE"
+                  },
+                  "mac": {
+                    "type": "string",
+                    "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",
+                    "description": "MAC address in XX:XX:XX:XX:XX:XX format",
+                    "example": "AA:BB:CC:DD:EE:FF"
+                  },
+                  "ip": {
+                    "type": "string",
+                    "format": "ipv4",
+                    "description": "IPv4 address",
+                    "example": "192.168.1.100"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Optional operator notes for the host",
+                    "example": "Hypervisor host"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "description": "Optional host tags",
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": ["infra", "linux"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Host added successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Host"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "Unauthorized - API key required (when NODE_API_KEY is configured)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/hosts/{name}": {
+      "get": {
+        "summary": "Get a specific host by name",
+        "description": "Retrieve detailed information about a single host",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {}
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The hostname to retrieve",
+            "example": "PHANTOM-MBP"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Host found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Host"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - API key required (when NODE_API_KEY is configured)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Host not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Not Found"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Host 'PHANTOM-MBP' not found"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update host properties",
+        "description": "Update host name, MAC address, or IP address",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {}
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Existing host name",
+            "example": "OLD-HOSTNAME"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "NEW-HOSTNAME"
+                  },
+                  "mac": {
+                    "type": "string",
+                    "example": "AA:BB:CC:DD:EE:FF"
+                  },
+                  "ip": {
+                    "type": "string",
+                    "example": "192.168.1.200"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true,
+                    "example": "Reserved for backup tasks"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": ["backup", "low-priority"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Host updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Host"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Host not found"
+          },
+          "409": {
+            "description": "Conflict (duplicate name/mac/ip)"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a host",
+        "description": "Remove host from local database",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {}
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Host name to delete",
+            "example": "OLD-HOSTNAME"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Host deleted successfully"
+          },
+          "404": {
+            "description": "Host not found"
+          }
+        }
+      }
+    },
+    "/hosts/wakeup/{name}": {
+      "post": {
+        "summary": "Wake up a host using Wake-on-LAN",
+        "description": "Send a Wake-on-LAN magic packet to the specified host",
+        "tags": ["Wake-on-LAN"],
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {}
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The hostname to wake up",
+            "example": "PHANTOM-MBP"
+          },
+          {
+            "in": "query",
+            "name": "verify",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Enable/disable post-WoL wake verification for this request"
+          },
+          {
+            "in": "query",
+            "name": "verifyTimeoutMs",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Verification timeout in milliseconds (bounded by server limits)"
+          },
+          {
+            "in": "query",
+            "name": "verifyPollIntervalMs",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Verification polling interval in milliseconds (bounded by server limits)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Magic packet sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "name": {
+                      "type": "string",
+                      "example": "PHANTOM-MBP"
+                    },
+                    "mac": {
+                      "type": "string",
+                      "example": "80:6D:97:60:39:08"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Wake-on-LAN packet sent"
+                    },
+                    "verification": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "not_requested",
+                            "woke",
+                            "timeout",
+                            "not_confirmed",
+                            "host_not_found",
+                            "error"
+                          ]
+                        },
+                        "attempts": {
+                          "type": "integer"
+                        },
+                        "timeoutMs": {
+                          "type": "integer"
+                        },
+                        "pollIntervalMs": {
+                          "type": "integer"
+                        },
+                        "elapsedMs": {
+                          "type": "integer"
+                        },
+                        "lastObservedStatus": {
+                          "type": "string",
+                          "enum": ["awake", "asleep", "unknown"]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": ["database", "ping"]
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - API key required (when NODE_API_KEY is configured)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Host not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Not Found"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Host 'PHANTOM-MBP' not found"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/hosts/scan": {
+      "post": {
+        "summary": "Trigger immediate network scan",
+        "description": "Force an immediate network discovery scan using ARP, ICMP ping, and DNS/NetBIOS lookups. Rate limited to 5 requests per minute.",
+        "tags": ["Network"],
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Scan completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Network scan completed"
+                    },
+                    "hostsCount": {
+                      "type": "integer",
+                      "example": 39
+                    },
+                    "hosts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Host"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - API key required (when NODE_API_KEY is configured)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/hosts/mac-vendor/{mac}": {
+      "get": {
+        "summary": "Get MAC address vendor information",
+        "description": "Look up the manufacturer/vendor of a network device by MAC address. Results are cached for 24 hours.",
+        "tags": ["Hosts"],
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {}
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mac",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"
+            },
+            "description": "MAC address to look up",
+            "example": "80:6D:97:60:39:08"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vendor information retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mac": {
+                      "type": "string",
+                      "example": "80:6D:97:60:39:08"
+                    },
+                    "vendor": {
+                      "type": "string",
+                      "example": "Apple, Inc."
+                    },
+                    "source": {
+                      "type": "string",
+                      "example": "macvendors.com (cached)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "Unauthorized - API key required (when NODE_API_KEY is configured)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded (external API or internal throttling)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Rate limit exceeded, please try again later"
+                    },
+                    "mac": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health check endpoint",
+        "description": "Returns the current health status of the WoLy backend service",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthCheck"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service is degraded (database issues)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthCheck"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

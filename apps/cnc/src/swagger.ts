@@ -298,6 +298,41 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        CapabilitiesResponse: {
+          type: 'object',
+          properties: {
+            mode: {
+              type: 'string',
+              enum: ['cnc'],
+              example: 'cnc',
+            },
+            versions: {
+              type: 'object',
+              properties: {
+                cncApi: {
+                  type: 'string',
+                  example: '1.0.0',
+                },
+                protocol: {
+                  type: 'string',
+                  example: '1.3.0',
+                },
+              },
+              required: ['cncApi', 'protocol'],
+            },
+            capabilities: {
+              type: 'object',
+              additionalProperties: true,
+              description: 'Capability descriptors keyed by feature name',
+            },
+            rateLimits: {
+              type: 'object',
+              additionalProperties: true,
+              description: 'Optional CNC rate limit descriptors',
+            },
+          },
+          required: ['mode', 'versions', 'capabilities'],
+        },
         CommandResult: {
           type: 'object',
           properties: {
@@ -320,6 +355,71 @@ const options: swaggerJsdoc.Options = {
               type: 'string',
               description: 'Request correlation identifier for end-to-end tracing',
               example: 'corr_2a8f6842-6f8f-4e8f-b6dc-f7dbd9a18e68',
+            },
+          },
+        },
+        HostWakeSchedule: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              example: 'schedule-1',
+            },
+            hostFqn: {
+              type: 'string',
+              example: 'PHANTOM-MBP@home-network',
+            },
+            hostName: {
+              type: 'string',
+              example: 'PHANTOM-MBP',
+            },
+            hostMac: {
+              type: 'string',
+              example: '80:6D:97:60:39:08',
+            },
+            scheduledTime: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-20T10:00:00.000Z',
+            },
+            frequency: {
+              type: 'string',
+              enum: ['once', 'daily', 'weekly', 'weekdays', 'weekends'],
+              example: 'daily',
+            },
+            enabled: {
+              type: 'boolean',
+              example: true,
+            },
+            notifyOnWake: {
+              type: 'boolean',
+              example: true,
+            },
+            timezone: {
+              type: 'string',
+              example: 'UTC',
+            },
+            lastTriggered: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              example: '2026-02-20T10:00:03.000Z',
+            },
+            nextTrigger: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              example: '2026-02-21T10:00:00.000Z',
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-18T00:00:00.000Z',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-18T00:00:00.000Z',
             },
           },
         },
@@ -434,6 +534,16 @@ const options: swaggerJsdoc.Options = {
       responses: {
         Unauthorized: {
           description: 'Missing or invalid authentication',
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/components/schemas/Error',
+              },
+            },
+          },
+        },
+        Forbidden: {
+          description: 'Authenticated but not authorized for this operation',
           content: {
             'application/json': {
               schema: {

@@ -1,0 +1,42 @@
+{
+  "name": "@kaonis/woly-client",
+  "version": "0.1.0",
+  "description": "Generated TypeScript API clients for WoLy C&C and node-agent APIs",
+  "license": "Apache-2.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "openapi",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "generate:specs": "npm run openapi:export -w @woly-server/cnc -- ../../packages/woly-client/openapi/cnc.json && npm run openapi:export -w @woly-server/node-agent -- ../../packages/woly-client/openapi/node-agent.json",
+    "generate:client": "node scripts/generate-clients.mjs",
+    "generate": "npm run generate:specs && npm run generate:client",
+    "build": "npm run generate && tsc",
+    "lint": "eslint src/index.ts --max-warnings=0",
+    "test": "node -e \"console.log('No tests in @kaonis/woly-client')\"",
+    "test:ci": "npm run test",
+    "typecheck": "tsc --noEmit",
+    "test:consumer-typecheck": "npm run build && tsc -p fixtures/app-consumer/tsconfig.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kaonis/woly-server",
+    "directory": "packages/woly-client"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "openapi-typescript-codegen": "^0.29.0",
+    "typescript": "^5.9.3"
+  }
+}
