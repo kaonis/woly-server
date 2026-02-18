@@ -112,27 +112,29 @@ git worktree remove ../woly-server-<topic>
 
 ## Commands
 
-| Command                          | Description                                                                        |
-| -------------------------------- | ---------------------------------------------------------------------------------- |
-| `npm run build`                  | Build all workspaces (protocol → apps)                                             |
-| `npm run test`                   | Run all tests                                                                      |
-| `npm run test:ci`                | CI mode with coverage                                                              |
-| `npm run test:e2e:smoke`         | Run cross-service C&C <-> node-agent E2E smoke suite                               |
-| `npm run validate:standard`      | Run standard repo validation gate (`lint`, `typecheck`, `test:ci`, `build`, smoke) |
-| `npm run typecheck`              | Type-check all workspaces                                                          |
-| `npm run lint`                   | Lint all workspaces                                                                |
-| `npm run prepush:checks`         | Run pre-push local gate (`typecheck` + related tests)                              |
-| `npm run secrets:scan:staged`    | Run staged secret scanning with gitleaks                                           |
-| `npm run deps:check`             | Run recurring dependency health checks (`audit`, `outdated`, ESLint10 watchdog)    |
-| `npm run dev:node-agent`         | Start node agent in dev mode                                                       |
-| `npm run dev:cnc`                | Start C&C backend in dev mode                                                      |
-| `npm run format`                 | Format all files with Prettier                                                     |
-| `npm run protocol:build`         | Build the protocol package                                                         |
-| `npm run protocol:publish`       | Build and publish protocol to npm (latest tag)                                     |
-| `npm run protocol:publish:next`  | Build and publish protocol to npm (next tag)                                       |
-| `npm run protocol:version:patch` | Bump protocol version (patch)                                                      |
-| `npm run protocol:version:minor` | Bump protocol version (minor)                                                      |
-| `npm run protocol:version:major` | Bump protocol version (major)                                                      |
+| Command                              | Description                                                                        |
+| ------------------------------------ | ---------------------------------------------------------------------------------- |
+| `npm run build`                      | Build all workspaces (protocol → apps)                                             |
+| `npm run test`                       | Run all tests                                                                      |
+| `npm run test:ci`                    | CI mode with coverage                                                              |
+| `npm run test:e2e:smoke`             | Run cross-service C&C <-> node-agent E2E smoke suite                               |
+| `npm run validate:standard`          | Run standard repo validation gate (`lint`, `typecheck`, `test:ci`, `build`, smoke) |
+| `npm run typecheck`                  | Type-check all workspaces                                                          |
+| `npm run lint`                       | Lint all workspaces                                                                |
+| `npm run prepush:checks`             | Run pre-push local gate (`typecheck` + related tests)                              |
+| `npm run secrets:scan:staged`        | Run staged secret scanning with gitleaks                                           |
+| `npm run dev:doctor`                 | Validate local dev prerequisites (versions, hooks, required tools)                 |
+| `npm run deps:check`                 | Run recurring dependency health checks (`audit`, `outdated`, ESLint10 watchdog)    |
+| `npm run ci:branch-protection:check` | Verify branch protection requires CNC policy check context                         |
+| `npm run dev:node-agent`             | Start node agent in dev mode                                                       |
+| `npm run dev:cnc`                    | Start C&C backend in dev mode                                                      |
+| `npm run format`                     | Format all files with Prettier                                                     |
+| `npm run protocol:build`             | Build the protocol package                                                         |
+| `npm run protocol:publish`           | Build and publish protocol to npm (latest tag)                                     |
+| `npm run protocol:publish:next`      | Build and publish protocol to npm (next tag)                                       |
+| `npm run protocol:version:patch`     | Bump protocol version (patch)                                                      |
+| `npm run protocol:version:minor`     | Bump protocol version (minor)                                                      |
+| `npm run protocol:version:major`     | Bump protocol version (major)                                                      |
 
 ## Node Agent
 
@@ -238,7 +240,10 @@ For full production rollout guidance (topology, secrets, TLS, backup/restore, an
 GitHub Actions is budget-scoped:
 
 - Heavy validation workflow (`.github/workflows/ci.yml`) runs manual-only.
-- Lightweight policy workflow (`.github/workflows/cnc-sync-policy.yml`) runs automatically on PR updates.
+- Lightweight policy workflow (`.github/workflows/cnc-sync-policy.yml`) runs automatically on PR updates and enforces:
+  - PR checklist and review-pass requirements
+  - conventional commit subject parity with local `commit-msg` hook
+  - low-cost added-line secret pattern guard parity with local staged secret scanning
 
 Current validation flow:
 
@@ -271,7 +276,7 @@ Dependency update review cadence and decision rules are documented in:
 - [docs/DEPENDENCY_TRIAGE_WORKFLOW.md](docs/DEPENDENCY_TRIAGE_WORKFLOW.md)
 - [docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md](docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md)
 
-**Note:** Branch protection requirements should match the current CI mode (manual-only vs automatic).
+**Note:** Branch protection requirements should match the current CI mode (manual-only vs automatic). Use `npm run ci:branch-protection:check` to verify `master` requires the CNC policy status check.
 
 ## Tech Stack
 
