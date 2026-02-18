@@ -49,6 +49,9 @@ gh workflow run publish-protocol.yml --ref master -f dry-run=true
 
 # Dependency health workflow
 gh workflow run dependency-health.yml --ref master
+
+# Cross-service E2E smoke workflow
+gh workflow run cross-service-e2e-smoke.yml --ref master
 ```
 
 Run watchdog check locally without dispatching workflow:

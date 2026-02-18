@@ -29,6 +29,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function asString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
 function formatServiceLogs(services: RunningService[]): string {
   const lines = services.flatMap((service) => service.logs);
   if (lines.length === 0) {
@@ -204,25 +208,27 @@ function seedNodeAgentDatabase(dbPath: string): void {
   db.close();
 }
 
-async function issueOperatorJwt(params: {
+async function issueJwt(params: {
   cncPort: number;
-  operatorToken: string;
+  bearerToken: string;
+  role: 'operator' | 'admin';
+  sub: string;
 }): Promise<string> {
   const response = await fetchJson(`http://${LOCALHOST}:${params.cncPort}/api/auth/token`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${params.operatorToken}`,
+      Authorization: `Bearer ${params.bearerToken}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      role: 'operator',
-      sub: 'cross-service-smoke',
+      role: params.role,
+      sub: params.sub,
     }),
   });
 
   if (response.status !== 200 || !isRecord(response.body) || typeof response.body.token !== 'string') {
     throw new Error(
-      `Failed to issue operator JWT (status=${response.status}, body=${response.rawBody || '<empty>'})`
+      `Failed to issue ${params.role} JWT (status=${response.status}, body=${response.rawBody || '<empty>'})`
     );
   }
 
@@ -245,7 +251,7 @@ describe('Cross-service E2E smoke', () => {
     }
   });
 
-  it('registers node, propagates host inventory, validates manual CRUD propagation, and routes wake command', async () => {
+  it('covers registration, propagation, wake, schedule execution, and reconnect queue delivery', async () => {
     try {
       const cncPort = await getFreePort();
       const nodeAgentPort = await getFreePort();
@@ -258,6 +264,7 @@ describe('Cross-service E2E smoke', () => {
 
       const wsNodeAuthToken = 'smoke-node-token';
       const operatorToken = 'smoke-operator-token';
+      const adminToken = 'smoke-admin-token';
 
       const cncService = startService({
         name: 'cnc',
@@ -270,7 +277,7 @@ describe('Cross-service E2E smoke', () => {
           DATABASE_URL: cncDbPath,
           NODE_AUTH_TOKENS: wsNodeAuthToken,
           OPERATOR_TOKENS: operatorToken,
-          ADMIN_TOKENS: 'smoke-admin-token',
+          ADMIN_TOKENS: adminToken,
           JWT_SECRET: 'smoke-jwt-secret',
           JWT_ISSUER: 'smoke-issuer',
           JWT_AUDIENCE: 'smoke-audience',
@@ -279,6 +286,9 @@ describe('Cross-service E2E smoke', () => {
           NODE_HEARTBEAT_INTERVAL: '1000',
           NODE_TIMEOUT: '3000',
           COMMAND_TIMEOUT: '7000',
+          SCHEDULE_WORKER_ENABLED: 'true',
+          SCHEDULE_POLL_INTERVAL_MS: '500',
+          SCHEDULE_BATCH_SIZE: '10',
           LOG_LEVEL: 'error',
         },
       });
@@ -293,9 +303,23 @@ describe('Cross-service E2E smoke', () => {
         },
       });
 
-      const operatorJwt = await issueOperatorJwt({ cncPort, operatorToken });
+      const operatorJwt = await issueJwt({
+        cncPort,
+        bearerToken: operatorToken,
+        role: 'operator',
+        sub: 'cross-service-smoke-operator',
+      });
+      const adminJwt = await issueJwt({
+        cncPort,
+        bearerToken: adminToken,
+        role: 'admin',
+        sub: 'cross-service-smoke-admin',
+      });
       const cncAuthHeaders = {
         Authorization: `Bearer ${operatorJwt}`,
+      };
+      const cncAdminAuthHeaders = {
+        Authorization: `Bearer ${adminJwt}`,
       };
       const nodeAgentBaseUrl = `http://${LOCALHOST}:${nodeAgentPort}`;
       const cncBaseUrl = `http://${LOCALHOST}:${cncPort}`;
@@ -310,6 +334,35 @@ describe('Cross-service E2E smoke', () => {
 
         return response.body.hosts.filter(isRecord);
       };
+
+      const fetchAdminCommands = async (): Promise<Array<Record<string, unknown>>> => {
+        const response = await fetchJson(`${cncBaseUrl}/api/admin/commands?limit=200`, {
+          headers: cncAdminAuthHeaders,
+        });
+
+        if (response.status !== 200 || !isRecord(response.body) || !Array.isArray(response.body.commands)) {
+          throw new Error(
+            `Unexpected /api/admin/commands response: status=${response.status} body=${response.rawBody}`
+          );
+        }
+
+        return response.body.commands.filter(isRecord);
+      };
+
+      const forbiddenAdminResponse = await fetchJson(`${cncBaseUrl}/api/admin/commands`, {
+        headers: cncAuthHeaders,
+      });
+      expect(forbiddenAdminResponse.status).toBe(403);
+
+      const initialAdminResponse = await fetchJson(`${cncBaseUrl}/api/admin/commands`, {
+        headers: cncAdminAuthHeaders,
+      });
+      expect(initialAdminResponse.status).toBe(200);
+      expect(isRecord(initialAdminResponse.body)).toBe(true);
+      if (!isRecord(initialAdminResponse.body)) {
+        throw new Error(`Expected admin response object, got: ${initialAdminResponse.rawBody}`);
+      }
+      expect(Array.isArray(initialAdminResponse.body.commands)).toBe(true);
 
       const nodeAgentService = startService({
         name: 'node-agent',
@@ -485,6 +538,7 @@ describe('Cross-service E2E smoke', () => {
       }
 
       expect(typeof wakeupResponse.body.correlationId).toBe('string');
+      expect(typeof wakeupResponse.body.commandId).toBe('string');
 
       if (wakeupResponse.status === 200) {
         expect(wakeupResponse.body.success).toBe(true);
@@ -493,6 +547,156 @@ describe('Cross-service E2E smoke', () => {
         expect(wakeupResponse.body.error).toBe('Internal Server Error');
         expect(typeof wakeupResponse.body.message).toBe('string');
       }
+
+      const scheduleCreateResponse = await fetchJson(
+        `${cncBaseUrl}/api/hosts/${encodeURIComponent(SMOKE_HOST_FQN)}/schedules`,
+        {
+          method: 'POST',
+          headers: {
+            ...cncAuthHeaders,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            scheduledTime: new Date(Date.now() + 4_000).toISOString(),
+            frequency: 'once',
+            enabled: true,
+            notifyOnWake: false,
+            timezone: 'UTC',
+          }),
+        }
+      );
+      expect(scheduleCreateResponse.status).toBe(201);
+      expect(isRecord(scheduleCreateResponse.body)).toBe(true);
+      if (!isRecord(scheduleCreateResponse.body)) {
+        throw new Error(`Schedule create response body was not JSON object: ${scheduleCreateResponse.rawBody}`);
+      }
+
+      const scheduleId = asString(scheduleCreateResponse.body.id);
+      if (!scheduleId) {
+        throw new Error(`Schedule create response missing id: ${scheduleCreateResponse.rawBody}`);
+      }
+
+      await waitForCondition({
+        description: 'once schedule execution',
+        timeoutMs: 40_000,
+        check: async () => {
+          const response = await fetchJson(`${cncBaseUrl}/api/schedules/${encodeURIComponent(scheduleId)}`, {
+            headers: cncAuthHeaders,
+          });
+
+          if (response.status !== 200 || !isRecord(response.body)) {
+            return false;
+          }
+
+          return response.body.enabled === false && typeof response.body.lastTriggered === 'string';
+        },
+      });
+
+      await nodeAgentService.stop();
+
+      await waitForCondition({
+        description: 'C&C node disconnect propagation',
+        timeoutMs: 30_000,
+        check: async () => {
+          const response = await fetchJson(`${cncBaseUrl}/api/nodes`, {
+            headers: cncAuthHeaders,
+          });
+
+          if (response.status !== 200 || !isRecord(response.body) || !Array.isArray(response.body.nodes)) {
+            return false;
+          }
+
+          return response.body.nodes.some(
+            (node) => isRecord(node) && node.id === SMOKE_NODE_ID && node.connected === false
+          );
+        },
+      });
+
+      const queuedWakeResponse = await fetchJson(
+        `${cncBaseUrl}/api/hosts/wakeup/${encodeURIComponent(SMOKE_HOST_FQN)}`,
+        {
+          method: 'POST',
+          headers: {
+            ...cncAuthHeaders,
+            'Idempotency-Key': 'cross-service-smoke-wakeup-offline',
+          },
+        }
+      );
+      expect(queuedWakeResponse.status).toBe(200);
+      expect(isRecord(queuedWakeResponse.body)).toBe(true);
+      if (!isRecord(queuedWakeResponse.body)) {
+        throw new Error(`Queued wake response body was not JSON object: ${queuedWakeResponse.rawBody}`);
+      }
+      expect(queuedWakeResponse.body.state).toBe('queued');
+
+      const queuedCommandId = asString(queuedWakeResponse.body.commandId);
+      if (!queuedCommandId) {
+        throw new Error(`Queued wake response missing commandId: ${queuedWakeResponse.rawBody}`);
+      }
+
+      await waitForCondition({
+        description: 'queued command visible in admin listing',
+        timeoutMs: 20_000,
+        check: async () => {
+          const commands = await fetchAdminCommands();
+          return commands.some(
+            (command) => command.id === queuedCommandId && command.state === 'queued'
+          );
+        },
+      });
+
+      const reconnectedNodeAgentService = startService({
+        name: 'node-agent-reconnect',
+        cwd: resolve(WORKSPACE_ROOT, 'apps/node-agent'),
+        entry: 'src/app.ts',
+        env: {
+          NODE_ENV: 'test',
+          NODE_MODE: 'agent',
+          PORT: String(nodeAgentPort),
+          HOST: LOCALHOST,
+          DB_PATH: nodeDbPath,
+          CNC_URL: `ws://${LOCALHOST}:${cncPort}`,
+          NODE_ID: SMOKE_NODE_ID,
+          NODE_LOCATION: SMOKE_LOCATION,
+          NODE_AUTH_TOKEN: wsNodeAuthToken,
+          SCAN_INTERVAL: '3600000',
+          SCAN_DELAY: '3600000',
+          LOG_LEVEL: 'error',
+        },
+      });
+      services.push(reconnectedNodeAgentService);
+
+      await waitForCondition({
+        description: 'node-agent reconnect /health agent.connected',
+        timeoutMs: 30_000,
+        check: async () => {
+          const response = await fetchJson(`${nodeAgentBaseUrl}/health`);
+          if (response.status !== 200 || !isRecord(response.body)) {
+            return false;
+          }
+
+          const maybeAgent = response.body.agent;
+          if (!isRecord(maybeAgent)) {
+            return false;
+          }
+
+          return maybeAgent.connected === true;
+        },
+      });
+
+      await waitForCondition({
+        description: 'queued wake command flushed after reconnect',
+        timeoutMs: 40_000,
+        check: async () => {
+          const commands = await fetchAdminCommands();
+          const queuedCommand = commands.find((command) => command.id === queuedCommandId);
+          if (!queuedCommand) {
+            return false;
+          }
+
+          return ['acknowledged', 'failed', 'timed_out'].includes(String(queuedCommand.state));
+        },
+      });
     } catch (error) {
       const baseMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`${baseMessage}\n\nCaptured service logs:\n${formatServiceLogs(services)}`);
