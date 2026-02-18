@@ -798,24 +798,24 @@ describe('CncClient Phase 1 auth lifecycle', () => {
   it('reuses cached session tokens until refresh window and then refreshes', async () => {
     mockedAgentConfig.sessionTokenUrl = 'https://cnc.example/api/nodes/session-token';
     ((client as unknown) as { sessionToken: { token: string; expiresAtMs: number | null } | null }).sessionToken = {
-      token: 'cached-session',
+      token: 'test-cached',
       expiresAtMs: Date.now() + 120_000,
     };
 
     await expect(
       ((client as unknown) as { resolveConnectionToken: () => Promise<string> }).resolveConnectionToken()
-    ).resolves.toBe('cached-session');
+    ).resolves.toBe('test-cached');
     expect(mockAxiosPost).not.toHaveBeenCalled();
 
     ((client as unknown) as { sessionToken: { token: string; expiresAtMs: number | null } | null }).sessionToken = {
-      token: 'expiring-session',
+      token: 'test-expiring',
       expiresAtMs: Date.now() + 500,
     };
-    mockAxiosPost.mockResolvedValueOnce({ data: { token: 'refreshed-session', expiresInSeconds: 120 } });
+    mockAxiosPost.mockResolvedValueOnce({ data: { token: 'test-refresh', expiresInSeconds: 120 } });
 
     await expect(
       ((client as unknown) as { resolveConnectionToken: () => Promise<string> }).resolveConnectionToken()
-    ).resolves.toBe('refreshed-session');
+    ).resolves.toBe('test-refresh');
     expect(logger.info).toHaveBeenCalledWith('Session token nearing expiry, requesting refresh');
   });
 
