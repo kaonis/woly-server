@@ -22,6 +22,7 @@
     "validate:standard": "npm run lint && npm run typecheck && npm run test:ci && npm run build && npm run test:e2e:smoke",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "prepush:checks": "node scripts/pre-push-checks.mjs",
     "dev:node-agent": "turbo run dev --filter=@woly-server/node-agent",
     "dev:cnc": "turbo run dev --filter=@woly-server/cnc",
     "format": "prettier --write .",
@@ -44,7 +45,8 @@
     "protocol:version:patch": "npm version patch --workspace=@kaonis/woly-protocol",
     "protocol:version:minor": "npm version minor --workspace=@kaonis/woly-protocol",
     "protocol:version:major": "npm version major --workspace=@kaonis/woly-protocol",
-    "protocol:consumer-typecheck": "npm run test:consumer-typecheck --workspace=@kaonis/woly-protocol"
+    "protocol:consumer-typecheck": "npm run test:consumer-typecheck --workspace=@kaonis/woly-protocol",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -53,6 +55,7 @@
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.0.0",
     "globals": "^17.3.0",
+    "husky": "^9.1.7",
     "prettier": "^3.1.1",
     "turbo": "^2",
     "typescript": "^5.9.3"
