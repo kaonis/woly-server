@@ -50,6 +50,18 @@ jobs:
             );
 
             const isCncFeature = /\[(x|X)\]\s+This PR is a CNC feature change\./.test(body);
+            const requiredReviewPassChecks = [
+              /\[(x|X)\]\s+I completed a final review pass after my latest implementation commit\b/,
+              /\[(x|X)\]\s+I reviewed the final diff for correctness, scope control, and regression risk\./,
+              /\[(x|X)\]\s+I addressed all review comments\/threads with follow-up commits or explicit rationale\./,
+              /\[(x|X)\]\s+I re-reviewed the updated diff after applying review feedback\./,
+            ];
+
+            for (const check of requiredReviewPassChecks) {
+              if (!check.test(body)) {
+                errors.push(`Missing required checked review-pass checklist item matching: ${check}`);
+              }
+            }
 
             if (touchesCncPaths && !isCncFeature) {
               errors.push('This PR touches CNC/protocol source paths. Check "This PR is a CNC feature change." in the PR template.');
