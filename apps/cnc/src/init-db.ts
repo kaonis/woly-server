@@ -8,7 +8,22 @@ import { join } from 'path';
 import db from './database/connection';
 import logger from './utils/logger';
 
-function getTableName(row: unknown): string | null {
+type DatabaseClient = {
+  connect: () => Promise<void>;
+  query: (text: string) => Promise<{ rows: unknown[]; rowCount: number }>;
+  close: () => Promise<void>;
+};
+type InitDbLogger = Pick<typeof logger, 'info' | 'error'>;
+type InitDbOptions = {
+  dbClient?: DatabaseClient;
+  readFile?: typeof readFileSync;
+  log?: InitDbLogger;
+  exit?: (code: number) => void;
+  dbType?: string;
+  schemaRootDir?: string;
+};
+
+export function getTableName(row: unknown): string | null {
   if (!row || typeof row !== 'object') {
     return null;
   }
@@ -16,57 +31,74 @@ function getTableName(row: unknown): string | null {
   return typeof maybeName === 'string' ? maybeName : null;
 }
 
-async function initDatabase(): Promise<void> {
+export async function initDatabase(options: InitDbOptions = {}): Promise<void> {
+  const dbClient = options.dbClient ?? db;
+  const readFile = options.readFile ?? readFileSync;
+  const log = options.log ?? logger;
+  const exit = options.exit ?? process.exit;
+
   try {
-    logger.info('Starting database initialization...');
+    log.info('Starting database initialization...');
 
     // Determine database type from config
-    const dbType = process.env.DB_TYPE || 'postgres';
+    const dbType = options.dbType ?? process.env.DB_TYPE ?? 'postgres';
 
     // Connect to database
-    await db.connect();
+    await dbClient.connect();
 
     // Read and execute appropriate schema
     const schemaFile = dbType === 'sqlite' ? 'schema.sqlite.sql' : 'schema.sql';
-    const schemaPath = join(__dirname, 'database', schemaFile);
-    const schema = readFileSync(schemaPath, 'utf-8');
+    const schemaPath = join(options.schemaRootDir ?? __dirname, 'database', schemaFile);
+    const schema = readFile(schemaPath, 'utf-8');
 
-    logger.info(`Executing ${dbType} schema...`);
-    await db.query(schema);
+    log.info(`Executing ${dbType} schema...`);
+    await dbClient.query(schema);
 
-    logger.info('Database initialized successfully!');
+    log.info('Database initialized successfully!');
 
     // Verify tables exist (database-specific queries)
     if (dbType === 'sqlite') {
-      const result = await db.query(`
+      const result = await dbClient.query(`
         SELECT name as table_name
         FROM sqlite_master
         WHERE type='table' AND name NOT LIKE 'sqlite_%'
         ORDER BY name
       `);
       const tables = result.rows.map(getTableName).filter((tableName): tableName is string => Boolean(tableName));
-      logger.info('Created tables:', {
+      log.info('Created tables:', {
         tables
       });
     } else {
-      const result = await db.query(`
+      const result = await dbClient.query(`
         SELECT table_name
         FROM information_schema.tables
         WHERE table_schema = 'public'
         ORDER BY table_name
       `);
       const tables = result.rows.map(getTableName).filter((tableName): tableName is string => Boolean(tableName));
-      logger.info('Created tables:', {
+      log.info('Created tables:', {
         tables
       });
     }
 
-    await db.close();
-    process.exit(0);
+    await dbClient.close();
+    exit(0);
   } catch (error) {
-    logger.error('Database initialization failed', { error });
-    process.exit(1);
+    log.error('Database initialization failed', { error });
+    exit(1);
   }
 }
 
-initDatabase();
+export function runInitDbCli(
+  currentModule: NodeModule,
+  mainModule: NodeModule | undefined = require.main,
+  runner: () => Promise<void> = () => initDatabase(),
+): Promise<void> | null {
+  if (mainModule !== currentModule) {
+    return null;
+  }
+
+  return runner();
+}
+
+void runInitDbCli(module);

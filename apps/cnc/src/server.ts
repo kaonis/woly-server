@@ -24,12 +24,12 @@ import { runtimeMetrics } from './services/runtimeMetrics';
 import { CNC_VERSION } from './utils/cncVersion';
 import { prometheusContentType, renderPrometheusMetrics } from './services/promMetrics';
 
-function isAllowedCorsOrigin(origin: string, allowedOrigins: string[]): boolean {
+export function isAllowedCorsOrigin(origin: string, allowedOrigins: string[]): boolean {
   if (allowedOrigins.includes('*')) return true;
   return allowedOrigins.includes(origin);
 }
 
-class Server {
+export class Server {
   private app: express.Application;
   private httpServer: ReturnType<typeof createServer>;
   private hostAggregator: HostAggregator;
@@ -256,8 +256,18 @@ class Server {
   }
 }
 
-// Start server
-const server = new Server();
-server.start();
+export function runServerCli(
+  currentModule: NodeModule,
+  mainModule: NodeModule | undefined = require.main,
+  createServer: () => Server = () => new Server(),
+): Server | null {
+  if (mainModule !== currentModule) {
+    return null;
+  }
 
-export default server;
+  const server = createServer();
+  void server.start();
+  return server;
+}
+
+void runServerCli(module);
