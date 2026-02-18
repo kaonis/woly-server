@@ -8,10 +8,11 @@ The schema files in `src/database/` are used for **fresh installations only**. I
 
 ## Migration History
 
-| Version | File | Description | Date |
-|---------|------|-------------|------|
-| 001 | `001_add_commands_table.sql` (PostgreSQL)<br/>`001_add_commands_table.sqlite.sql` (SQLite) | Adds the `commands` table for Phase 4 (Durable Command Lifecycle) with lifecycle states and idempotency support | 2026-02-07 |
-| 002 | `002_add_host_metadata.sql` (PostgreSQL)<br/>`002_add_host_metadata.sqlite.sql` (SQLite) | Adds `notes` and `tags` host metadata columns to `aggregated_hosts` and backfills null tags | 2026-02-15 |
+| Version | File                                                                                             | Description                                                                                                     | Date       |
+| ------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | ---------- |
+| 001     | `001_add_commands_table.sql` (PostgreSQL)<br/>`001_add_commands_table.sqlite.sql` (SQLite)       | Adds the `commands` table for Phase 4 (Durable Command Lifecycle) with lifecycle states and idempotency support | 2026-02-07 |
+| 002     | `002_add_host_metadata.sql` (PostgreSQL)<br/>`002_add_host_metadata.sqlite.sql` (SQLite)         | Adds `notes` and `tags` host metadata columns to `aggregated_hosts` and backfills null tags                     | 2026-02-15 |
+| 003     | `003_add_host_power_config.sql` (PostgreSQL)<br/>`003_add_host_power_config.sqlite.sql` (SQLite) | Adds `power_config` metadata column to `aggregated_hosts` for per-host sleep/shutdown opt-in                    | 2026-02-18 |
 
 ## How to Apply Migrations
 
@@ -23,11 +24,13 @@ For production PostgreSQL databases, run the migration script using `psql`:
 # Connect to your database and run the migration
 psql -U woly -d woly < migrations/001_add_commands_table.sql
 psql -U woly -d woly < migrations/002_add_host_metadata.sql
+psql -U woly -d woly < migrations/003_add_host_power_config.sql
 
 # Or connect first, then run the migration
 psql -U woly -d woly
 \i migrations/001_add_commands_table.sql
 \i migrations/002_add_host_metadata.sql
+\i migrations/003_add_host_power_config.sql
 ```
 
 ### SQLite
@@ -38,11 +41,13 @@ For SQLite databases (development/tunnel environments), use the `sqlite3` comman
 # Run the migration
 sqlite3 db/woly-cnc.db < migrations/001_add_commands_table.sqlite.sql
 sqlite3 db/woly-cnc.db < migrations/002_add_host_metadata.sqlite.sql
+sqlite3 db/woly-cnc.db < migrations/003_add_host_power_config.sqlite.sql
 
 # Or interactively
 sqlite3 db/woly-cnc.db
 .read migrations/001_add_commands_table.sqlite.sql
 .read migrations/002_add_host_metadata.sqlite.sql
+.read migrations/003_add_host_power_config.sqlite.sql
 ```
 
 ### Docker Environments
@@ -119,6 +124,7 @@ DROP TABLE IF EXISTS commands;
 ## Future Enhancements
 
 Consider implementing a migration management tool in the future:
+
 - **Flyway** - Java-based database migration tool
 - **Liquibase** - Database schema change management
 - **TypeORM migrations** - If adopting an ORM layer

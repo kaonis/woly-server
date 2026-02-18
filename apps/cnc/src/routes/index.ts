@@ -114,6 +114,8 @@ export function createRoutes(
   router.get('/hosts/:fqn/uptime', (req, res) => hostsController.getHostUptime(req, res));
   router.get('/hosts/:fqn', (req, res) => hostsController.getHostByFQN(req, res));
   router.post('/hosts/wakeup/:fqn', (req, res) => hostsController.wakeupHost(req, res));
+  router.post('/hosts/:fqn/sleep', (req, res) => hostsController.sleepHost(req, res));
+  router.post('/hosts/:fqn/shutdown', (req, res) => hostsController.shutdownHost(req, res));
   router.put('/hosts/:fqn', (req, res) => hostsController.updateHost(req, res));
   router.delete('/hosts/:fqn', (req, res) => hostsController.deleteHost(req, res));
 

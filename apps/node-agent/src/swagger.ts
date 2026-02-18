@@ -139,6 +139,45 @@ const options: swaggerJsdoc.Options = {
               },
               example: ['infra', 'linux'],
             },
+            powerControl: {
+              type: 'object',
+              nullable: true,
+              description: 'Optional per-host remote power-control configuration',
+              properties: {
+                enabled: {
+                  type: 'boolean',
+                  example: true,
+                },
+                transport: {
+                  type: 'string',
+                  enum: ['ssh'],
+                },
+                platform: {
+                  type: 'string',
+                  enum: ['linux', 'macos', 'windows'],
+                },
+                ssh: {
+                  type: 'object',
+                  properties: {
+                    username: { type: 'string', example: 'ops' },
+                    port: { type: 'integer', minimum: 1, maximum: 65535, example: 22 },
+                    privateKeyPath: { type: 'string', example: '/home/ops/.ssh/id_ed25519' },
+                    strictHostKeyChecking: {
+                      type: 'string',
+                      enum: ['enforce', 'accept-new', 'off'],
+                    },
+                  },
+                  required: ['username'],
+                },
+                commands: {
+                  type: 'object',
+                  properties: {
+                    sleep: { type: 'string', example: 'systemctl suspend' },
+                    shutdown: { type: 'string', example: 'shutdown -h now' },
+                  },
+                },
+              },
+            },
           },
           required: ['name', 'mac', 'ip', 'status'],
         },

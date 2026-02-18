@@ -8,6 +8,7 @@ import type {
   CommandState,
   HostWakeSchedule as ProtocolHostWakeSchedule,
   Host,
+  HostPowerAction as ProtocolHostPowerAction,
   HostPingResult as ProtocolHostPingResult,
   HostPortScanResult as ProtocolHostPortScanResult,
   HostPortScanResponse as ProtocolHostPortScanResponse,
@@ -93,6 +94,7 @@ export type CapabilityDescriptor = ProtocolCncCapabilityDescriptor;
 export type CncCapabilitiesResponse = ProtocolCncCapabilitiesResponse;
 export type HostPingResult = ProtocolHostPingResult;
 export type HostPortScanResponse = ProtocolHostPortScanResponse;
+export type HostPowerAction = ProtocolHostPowerAction;
 export type ScheduleFrequency = ProtocolScheduleFrequency;
 export type HostWakeSchedule = ProtocolHostWakeSchedule;
 export type WakeVerificationResult = ProtocolWakeVerificationResult;
@@ -152,6 +154,17 @@ export interface WakeupResponse {
     status: 'pending';
     startedAt: string;
   };
+}
+
+export interface HostPowerResponse {
+  success: boolean;
+  action: HostPowerAction;
+  message: string;
+  nodeId: string;
+  location: string;
+  commandId?: string;
+  state?: CommandState;
+  correlationId?: string;
 }
 
 export interface CommandRecord {

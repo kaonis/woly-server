@@ -7,6 +7,8 @@ const TRACKED_COMMAND_TYPES = [
   'update-host',
   'delete-host',
   'ping-host',
+  'sleep-host',
+  'shutdown-host',
 ] as const;
 
 type CommandOutcomeSnapshot = {

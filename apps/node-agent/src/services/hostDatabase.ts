@@ -12,7 +12,7 @@ import { Host, HostMergeCandidate } from '../types';
  */
 
 const HOST_SELECT_COLUMNS =
-  'name, mac, secondary_macs as secondaryMacs, ip, status, wol_port as wolPort, lastSeen, discovered, pingResponsive, notes, tags';
+  'name, mac, secondary_macs as secondaryMacs, ip, status, wol_port as wolPort, lastSeen, discovered, pingResponsive, notes, tags, power_config as powerControl';
 
 class HostDatabase extends EventEmitter {
   private db: Database.Database | null = null;
@@ -176,16 +176,170 @@ class HostDatabase extends EventEmitter {
     return 9;
   }
 
+  private parsePowerControl(value: unknown, hostName: string): Host['powerControl'] | undefined {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+
+    let parsed: unknown = value;
+    if (typeof value === 'string') {
+      if (value.trim().length === 0) {
+        return undefined;
+      }
+
+      try {
+        parsed = JSON.parse(value) as unknown;
+      } catch (error) {
+        logger.warn('Failed to parse host power control metadata; falling back to undefined', {
+          hostName,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return undefined;
+      }
+    }
+
+    if (parsed === null) {
+      return null;
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+      return undefined;
+    }
+
+    const candidate = parsed as {
+      enabled?: unknown;
+      transport?: unknown;
+      platform?: unknown;
+      ssh?: unknown;
+      commands?: unknown;
+    };
+
+    if (typeof candidate.enabled !== 'boolean' || candidate.transport !== 'ssh') {
+      return undefined;
+    }
+
+    if (
+      candidate.platform !== 'linux' &&
+      candidate.platform !== 'macos' &&
+      candidate.platform !== 'windows'
+    ) {
+      return undefined;
+    }
+
+    if (!candidate.ssh || typeof candidate.ssh !== 'object') {
+      return undefined;
+    }
+
+    const sshCandidate = candidate.ssh as {
+      username?: unknown;
+      port?: unknown;
+      privateKeyPath?: unknown;
+      strictHostKeyChecking?: unknown;
+    };
+
+    const username = typeof sshCandidate.username === 'string' ? sshCandidate.username.trim() : '';
+    if (!username) {
+      return undefined;
+    }
+
+    let port: number | undefined;
+    if (sshCandidate.port !== undefined) {
+      if (
+        typeof sshCandidate.port !== 'number' ||
+        !Number.isInteger(sshCandidate.port) ||
+        sshCandidate.port < 1 ||
+        sshCandidate.port > 65_535
+      ) {
+        return undefined;
+      }
+      port = sshCandidate.port;
+    }
+
+    let privateKeyPath: string | undefined;
+    if (sshCandidate.privateKeyPath !== undefined) {
+      if (typeof sshCandidate.privateKeyPath !== 'string') {
+        return undefined;
+      }
+      const normalizedPath = sshCandidate.privateKeyPath.trim();
+      if (!normalizedPath) {
+        return undefined;
+      }
+      privateKeyPath = normalizedPath;
+    }
+
+    let strictHostKeyChecking: 'enforce' | 'accept-new' | 'off' | undefined;
+    if (sshCandidate.strictHostKeyChecking !== undefined) {
+      if (
+        sshCandidate.strictHostKeyChecking !== 'enforce' &&
+        sshCandidate.strictHostKeyChecking !== 'accept-new' &&
+        sshCandidate.strictHostKeyChecking !== 'off'
+      ) {
+        return undefined;
+      }
+      strictHostKeyChecking = sshCandidate.strictHostKeyChecking;
+    }
+
+    let commands: { sleep?: string; shutdown?: string } | undefined;
+    if (candidate.commands !== undefined) {
+      if (!candidate.commands || typeof candidate.commands !== 'object') {
+        return undefined;
+      }
+
+      const commandCandidate = candidate.commands as { sleep?: unknown; shutdown?: unknown };
+      const sleep =
+        typeof commandCandidate.sleep === 'string' && commandCandidate.sleep.trim().length > 0
+          ? commandCandidate.sleep.trim()
+          : undefined;
+      const shutdown =
+        typeof commandCandidate.shutdown === 'string' && commandCandidate.shutdown.trim().length > 0
+          ? commandCandidate.shutdown.trim()
+          : undefined;
+
+      if (sleep || shutdown) {
+        commands = {};
+        if (sleep) {
+          commands.sleep = sleep;
+        }
+        if (shutdown) {
+          commands.shutdown = shutdown;
+        }
+      }
+    }
+
+    return {
+      enabled: candidate.enabled,
+      transport: 'ssh',
+      platform: candidate.platform,
+      ssh: {
+        username,
+        ...(port !== undefined ? { port } : {}),
+        ...(privateKeyPath ? { privateKeyPath } : {}),
+        ...(strictHostKeyChecking ? { strictHostKeyChecking } : {}),
+      },
+      ...(commands ? { commands } : {}),
+    };
+  }
+
+  private serializePowerControl(powerControl: Host['powerControl'] | undefined): string | null {
+    if (powerControl === undefined || powerControl === null) {
+      return null;
+    }
+
+    return JSON.stringify(powerControl);
+  }
+
   private normalizeHostRow(
-    row: Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown }
+    row: Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown; powerControl?: unknown }
   ): Host {
     const {
       wolPort: rawWolPort,
       tags: rawTags,
       secondaryMacs: rawSecondaryMacs,
+      powerControl: rawPowerControl,
       ...base
     } = row;
     const secondaryMacs = this.parseSecondaryMacs(rawSecondaryMacs, base.name, base.mac);
+    const powerControl = this.parsePowerControl(rawPowerControl, base.name);
 
     return {
       ...base,
@@ -194,6 +348,7 @@ class HostDatabase extends EventEmitter {
       wolPort: this.normalizeWolPort(rawWolPort),
       notes: base.notes ?? null,
       tags: this.parseTags(rawTags, base.name),
+      ...(powerControl !== undefined ? { powerControl } : {}),
     };
   }
 
@@ -296,7 +451,8 @@ class HostDatabase extends EventEmitter {
       discovered integer DEFAULT 0,
       pingResponsive integer,
       notes text,
-      tags text NOT NULL DEFAULT '[]'
+      tags text NOT NULL DEFAULT '[]',
+      power_config text
     )`);
 
     // Keep runtime schema compatible with older databases.
@@ -305,6 +461,7 @@ class HostDatabase extends EventEmitter {
     this.addColumnIfMissing("tags text NOT NULL DEFAULT '[]'");
     this.addColumnIfMissing('wol_port integer NOT NULL DEFAULT 9');
     this.addColumnIfMissing("secondary_macs text NOT NULL DEFAULT '[]'");
+    this.addColumnIfMissing('power_config text');
     try {
       db.exec('UPDATE hosts SET wol_port = 9 WHERE wol_port IS NULL');
     } catch (err) {
@@ -327,7 +484,9 @@ class HostDatabase extends EventEmitter {
       const db = this.assertReady();
       const rows = db
         .prepare(`SELECT ${HOST_SELECT_COLUMNS} FROM hosts ORDER BY name`)
-        .all() as Array<Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown }>;
+        .all() as Array<
+        Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown; powerControl?: unknown }
+      >;
 
       return rows.map((row) => this.normalizeHostRow(row));
     } catch (error) {
@@ -346,7 +505,7 @@ class HostDatabase extends EventEmitter {
       const row = db
         .prepare(`SELECT ${HOST_SELECT_COLUMNS} FROM hosts WHERE name = ?`)
         .get(name) as
-        | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown })
+        | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown; powerControl?: unknown })
         | undefined;
 
       return row ? this.normalizeHostRow(row) : undefined;
@@ -367,7 +526,7 @@ class HostDatabase extends EventEmitter {
       const row = db
         .prepare(`SELECT ${HOST_SELECT_COLUMNS} FROM hosts WHERE mac = ?`)
         .get(formattedMac) as
-        | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown })
+        | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown; powerControl?: unknown })
         | undefined;
 
       if (row) {
@@ -387,7 +546,7 @@ class HostDatabase extends EventEmitter {
            LIMIT 1`
         )
         .get(formattedMac) as
-        | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown })
+        | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown; powerControl?: unknown })
         | undefined;
 
       return secondaryRow ? this.normalizeHostRow(secondaryRow) : undefined;
@@ -405,12 +564,18 @@ class HostDatabase extends EventEmitter {
     name: string,
     mac: string,
     ip: string,
-    metadata?: { notes?: string | null; tags?: string[]; wolPort?: number; secondaryMacs?: string[] },
+    metadata?: {
+      notes?: string | null;
+      tags?: string[];
+      wolPort?: number;
+      secondaryMacs?: string[];
+      powerControl?: Host['powerControl'];
+    },
     options?: { emitLifecycleEvent?: boolean }
   ): Promise<Host> {
     return new Promise((resolve, reject) => {
-      const sql = `INSERT INTO hosts(name, mac, secondary_macs, ip, status, wol_port, lastSeen, discovered, pingResponsive, notes, tags)
-                   VALUES(?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 0, NULL, ?, ?)`;
+      const sql = `INSERT INTO hosts(name, mac, secondary_macs, ip, status, wol_port, lastSeen, discovered, pingResponsive, notes, tags, power_config)
+                   VALUES(?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 0, NULL, ?, ?, ?)`;
       try {
         const db = this.assertReady();
         const formattedMac = networkDiscovery.formatMAC(mac);
@@ -418,6 +583,8 @@ class HostDatabase extends EventEmitter {
         const tags = this.serializeTags(metadata?.tags);
         const secondaryMacs = this.normalizeSecondaryMacs(metadata?.secondaryMacs, formattedMac);
         const wolPort = this.normalizeWolPort(metadata?.wolPort);
+        const powerControl = metadata?.powerControl ?? undefined;
+        const serializedPowerControl = this.serializePowerControl(powerControl);
         db.prepare(sql).run(
           name,
           formattedMac,
@@ -426,7 +593,8 @@ class HostDatabase extends EventEmitter {
           'asleep',
           wolPort,
           notes,
-          tags
+          tags,
+          serializedPowerControl
         );
         logger.info(`Added host: ${name}`);
         const createdHost: Host = {
@@ -441,6 +609,7 @@ class HostDatabase extends EventEmitter {
           pingResponsive: null,
           notes,
           tags: this.parseTags(tags, name),
+          ...(powerControl !== undefined ? { powerControl } : {}),
         };
         if (options?.emitLifecycleEvent ?? true) {
           this.emit('host-discovered', createdHost);
@@ -510,7 +679,9 @@ class HostDatabase extends EventEmitter {
    */
   updateHost(
     name: string,
-    updates: Partial<Pick<Host, 'name' | 'mac' | 'secondaryMacs' | 'ip' | 'wolPort' | 'status' | 'notes' | 'tags'>>,
+    updates: Partial<
+      Pick<Host, 'name' | 'mac' | 'secondaryMacs' | 'ip' | 'wolPort' | 'status' | 'notes' | 'tags' | 'powerControl'>
+    >,
     options?: { emitLifecycleEvent?: boolean }
   ): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -530,7 +701,8 @@ class HostDatabase extends EventEmitter {
         updates.wolPort !== undefined ||
         updates.status !== undefined ||
         updates.notes !== undefined ||
-        updates.tags !== undefined;
+        updates.tags !== undefined ||
+        updates.powerControl !== undefined;
       if (!hasRequestedUpdate) {
         resolve();
         return;
@@ -539,7 +711,7 @@ class HostDatabase extends EventEmitter {
       const existingRow = db
         .prepare(`SELECT ${HOST_SELECT_COLUMNS} FROM hosts WHERE name = ?`)
         .get(name) as
-        | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown })
+        | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown; powerControl?: unknown })
         | undefined;
       if (!existingRow) {
         reject(new Error(`Host ${name} not found`));
@@ -559,6 +731,8 @@ class HostDatabase extends EventEmitter {
       const nextStatus = updates.status ?? existing.status;
       const nextNotes = updates.notes !== undefined ? updates.notes : (existing.notes ?? null);
       const nextTags = updates.tags !== undefined ? updates.tags : (existing.tags ?? []);
+      const nextPowerControl =
+        updates.powerControl !== undefined ? updates.powerControl : existing.powerControl;
 
       const hasMeaningfulChange =
         nextName !== existing.name ||
@@ -568,7 +742,8 @@ class HostDatabase extends EventEmitter {
         nextStatus !== existing.status ||
         nextNotes !== (existing.notes ?? null) ||
         JSON.stringify(nextTags) !== JSON.stringify(existing.tags ?? []) ||
-        JSON.stringify(nextSecondaryMacs) !== JSON.stringify(existing.secondaryMacs ?? []);
+        JSON.stringify(nextSecondaryMacs) !== JSON.stringify(existing.secondaryMacs ?? []) ||
+        JSON.stringify(nextPowerControl ?? null) !== JSON.stringify(existing.powerControl ?? null);
 
       if (!hasMeaningfulChange) {
         resolve();
@@ -586,7 +761,8 @@ class HostDatabase extends EventEmitter {
                  wol_port = ?,
                  status = ?,
                  notes = ?,
-                 tags = ?
+                 tags = ?,
+                 power_config = ?
              WHERE name = ?`
           )
           .run(
@@ -598,6 +774,7 @@ class HostDatabase extends EventEmitter {
             nextStatus,
             nextNotes,
             this.serializeTags(nextTags),
+            this.serializePowerControl(nextPowerControl),
             name
           );
 
@@ -608,7 +785,7 @@ class HostDatabase extends EventEmitter {
           const updatedRow = db
             .prepare(`SELECT ${HOST_SELECT_COLUMNS} FROM hosts WHERE name = ?`)
             .get(resolvedName) as
-            | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown })
+            | (Host & { tags?: unknown; wolPort?: unknown; secondaryMacs?: unknown; powerControl?: unknown })
             | undefined;
           if (updatedRow && (options?.emitLifecycleEvent ?? true)) {
             this.emit('host-updated', this.normalizeHostRow(updatedRow));

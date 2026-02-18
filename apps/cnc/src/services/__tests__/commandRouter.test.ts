@@ -223,7 +223,9 @@ describe('CommandRouter', () => {
               | 'scan-host-ports'
               | 'update-host'
               | 'delete-host'
-              | 'ping-host';
+              | 'ping-host'
+              | 'sleep-host'
+              | 'shutdown-host';
           }
         >;
         handleCommandResult: (result: {

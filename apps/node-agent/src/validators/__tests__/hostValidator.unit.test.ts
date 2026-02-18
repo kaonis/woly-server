@@ -3,6 +3,8 @@ import {
   deleteHostSchema,
   hostNameParamSchema,
   macAddressSchema,
+  shutdownHostSchema,
+  sleepHostSchema,
   updateHostSchema,
   wakeHostSchema,
 } from '../hostValidator';
@@ -46,6 +48,18 @@ describe('hostValidator schemas', () => {
       expect(updateHostSchema.safeParse({ notes: null }).success).toBe(true);
       expect(updateHostSchema.safeParse({ tags: ['tag-1'] }).success).toBe(true);
       expect(updateHostSchema.safeParse({ wolPort: 7 }).success).toBe(true);
+      expect(
+        updateHostSchema.safeParse({
+          powerControl: {
+            enabled: true,
+            transport: 'ssh',
+            platform: 'linux',
+            ssh: {
+              username: 'root',
+            },
+          },
+        }).success
+      ).toBe(true);
     });
 
     it('accepts combined updates', () => {
@@ -79,6 +93,18 @@ describe('hostValidator schemas', () => {
       expect(updateHostSchema.safeParse({ tags: [''] }).success).toBe(false);
       expect(updateHostSchema.safeParse({ wolPort: 0 }).success).toBe(false);
       expect(updateHostSchema.safeParse({ wolPort: 70000 }).success).toBe(false);
+      expect(
+        updateHostSchema.safeParse({
+          powerControl: {
+            enabled: true,
+            transport: 'ssh',
+            platform: 'linux',
+            ssh: {
+              username: '',
+            },
+          },
+        }).success
+      ).toBe(false);
     });
   });
 
@@ -104,6 +130,18 @@ describe('hostValidator schemas', () => {
       if (result.success) {
         expect(result.data.name).toBe('PHANTOM-MBP');
       }
+    });
+  });
+
+  describe('dangerous power action schemas', () => {
+    it('requires explicit confirmation for sleep', () => {
+      expect(sleepHostSchema.safeParse({ confirm: 'sleep' }).success).toBe(true);
+      expect(sleepHostSchema.safeParse({ confirm: 'shutdown' }).success).toBe(false);
+    });
+
+    it('requires explicit confirmation for shutdown', () => {
+      expect(shutdownHostSchema.safeParse({ confirm: 'shutdown' }).success).toBe(true);
+      expect(shutdownHostSchema.safeParse({ confirm: 'sleep' }).success).toBe(false);
     });
   });
 

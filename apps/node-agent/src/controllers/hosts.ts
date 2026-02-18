@@ -7,6 +7,7 @@ import { logger } from '../utils/logger';
 import HostDatabase from '../services/hostDatabase';
 import ScanOrchestrator from '../services/scanOrchestrator';
 import * as networkDiscovery from '../services/networkDiscovery';
+import { executeHostPowerAction } from '../services/hostPowerControl';
 import {
   Host,
   HostMergeCandidatesResponse,
@@ -40,6 +41,7 @@ type WakeVerificationOptions = {
   timeoutMs: number;
   pollIntervalMs: number;
 };
+type HostPowerAction = 'sleep' | 'shutdown';
 
 function setHostDatabase(db: HostDatabase | null): void {
   hostDb = db;
@@ -140,6 +142,35 @@ async function waitForWakeVerificationDelay(ms: number): Promise<void> {
   }
 
   await new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+function mapHostPowerErrorToStatus(message: string): number {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes('not found')) {
+    return 404;
+  }
+
+  if (
+    normalized.includes('does not have power control configured') ||
+    normalized.includes('power control is disabled')
+  ) {
+    return 409;
+  }
+
+  if (
+    normalized.includes('missing ssh') ||
+    normalized.includes('invalid') ||
+    normalized.includes('does not have a valid ip')
+  ) {
+    return 400;
+  }
+
+  if (normalized.includes('ssh')) {
+    return 502;
+  }
+
+  return 500;
 }
 
 async function verifyWakeState(
@@ -604,6 +635,75 @@ const wakeUpHost = async (req: Request, res: Response): Promise<void> => {
   });
 };
 
+async function handleHostPowerAction(
+  req: Request,
+  res: Response,
+  action: HostPowerAction
+): Promise<void> {
+  const name = req.params.name as string;
+  const confirm = (req.body as { confirm?: unknown } | undefined)?.confirm;
+
+  if (confirm !== action) {
+    res.status(400).json({
+      error: 'Bad Request',
+      message: `Field "confirm" must equal "${action}"`,
+    });
+    return;
+  }
+
+  if (!hostDb) {
+    res.status(500).json({ error: 'Database not initialized' });
+    return;
+  }
+
+  const host = await hostDb.getHost(name);
+  if (!host) {
+    res.status(404).json({ error: 'Not Found', message: `Host '${name}' not found` });
+    return;
+  }
+
+  try {
+    const result = await executeHostPowerAction(host, action);
+    await hostDb.updateHostStatus(host.name, 'asleep');
+    const updatedHost = await hostDb.getHost(host.name);
+    if (updatedHost) {
+      hostDb.emit('host-updated', updatedHost);
+    }
+
+    res.status(200).json({
+      success: true,
+      name: host.name,
+      action,
+      message: result.message,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown power action error';
+    const statusCode = mapHostPowerErrorToStatus(message);
+    const errorTitle = statusCode === 400
+      ? 'Bad Request'
+      : statusCode === 404
+        ? 'Not Found'
+        : statusCode === 409
+          ? 'Conflict'
+          : statusCode === 502
+            ? 'Bad Gateway'
+            : 'Internal Server Error';
+
+    res.status(statusCode).json({
+      error: errorTitle,
+      message,
+      name: host.name,
+      action,
+    });
+  }
+}
+
+const sleepHost = async (req: Request, res: Response): Promise<void> =>
+  handleHostPowerAction(req, res, 'sleep');
+
+const shutdownHost = async (req: Request, res: Response): Promise<void> =>
+  handleHostPowerAction(req, res, 'shutdown');
+
 /**
  * @swagger
  * /hosts/scan:
@@ -739,7 +839,7 @@ const scanNetwork = async (_req: Request, res: Response): Promise<void> => {
  *         $ref: '#/components/responses/InternalError'
  */
 const addHost = async (req: Request, res: Response): Promise<void> => {
-  const { name, mac, ip, notes, tags, secondaryMacs } = req.body;
+  const { name, mac, ip, notes, tags, secondaryMacs, powerControl } = req.body;
 
   if (!name || !mac || !ip) {
     res.status(400).json({ error: 'Missing required fields: name, mac, ip' });
@@ -750,11 +850,13 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ error: 'Database not initialized' });
     return;
   }
-  const host = await hostDb.addHost(name, mac, ip, {
+  const metadata = {
     notes,
     tags,
     secondaryMacs,
-  });
+    ...(powerControl !== undefined ? { powerControl } : {}),
+  };
+  const host = await hostDb.addHost(name, mac, ip, metadata);
   res.status(201).json(host);
 };
 
@@ -826,7 +928,7 @@ const addHost = async (req: Request, res: Response): Promise<void> => {
 const updateHost = async (req: Request, res: Response): Promise<void> => {
   const currentName = req.params.name as string;
   const updates = req.body as Partial<
-    Pick<Host, 'name' | 'mac' | 'secondaryMacs' | 'ip' | 'notes' | 'tags' | 'wolPort'>
+    Pick<Host, 'name' | 'mac' | 'secondaryMacs' | 'ip' | 'notes' | 'tags' | 'wolPort' | 'powerControl'>
   >;
 
   if (!hostDb) {
@@ -1178,6 +1280,8 @@ export {
   getAllHosts,
   getHost,
   wakeUpHost,
+  sleepHost,
+  shutdownHost,
   scanNetwork,
   addHost,
   updateHost,

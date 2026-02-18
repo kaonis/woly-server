@@ -78,6 +78,8 @@ describe('Webhook Routes Authentication and Authorization', () => {
 
     const commandRouter = {
       routeWakeCommand: jest.fn().mockRejectedValue(new Error('Node not connected')),
+      routeSleepHostCommand: jest.fn().mockRejectedValue(new Error('Node not connected')),
+      routeShutdownHostCommand: jest.fn().mockRejectedValue(new Error('Node not connected')),
       routeScanHostsCommand: jest.fn().mockResolvedValue({
         state: 'acknowledged',
         queuedAt: '2026-02-18T00:00:00.000Z',

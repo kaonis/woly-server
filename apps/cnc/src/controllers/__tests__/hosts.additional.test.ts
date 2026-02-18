@@ -49,6 +49,8 @@ describe('HostsController additional branches', () => {
   };
   let commandRouter: {
     routeWakeCommand: jest.Mock;
+    routeSleepHostCommand: jest.Mock;
+    routeShutdownHostCommand: jest.Mock;
     routeScanHostsCommand: jest.Mock;
     routePingHostCommand: jest.Mock;
     routeScanHostPortsCommand: jest.Mock;
@@ -70,6 +72,8 @@ describe('HostsController additional branches', () => {
     };
     commandRouter = {
       routeWakeCommand: jest.fn(),
+      routeSleepHostCommand: jest.fn(),
+      routeShutdownHostCommand: jest.fn(),
       routeScanHostsCommand: jest.fn(),
       routePingHostCommand: jest.fn(),
       routeScanHostPortsCommand: jest.fn(),
@@ -512,6 +516,78 @@ describe('HostsController additional branches', () => {
       expect(res.json).toHaveBeenCalledWith({
         error: 'Internal Server Error',
         message: 'Failed to wake host',
+      });
+    });
+  });
+
+  describe('sleepHost', () => {
+    it('requires explicit confirmation token', async () => {
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        body: {},
+      });
+      const res = createMockResponse();
+
+      await controller.sleepHost(req, res);
+
+      expect(commandRouter.routeSleepHostCommand).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: 'Bad Request',
+        })
+      );
+    });
+
+    it('dispatches sleep command with idempotency/correlation context', async () => {
+      commandRouter.routeSleepHostCommand.mockResolvedValue({
+        success: true,
+        action: 'sleep',
+        message: 'Remote sleep command executed for desktop',
+        nodeId: 'node-1',
+        location: 'lab',
+      });
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        body: { confirm: 'sleep' },
+        correlationId: 'cid-request',
+        headers: { 'Idempotency-Key': ' sleep-1 ' },
+      });
+      const res = createMockResponse();
+
+      await controller.sleepHost(req, res);
+
+      expect(commandRouter.routeSleepHostCommand).toHaveBeenCalledWith('desktop@lab', {
+        idempotencyKey: 'sleep-1',
+        correlationId: 'cid-request',
+      });
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          action: 'sleep',
+          correlationId: 'cid-request',
+        })
+      );
+    });
+  });
+
+  describe('shutdownHost', () => {
+    it('maps routing errors consistently', async () => {
+      commandRouter.routeShutdownHostCommand.mockRejectedValue(new Error('Node node-1 is offline'));
+
+      const req = createMockRequest({
+        params: { fqn: 'desktop@lab' },
+        body: { confirm: 'shutdown' },
+      });
+      const res = createMockResponse();
+
+      await controller.shutdownHost(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Service Unavailable',
+        message: 'Node node-1 is offline',
       });
     });
   });

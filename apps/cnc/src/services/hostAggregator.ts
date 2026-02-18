@@ -6,6 +6,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { hostPowerControlSchema } from '@kaonis/woly-protocol';
 import db from '../database/connection';
 import { logger } from '../utils/logger';
 import { Host, AggregatedHost, HostStatusHistoryEntry, HostUptimeSummary } from '../types';
@@ -34,6 +35,7 @@ type HostStatus = Host['status'];
 type AggregatedHostRowRaw = AggregatedHost & {
   secondaryMacs?: unknown;
   tags?: unknown;
+  powerControl?: unknown;
   openPorts?: unknown;
   portsScannedAt?: unknown;
   portsExpireAt?: unknown;
@@ -59,6 +61,7 @@ const HOST_SELECT_COLUMNS = `
         ah.last_seen as "lastSeen",
         ah.notes,
         ah.tags,
+        ah.power_config as "powerControl",
         ah.open_ports as "openPorts",
         ah.ports_scanned_at as "portsScannedAt",
         ah.ports_expire_at as "portsExpireAt",
@@ -112,6 +115,49 @@ export class HostAggregator extends EventEmitter {
     }
 
     return JSON.stringify(tags);
+  }
+
+  private parsePowerControl(value: unknown, hostName: string): Host['powerControl'] | undefined {
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+
+    let parsed: unknown = value;
+    if (typeof value === 'string') {
+      if (value.trim().length === 0) {
+        return undefined;
+      }
+      try {
+        parsed = JSON.parse(value) as unknown;
+      } catch (error) {
+        logger.warn('Failed to parse aggregated host power control metadata; defaulting to undefined', {
+          hostName,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return undefined;
+      }
+    }
+
+    if (parsed === null) {
+      return null;
+    }
+
+    const validation = hostPowerControlSchema.safeParse(parsed);
+    if (!validation.success) {
+      logger.warn('Aggregated host power control metadata failed validation; defaulting to undefined', {
+        hostName,
+      });
+      return undefined;
+    }
+
+    return validation.data;
+  }
+
+  private serializePowerControl(value: Host['powerControl'] | undefined): string | null {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    return JSON.stringify(value);
   }
 
   private parseSecondaryMacs(value: unknown, hostName: string, primaryMac: string): string[] {
@@ -262,18 +308,20 @@ export class HostAggregator extends EventEmitter {
   }
 
   private normalizeHost(row: AggregatedHostRowRaw): AggregatedHost {
-    const { secondaryMacs: rawSecondaryMacs, ...base } = row;
+    const { secondaryMacs: rawSecondaryMacs, powerControl: rawPowerControl, ...base } = row;
     const openPorts = this.parseOpenPorts(base.openPorts, base.name);
     const portsScannedAt = this.normalizeDateValue(base.portsScannedAt);
     const portsExpireAt = this.normalizeDateValue(base.portsExpireAt);
     const hasFreshPortScan = this.isPortScanStillFresh(portsExpireAt);
     const secondaryMacs = this.parseSecondaryMacs(rawSecondaryMacs, base.name, base.mac);
+    const powerControl = this.parsePowerControl(rawPowerControl, base.name);
 
     return {
       ...base,
       ...(secondaryMacs.length > 0 ? { secondaryMacs } : {}),
       notes: base.notes ?? null,
       tags: this.parseTags(base.tags, base.name),
+      ...(powerControl !== undefined ? { powerControl } : {}),
       openPorts: hasFreshPortScan ? openPorts : undefined,
       portsScannedAt: hasFreshPortScan ? portsScannedAt : null,
       portsExpireAt: hasFreshPortScan ? portsExpireAt : null,
@@ -373,6 +421,10 @@ export class HostAggregator extends EventEmitter {
       {
         column: 'ports_expire_at',
         statement: 'ALTER TABLE aggregated_hosts ADD COLUMN ports_expire_at TIMESTAMP',
+      },
+      {
+        column: 'power_config',
+        statement: 'ALTER TABLE aggregated_hosts ADD COLUMN power_config TEXT',
       },
     ];
 
@@ -564,6 +616,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
     const notes = host.notes ?? null;
     const tags = this.serializeTags(host.tags);
     const secondaryMacs = this.serializeSecondaryMacs(host.secondaryMacs, host.mac);
+    const powerControl = this.serializePowerControl(host.powerControl);
 
     // Convert lastSeen to ISO string for SQLite compatibility
     const lastSeen = host.lastSeen
@@ -586,8 +639,9 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
             notes = $10,
             tags = $11,
             secondary_macs = $12,
+            power_config = $13,
             updated_at = ${timestamp}
-        WHERE id = $13 AND node_id = $14`,
+        WHERE id = $14 AND node_id = $15`,
       [
         host.name,
         host.mac,
@@ -601,6 +655,7 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
         notes,
         tags,
         secondaryMacs,
+        powerControl,
         id,
         nodeId,
       ]
@@ -641,6 +696,10 @@ ${HOST_SELECT_COLUMNS_WITH_ID}
     }
 
     if ((previous.notes ?? null) !== (next.notes ?? null)) {
+      return true;
+    }
+
+    if (JSON.stringify(previous.powerControl ?? null) !== JSON.stringify(next.powerControl ?? null)) {
       return true;
     }
 
@@ -1317,6 +1376,7 @@ ${HOST_SELECT_COLUMNS}
     const notes = host.notes ?? null;
     const tags = this.serializeTags(host.tags);
     const secondaryMacs = this.serializeSecondaryMacs(host.secondaryMacs, host.mac);
+    const powerControl = this.serializePowerControl(host.powerControl);
 
     // Convert lastSeen to ISO string for SQLite compatibility
     const lastSeen = host.lastSeen 
@@ -1325,8 +1385,8 @@ ${HOST_SELECT_COLUMNS}
 
     await db.query(
       `INSERT INTO aggregated_hosts
-        (node_id, name, mac, secondary_macs, ip, status, last_seen, location, fully_qualified_name, discovered, ping_responsive, notes, tags)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        (node_id, name, mac, secondary_macs, ip, status, last_seen, location, fully_qualified_name, discovered, ping_responsive, notes, tags, power_config)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
       [
         nodeId,
         host.name,
@@ -1341,6 +1401,7 @@ ${HOST_SELECT_COLUMNS}
         pingResponsive,
         notes,
         tags,
+        powerControl,
       ]
     );
   }

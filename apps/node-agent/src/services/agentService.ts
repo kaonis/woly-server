@@ -1,6 +1,11 @@
 import { EventEmitter } from 'events';
 import { isIP } from 'node:net';
-import type { CommandState, WakeVerificationResult, WakeVerificationStatus } from '@kaonis/woly-protocol';
+import {
+  hostPowerControlSchema,
+  type CommandState,
+  type WakeVerificationResult,
+  type WakeVerificationStatus,
+} from '@kaonis/woly-protocol';
 import { cncClient } from './cncClient';
 import { agentConfig, validateAgentConfig } from '../config/agent';
 import { config } from '../config';
@@ -10,6 +15,7 @@ import HostDatabase from './hostDatabase';
 import ScanOrchestrator from './scanOrchestrator';
 import { runtimeTelemetry } from './runtimeTelemetry';
 import * as networkDiscovery from './networkDiscovery';
+import { executeHostPowerAction } from './hostPowerControl';
 
 type WakeCommand = Extract<CncCommand, { type: 'wake' }>;
 type ScanCommand = Extract<CncCommand, { type: 'scan' }>;
@@ -17,13 +23,17 @@ type ScanHostPortsCommand = Extract<CncCommand, { type: 'scan-host-ports' }>;
 type UpdateHostCommand = Extract<CncCommand, { type: 'update-host' }>;
 type DeleteHostCommand = Extract<CncCommand, { type: 'delete-host' }>;
 type PingHostCommand = Extract<CncCommand, { type: 'ping-host' }>;
+type SleepHostCommand = Extract<CncCommand, { type: 'sleep-host' }>;
+type ShutdownHostCommand = Extract<CncCommand, { type: 'shutdown-host' }>;
 type DispatchableCommand =
   | WakeCommand
   | ScanCommand
   | ScanHostPortsCommand
   | UpdateHostCommand
   | DeleteHostCommand
-  | PingHostCommand;
+  | PingHostCommand
+  | SleepHostCommand
+  | ShutdownHostCommand;
 type HostEventMessage = Extract<
   NodeMessage,
   { type: 'host-discovered' | 'host-updated' | 'host-removed' | 'scan-complete' }
@@ -44,6 +54,7 @@ type ValidatedUpdateHostData = {
   status?: Host['status'];
   notes?: string | null;
   tags?: string[];
+  powerControl?: Host['powerControl'];
 };
 
 const MAC_ADDRESS_REGEX = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^([0-9A-Fa-f]{12})$/;
@@ -104,6 +115,18 @@ const COMMAND_EXECUTION_POLICIES: Record<DispatchableCommand['type'], CommandExe
     timeoutMs: 5_000,
     maxAttempts: 1,
     retryDelayMs: 200,
+    retryOnFailure: false,
+  },
+  'sleep-host': {
+    timeoutMs: 45_000,
+    maxAttempts: 1,
+    retryDelayMs: 0,
+    retryOnFailure: false,
+  },
+  'shutdown-host': {
+    timeoutMs: 45_000,
+    maxAttempts: 1,
+    retryDelayMs: 0,
     retryOnFailure: false,
   },
 };
@@ -287,6 +310,14 @@ export class AgentService extends EventEmitter {
 
     cncClient.on('command:ping-host', async (command: PingHostCommand) => {
       await this.handlePingHostCommand(command);
+    });
+
+    cncClient.on('command:sleep-host', async (command: SleepHostCommand) => {
+      await this.handleSleepHostCommand(command);
+    });
+
+    cncClient.on('command:shutdown-host', async (command: ShutdownHostCommand) => {
+      await this.handleShutdownHostCommand(command);
     });
   }
 
@@ -550,6 +581,10 @@ export class AgentService extends EventEmitter {
     }
 
     if ((previous.notes ?? null) !== (next.notes ?? null)) {
+      return true;
+    }
+
+    if (JSON.stringify(previous.powerControl ?? null) !== JSON.stringify(next.powerControl ?? null)) {
       return true;
     }
 
@@ -1278,7 +1313,7 @@ export class AgentService extends EventEmitter {
         throw new NonRetryableCommandError(`Host ${currentName} not found`);
       }
 
-      await this.hostDb.updateHost(currentName, {
+      const updatePayload: Parameters<HostDatabase['updateHost']>[1] = {
         name: data.name,
         mac: data.mac,
         secondaryMacs: data.secondaryMacs,
@@ -1287,7 +1322,12 @@ export class AgentService extends EventEmitter {
         status: data.status,
         notes: data.notes,
         tags: data.tags,
-      }, {
+      };
+      if (data.powerControl !== undefined) {
+        updatePayload.powerControl = data.powerControl;
+      }
+
+      await this.hostDb.updateHost(currentName, updatePayload, {
         emitLifecycleEvent: false,
       });
 
@@ -1382,6 +1422,60 @@ export class AgentService extends EventEmitter {
           latencyMs,
           checkedAt,
         },
+      };
+    });
+  }
+
+  private async handleSleepHostCommand(command: SleepHostCommand): Promise<void> {
+    await this.handleHostPowerCommand(command, 'sleep');
+  }
+
+  private async handleShutdownHostCommand(command: ShutdownHostCommand): Promise<void> {
+    await this.handleHostPowerCommand(command, 'shutdown');
+  }
+
+  private async handleHostPowerCommand(
+    command: SleepHostCommand | ShutdownHostCommand,
+    action: 'sleep' | 'shutdown',
+  ): Promise<void> {
+    const { commandId, data } = command;
+    const { hostName, mac, confirmation } = data;
+
+    logger.info('Received host power command from C&C', {
+      commandId,
+      hostName,
+      action,
+    });
+
+    await this.executeCommandWithReliability(command, async () => {
+      if (!this.hostDb) {
+        throw new NonRetryableCommandError('Host database not initialized');
+      }
+
+      if (confirmation !== action) {
+        throw new NonRetryableCommandError(
+          `Invalid ${command.type} payload: confirmation must be '${action}'`
+        );
+      }
+
+      let host = await this.hostDb.getHost(hostName);
+      if (!host) {
+        host = await this.hostDb.getHostByMAC(mac);
+      }
+      if (!host) {
+        throw new NonRetryableCommandError(`Host ${hostName} not found`);
+      }
+
+      const executionResult = await executeHostPowerAction(host, action);
+      await this.hostDb.updateHostStatus(host.name, 'asleep');
+      const refreshed = await this.hostDb.getHost(host.name);
+      if (refreshed) {
+        this.sendHostUpdated(refreshed);
+      }
+
+      return {
+        success: true,
+        message: executionResult.message,
       };
     });
   }
@@ -1510,6 +1604,23 @@ export class AgentService extends EventEmitter {
       });
     }
 
+    let powerControl: Host['powerControl'] | undefined;
+    if (payload.powerControl !== undefined) {
+      if (payload.powerControl === null) {
+        powerControl = null;
+      } else {
+        const parsedPowerControl = hostPowerControlSchema.safeParse(payload.powerControl);
+        if (!parsedPowerControl.success) {
+          const issue = parsedPowerControl.error.issues[0];
+          const issuePath = issue && issue.path.length > 0 ? `${issue.path.join('.')}: ` : '';
+          throw new Error(
+            `Invalid update-host payload: powerControl ${issuePath}${issue?.message ?? 'is invalid'}`
+          );
+        }
+        powerControl = parsedPowerControl.data;
+      }
+    }
+
     return {
       currentName,
       name,
@@ -1520,6 +1631,7 @@ export class AgentService extends EventEmitter {
       status,
       notes,
       tags,
+      powerControl,
     };
   }
 }

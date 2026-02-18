@@ -5,7 +5,7 @@
 import { Request, Response } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
-import { hostStatusSchema } from '@kaonis/woly-protocol';
+import { hostPowerControlSchema, hostStatusSchema } from '@kaonis/woly-protocol';
 import { HostAggregator } from '../services/hostAggregator';
 import { CommandRouter } from '../services/commandRouter';
 import { lookupMacVendor, MAC_ADDRESS_PATTERN } from '../services/macVendorService';
@@ -27,11 +27,16 @@ const updateHostBodySchema = z.object({
   status: hostStatusSchema.optional(),
   notes: z.string().max(2_000).nullable().optional(),
   tags: z.array(z.string().min(1).max(64)).max(32).optional(),
+  powerControl: hostPowerControlSchema.nullable().optional(),
 }).strict();
 
 const wakeupBodySchema = z.object({
   wolPort: wolPortSchema.optional(),
 }).passthrough();
+
+const hostPowerActionBodySchema = z.object({
+  confirm: z.string().min(1),
+}).strict();
 
 const historyQuerySchema = z.object({
   from: z.string().datetime().optional(),
@@ -62,6 +67,7 @@ function toRouteUpdateHostData(payload: z.infer<typeof updateHostBodySchema>): R
   if (payload.wolPort !== undefined) hostData.wolPort = payload.wolPort;
   if (payload.notes !== undefined) hostData.notes = payload.notes;
   if (payload.tags !== undefined) hostData.tags = payload.tags;
+  if (payload.powerControl !== undefined) hostData.powerControl = payload.powerControl;
   if (payload.status === 'awake' || payload.status === 'asleep') {
     hostData.status = payload.status;
   }
@@ -685,6 +691,81 @@ export class HostsController {
 
       res.status(statusCode).json(errorBody);
     }
+  }
+
+  private async dispatchHostPowerAction(
+    req: Request,
+    res: Response,
+    action: 'sleep' | 'shutdown'
+  ): Promise<void> {
+    try {
+      const fqn = req.params.fqn as string;
+      const correlationId = req.correlationId ?? null;
+
+      const bodyParse = hostPowerActionBodySchema.safeParse(req.body ?? {});
+      if (!bodyParse.success) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: 'Invalid request body',
+          details: bodyParse.error.issues,
+        });
+        return;
+      }
+
+      if (bodyParse.data.confirm.trim().toLowerCase() !== action) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: `Field "confirm" must equal "${action}"`,
+        });
+        return;
+      }
+
+      const idempotencyKeyHeader = req.header('Idempotency-Key');
+      const idempotencyKey =
+        idempotencyKeyHeader && idempotencyKeyHeader.trim().length > 0
+          ? idempotencyKeyHeader.trim()
+          : null;
+
+      const options: { idempotencyKey: string | null; correlationId?: string } = {
+        idempotencyKey,
+      };
+      if (correlationId) {
+        options.correlationId = correlationId;
+      }
+
+      const result = action === 'sleep'
+        ? await this.commandRouter.routeSleepHostCommand(fqn, options)
+        : await this.commandRouter.routeShutdownHostCommand(fqn, options);
+
+      const responseBody = { ...result } as typeof result & { correlationId?: string };
+      const responseCorrelationId = result.correlationId ?? correlationId ?? undefined;
+      if (responseCorrelationId) {
+        responseBody.correlationId = responseCorrelationId;
+      }
+
+      res.json(responseBody);
+    } catch (error) {
+      logger.error(`Failed to ${action} host`, { fqn: req.params.fqn, ...toLogError(error) });
+
+      const mapped = mapCommandError(error, `Failed to ${action} host`);
+      const errorBody: { error: string; message: string; correlationId?: string } = {
+        error: mapped.errorTitle,
+        message: mapped.message,
+      };
+      if (req.correlationId) {
+        errorBody.correlationId = req.correlationId;
+      }
+
+      res.status(mapped.statusCode).json(errorBody);
+    }
+  }
+
+  async sleepHost(req: Request, res: Response): Promise<void> {
+    await this.dispatchHostPowerAction(req, res, 'sleep');
+  }
+
+  async shutdownHost(req: Request, res: Response): Promise<void> {
+    await this.dispatchHostPowerAction(req, res, 'shutdown');
   }
 
   /**

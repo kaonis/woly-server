@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS aggregated_hosts (
     ping_responsive INTEGER,
     notes TEXT,
     tags TEXT NOT NULL DEFAULT '[]',
+    power_config TEXT,
     open_ports TEXT NOT NULL DEFAULT '[]',
     ports_scanned_at DATETIME,
     ports_expire_at DATETIME,
