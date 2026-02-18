@@ -161,7 +161,12 @@ class Server {
     });
 
     // Mount API routes
-    this.app.use('/api', createRoutes(this.nodeManager, this.hostAggregator, this.commandRouter));
+    this.app.use('/api', createRoutes(
+      this.nodeManager,
+      this.hostAggregator,
+      this.commandRouter,
+      this.hostStateStreamBroker,
+    ));
 
     // 404 handler
     this.app.use((req, res) => {

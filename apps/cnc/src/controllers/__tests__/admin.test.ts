@@ -157,10 +157,10 @@ describe('AdminController', () => {
         expect.objectContaining({
           nodes: { online: 2, offline: 1 },
           hosts: expect.objectContaining({ total: 3 }),
-          websocket: {
+          websocket: expect.objectContaining({
             connectedNodes: 2,
             protocolValidationFailures: { total: 7, byKey: { 'inbound.register': 7 } },
-          },
+          }),
           commandRouter: { pendingCommands: 4 },
           observability: expect.any(Object),
           timestamp: expect.any(String),
@@ -190,6 +190,62 @@ describe('AdminController', () => {
           websocket: undefined,
           commandRouter: undefined,
         })
+      );
+    });
+
+    it('includes mobile host-state stream telemetry when broker is provided', async () => {
+      const hostAggregator = {
+        getStats: jest.fn().mockResolvedValue({
+          total: 1,
+          awake: 1,
+          asleep: 0,
+          byLocation: {},
+        }),
+      };
+      const nodeManager = {
+        getConnectedNodes: jest.fn().mockReturnValue(['node-1']),
+        getProtocolValidationStats: jest.fn().mockReturnValue({ total: 0, byKey: {} }),
+      };
+      const hostStateStreamBroker = {
+        getStats: jest.fn().mockReturnValue({
+          activeClients: 1,
+          totalConnections: 4,
+          totalDisconnects: 3,
+          totalErrors: 0,
+          closeCodes: { '1000': 3 },
+          closeReasons: { none: 3 },
+          events: {
+            totalBroadcasts: 12,
+            byType: { 'host.updated': 9 },
+            deliveries: 9,
+            droppedNoSubscribers: 0,
+            sendFailures: 0,
+          },
+        }),
+      };
+      mockedNodeModel.getStatusCounts.mockResolvedValue({ online: 1, offline: 0 });
+
+      const controller = new AdminController(
+        hostAggregator as unknown as never,
+        nodeManager as unknown as never,
+        undefined,
+        hostStateStreamBroker as unknown as never,
+      );
+      const req = {} as Request;
+      const res = createMockResponse();
+
+      await controller.getStats(req, res);
+
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          websocket: expect.objectContaining({
+            connectedNodes: 1,
+            mobileHostStateStream: expect.objectContaining({
+              activeClients: 1,
+              totalConnections: 4,
+            }),
+          }),
+        }),
       );
     });
 

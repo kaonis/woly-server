@@ -8,6 +8,7 @@ import { CommandModel } from '../models/Command';
 import { HostAggregator } from '../services/hostAggregator';
 import { NodeManager } from '../services/nodeManager';
 import { CommandRouter } from '../services/commandRouter';
+import type { HostStateStreamBroker } from '../services/hostStateStreamBroker';
 import { runtimeMetrics } from '../services/runtimeMetrics';
 import logger from '../utils/logger';
 
@@ -15,7 +16,8 @@ export class AdminController {
   constructor(
     private hostAggregator: HostAggregator,
     private nodeManager?: NodeManager,
-    private commandRouter?: CommandRouter
+    private commandRouter?: CommandRouter,
+    private hostStateStreamBroker?: HostStateStreamBroker
   ) {}
   /**
    * @swagger
@@ -115,10 +117,15 @@ export class AdminController {
       res.json({
         nodes: nodeCounts,
         hosts: hostStats,
-        websocket: this.nodeManager
+        websocket: this.nodeManager || this.hostStateStreamBroker
           ? {
-              connectedNodes: this.nodeManager.getConnectedNodes().length,
-              protocolValidationFailures: this.nodeManager.getProtocolValidationStats(),
+              connectedNodes: this.nodeManager
+                ? this.nodeManager.getConnectedNodes().length
+                : 0,
+              protocolValidationFailures: this.nodeManager
+                ? this.nodeManager.getProtocolValidationStats()
+                : { total: 0, byKey: {} },
+              mobileHostStateStream: this.hostStateStreamBroker?.getStats(),
             }
           : undefined,
         commandRouter: commandRouterStats,
