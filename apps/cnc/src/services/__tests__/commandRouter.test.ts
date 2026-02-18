@@ -45,7 +45,7 @@ describe('CommandRouter', () => {
       ).rejects.toThrow('Host not found');
     });
 
-    it('should throw error if node is offline', async () => {
+    it('queues wake command when node is offline', async () => {
       // Register offline node
       await NodeModel.register({
         nodeId: 'test-cmd-node-1',
@@ -81,9 +81,12 @@ describe('CommandRouter', () => {
         },
       });
 
-      await expect(
-        commandRouter.routeWakeCommand('test-host@Test%20Location-test-cmd-node-1')
-      ).rejects.toThrow('offline');
+      const response = await commandRouter.routeWakeCommand(
+        'test-host@Test%20Location-test-cmd-node-1'
+      );
+      expect(response.success).toBe(true);
+      expect(response.state).toBe('queued');
+      expect(response.message).toContain('queued');
     });
   });
 
@@ -127,7 +130,7 @@ describe('CommandRouter', () => {
       ).rejects.toThrow('Host not found');
     });
 
-    it('should throw error if node is offline', async () => {
+    it('queues delete command if node is offline', async () => {
       await NodeModel.register({
         nodeId: 'test-cmd-node-3',
         name: 'Delete Test',
@@ -160,9 +163,11 @@ describe('CommandRouter', () => {
         },
       });
 
-      await expect(
-        commandRouter.routeDeleteHostCommand('delete-host@Test%20Location-test-cmd-node-3')
-      ).rejects.toThrow('offline');
+      const result = await commandRouter.routeDeleteHostCommand(
+        'delete-host@Test%20Location-test-cmd-node-3'
+      );
+      expect(result.success).toBe(true);
+      expect(result.state).toBe('queued');
     });
   });
 

@@ -38,7 +38,7 @@ describe('CommandModel', () => {
     expect(second.idempotencyKey).toBe('idem-1');
   });
 
-  it('reconciles stale queued commands as timed_out', async () => {
+  it('reconciles stale sent commands as timed_out', async () => {
     await CommandModel.enqueue({
       id: 'cmd-stale',
       nodeId: 'node-1',
@@ -46,6 +46,7 @@ describe('CommandModel', () => {
       payload: { type: 'scan', commandId: 'cmd-stale', data: { immediate: true } },
       idempotencyKey: null,
     });
+    await CommandModel.markSent('cmd-stale');
 
     // Make it stale: set created_at far in the past.
     // Use SQLite datetime format (space-separated) to test the reconciliation logic
@@ -56,6 +57,23 @@ describe('CommandModel', () => {
 
     const record = await CommandModel.findById('cmd-stale');
     expect(record?.state).toBe('timed_out');
+  });
+
+  it('does not reconcile queued commands that have not been sent yet', async () => {
+    await CommandModel.enqueue({
+      id: 'cmd-queued-fresh',
+      nodeId: 'node-1',
+      type: 'scan',
+      payload: { type: 'scan', commandId: 'cmd-queued-fresh', data: { immediate: true } },
+      idempotencyKey: null,
+    });
+
+    await db.query(`UPDATE commands SET created_at = '2000-01-01 00:00:00' WHERE id = $1`, ['cmd-queued-fresh']);
+
+    await CommandModel.reconcileStaleInFlight(1000);
+
+    const record = await CommandModel.findById('cmd-queued-fresh');
+    expect(record?.state).toBe('queued');
   });
 
   it('prunes old commands beyond retention period', async () => {
@@ -176,5 +194,31 @@ describe('CommandModel', () => {
     expect(record?.retryCount).toBe(1);
     expect(record?.error).toBe('Test failure');
   });
-});
 
+  it('lists queued commands for a node in FIFO order', async () => {
+    await CommandModel.enqueue({
+      id: 'cmd-fifo-1',
+      nodeId: 'node-1',
+      type: 'wake',
+      payload: { type: 'wake', commandId: 'cmd-fifo-1', data: { hostName: 'h', mac: 'm' } },
+      idempotencyKey: null,
+    });
+    await CommandModel.enqueue({
+      id: 'cmd-fifo-2',
+      nodeId: 'node-1',
+      type: 'wake',
+      payload: { type: 'wake', commandId: 'cmd-fifo-2', data: { hostName: 'h', mac: 'm' } },
+      idempotencyKey: null,
+    });
+
+    await db.query(`UPDATE commands SET created_at = '2000-01-01 00:00:00' WHERE id = $1`, ['cmd-fifo-1']);
+    await db.query(`UPDATE commands SET created_at = '2000-01-01 00:00:01' WHERE id = $1`, ['cmd-fifo-2']);
+
+    const queued = await CommandModel.listQueuedByNode('node-1');
+    const ids = queued.map((record) => record.id);
+
+    expect(ids.indexOf('cmd-fifo-1')).toBeGreaterThanOrEqual(0);
+    expect(ids.indexOf('cmd-fifo-2')).toBeGreaterThanOrEqual(0);
+    expect(ids.indexOf('cmd-fifo-1')).toBeLessThan(ids.indexOf('cmd-fifo-2'));
+  });
+});

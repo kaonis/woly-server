@@ -58,6 +58,7 @@ export type {
 export interface CommandResult {
   commandId: string;
   success: boolean;
+  state?: CommandState;
   message?: string;
   error?: string;
   hostPing?: ProtocolHostPingResult;
@@ -105,6 +106,8 @@ export interface WakeupResponse {
   message: string;
   nodeId: string;
   location: string;
+  commandId?: string;
+  state?: CommandState;
   correlationId?: string;
   wakeVerification?: {
     status: 'pending';
@@ -153,6 +156,7 @@ export interface ServerConfig {
   nodeHeartbeatInterval: number;
   nodeTimeout: number;
   commandTimeout: number;
+  offlineCommandTtlMs: number;
   commandRetentionDays: number;
   commandMaxRetries: number;
   commandRetryBaseDelayMs: number;

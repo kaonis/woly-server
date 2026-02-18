@@ -50,6 +50,7 @@ describe('config parsing and validation', () => {
       SCHEDULE_WORKER_ENABLED: 'false',
       SCHEDULE_POLL_INTERVAL_MS: '45000',
       SCHEDULE_BATCH_SIZE: '10',
+      OFFLINE_COMMAND_TTL_MS: '120000',
     });
 
     expect(config.operatorAuthTokens).toEqual(['node-token-1', 'node-token-2']);
@@ -61,6 +62,7 @@ describe('config parsing and validation', () => {
     expect(config.scheduleWorkerEnabled).toBe(false);
     expect(config.schedulePollIntervalMs).toBe(45000);
     expect(config.scheduleBatchSize).toBe(10);
+    expect(config.offlineCommandTtlMs).toBe(120000);
   });
 
   it('parses TRUST_PROXY numeric hop count', async () => {
@@ -127,5 +129,13 @@ describe('config parsing and validation', () => {
         SCHEDULE_POLL_INTERVAL_MS: '0',
       }),
     ).rejects.toThrow('SCHEDULE_POLL_INTERVAL_MS must be a finite number > 0');
+  });
+
+  it('throws when offline command ttl is not greater than zero', async () => {
+    await expect(
+      loadConfig({
+        OFFLINE_COMMAND_TTL_MS: '0',
+      }),
+    ).rejects.toThrow('OFFLINE_COMMAND_TTL_MS must be a finite number > 0');
   });
 });

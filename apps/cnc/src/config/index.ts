@@ -121,6 +121,7 @@ export const config: ServerConfig = {
   nodeHeartbeatInterval: getEnvNumber('NODE_HEARTBEAT_INTERVAL', 30000),
   nodeTimeout: getEnvNumber('NODE_TIMEOUT', 90000),
   commandTimeout: getEnvNumber('COMMAND_TIMEOUT', 30000),
+  offlineCommandTtlMs: getEnvNumber('OFFLINE_COMMAND_TTL_MS', 60 * 60 * 1000),
   commandRetentionDays: getEnvNumber('COMMAND_RETENTION_DAYS', 30),
   commandMaxRetries: getEnvNumber('COMMAND_MAX_RETRIES', 3),
   commandRetryBaseDelayMs: getEnvNumber('COMMAND_RETRY_BASE_DELAY_MS', 1000),
@@ -161,6 +162,10 @@ if (!Number.isFinite(config.wsMaxConnectionsPerIp) || config.wsMaxConnectionsPer
 
 if (!Number.isFinite(config.jwtTtlSeconds) || config.jwtTtlSeconds <= 0) {
   throw new Error('JWT_TTL_SECONDS must be a finite number > 0');
+}
+
+if (!Number.isFinite(config.offlineCommandTtlMs) || config.offlineCommandTtlMs <= 0) {
+  throw new Error('OFFLINE_COMMAND_TTL_MS must be a finite number > 0');
 }
 
 if (!Number.isFinite(config.schedulePollIntervalMs) || config.schedulePollIntervalMs <= 0) {

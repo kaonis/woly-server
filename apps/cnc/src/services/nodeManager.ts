@@ -126,6 +126,7 @@ export class NodeManager extends EventEmitter {
         logger.info('Node disconnected', { nodeId: connection.nodeId });
         this.connections.delete(connection.nodeId);
         runtimeMetrics.setConnectedNodeCount(this.connections.size);
+        this.emit('node-disconnected', { nodeId: connection.nodeId });
         
         // Mark node's hosts as unreachable
         try {
@@ -285,6 +286,7 @@ export class NodeManager extends EventEmitter {
         location: node.location,
       });
       runtimeMetrics.setConnectedNodeCount(this.connections.size);
+      this.emit('node-connected', { nodeId: node.id });
 
       const minted = mintWsSessionToken(node.id, {
         issuer: config.wsSessionTokenIssuer,
