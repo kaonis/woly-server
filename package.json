@@ -58,8 +58,17 @@
     "eslint-config-prettier": "^10.0.0",
     "globals": "^17.3.0",
     "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.1.1",
     "turbo": "^2",
     "typescript": "^5.9.3"
+  },
+  "lint-staged": {
+    "*.{js,cjs,mjs,jsx,ts,tsx}": [
+      "eslint --cache --fix --quiet --no-warn-ignored"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write --ignore-unknown"
+    ]
   }
 }
