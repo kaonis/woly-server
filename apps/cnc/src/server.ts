@@ -45,6 +45,7 @@ class Server {
     this.nodeManager = new NodeManager(this.hostAggregator);
     this.commandRouter = new CommandRouter(this.nodeManager, this.hostAggregator);
     this.hostStateStreamBroker = new HostStateStreamBroker(this.hostAggregator);
+    this.hostStateStreamBroker.subscribeToCommandRouter(this.commandRouter);
     this.setupMiddleware();
     this.setupRoutes();
     this.setupWebSocket();

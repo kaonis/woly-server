@@ -165,6 +165,107 @@ describe('HostStateStreamBroker', () => {
     });
   });
 
+  it('broadcasts wake.verified event when subscribed command router emits', () => {
+    const hostAggregator = new EventEmitter();
+    const commandRouter = new EventEmitter();
+    const broker = new HostStateStreamBroker(hostAggregator as unknown as never);
+    broker.subscribeToCommandRouter(commandRouter as never);
+    const { ws, mock } = createMockWs();
+
+    broker.handleConnection(ws, auth);
+
+    commandRouter.emit('wake-verification-complete', {
+      commandId: 'cmd-verify-1',
+      fullyQualifiedName: 'office-pc@home',
+      wakeVerification: {
+        status: 'confirmed',
+        attempts: 8,
+        elapsedMs: 24000,
+        source: 'ping',
+      },
+    });
+
+    // Skip the connected event (index 0)
+    const wakePayload = parseSentPayload(mock.send.mock.calls[1]?.[0]);
+    expect(wakePayload).toMatchObject({
+      type: 'wake.verified',
+      changed: true,
+      payload: {
+        commandId: 'cmd-verify-1',
+        fullyQualifiedName: 'office-pc@home',
+        status: 'confirmed',
+        attempts: 8,
+        elapsedMs: 24000,
+        source: 'ping',
+      },
+    });
+    expect(wakePayload.timestamp).toBeDefined();
+
+    expect(broker.getStats()).toMatchObject({
+      events: {
+        totalBroadcasts: 1,
+        deliveries: 1,
+        byType: { 'wake.verified': 1 },
+      },
+    });
+  });
+
+  it('broadcasts wake.verified timeout event', () => {
+    const hostAggregator = new EventEmitter();
+    const commandRouter = new EventEmitter();
+    const broker = new HostStateStreamBroker(hostAggregator as unknown as never);
+    broker.subscribeToCommandRouter(commandRouter as never);
+    const { ws, mock } = createMockWs();
+
+    broker.handleConnection(ws, auth);
+
+    commandRouter.emit('wake-verification-complete', {
+      commandId: 'cmd-verify-2',
+      fullyQualifiedName: 'server@office',
+      wakeVerification: {
+        status: 'timeout',
+        attempts: 40,
+        elapsedMs: 120000,
+        source: undefined,
+      },
+    });
+
+    const wakePayload = parseSentPayload(mock.send.mock.calls[1]?.[0]);
+    expect(wakePayload).toMatchObject({
+      type: 'wake.verified',
+      changed: true,
+      payload: {
+        commandId: 'cmd-verify-2',
+        fullyQualifiedName: 'server@office',
+        status: 'timeout',
+        attempts: 40,
+        elapsedMs: 120000,
+      },
+    });
+  });
+
+  it('detaches from command router on shutdown', () => {
+    const hostAggregator = new EventEmitter();
+    const commandRouter = new EventEmitter();
+    const broker = new HostStateStreamBroker(hostAggregator as unknown as never);
+    broker.subscribeToCommandRouter(commandRouter as never);
+    const { ws, mock } = createMockWs();
+
+    broker.handleConnection(ws, auth);
+    broker.shutdown();
+
+    // After shutdown, emitting should NOT deliver anything (client closed)
+    commandRouter.emit('wake-verification-complete', {
+      commandId: 'cmd-after-shutdown',
+      fullyQualifiedName: 'pc@home',
+      wakeVerification: { status: 'confirmed', attempts: 1, elapsedMs: 1000 },
+    });
+
+    // Only the connected event and no more
+    expect(mock.send).toHaveBeenCalledTimes(1);
+    expect(commandRouter.listenerCount('wake-verification-complete')).toBe(0);
+  });
+
   it('closes all clients and detaches listeners on shutdown', () => {
     const hostAggregator = new EventEmitter();
     const broker = new HostStateStreamBroker(hostAggregator as unknown as never);

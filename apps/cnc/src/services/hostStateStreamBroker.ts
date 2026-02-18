@@ -4,8 +4,10 @@ import type {
   HostStateStreamEventType,
   HostStateStreamMutatingEventType,
   HostStateStreamNonMutatingEventType,
+  WakeVerificationResult,
 } from '@kaonis/woly-protocol';
 import { HostAggregator } from './hostAggregator';
+import type { CommandRouter } from './commandRouter';
 import logger from '../utils/logger';
 import type { AuthContext } from '../types/auth';
 
@@ -37,6 +39,12 @@ type HostRemovedPayload = {
 type NodeHostsChangedPayload = {
   nodeId: string;
   count: number;
+};
+
+type WakeVerificationCompletePayload = {
+  commandId: string;
+  fullyQualifiedName: string;
+  wakeVerification: WakeVerificationResult;
 };
 
 type HostStateStreamBrokerStats = {
@@ -119,12 +127,39 @@ export class HostStateStreamBroker {
     );
   };
 
+  private readonly onWakeVerificationComplete = (payload: WakeVerificationCompletePayload) => {
+    this.broadcast(
+      this.createMutatingEvent('wake.verified', {
+        commandId: payload.commandId,
+        fullyQualifiedName: payload.fullyQualifiedName,
+        status: payload.wakeVerification.status,
+        attempts: payload.wakeVerification.attempts,
+        elapsedMs: payload.wakeVerification.elapsedMs,
+        source: payload.wakeVerification.source,
+      })
+    );
+  };
+
+  private commandRouter: CommandRouter | null = null;
+
   constructor(private readonly hostAggregator: HostAggregator) {
     this.hostAggregator.on('host-added', this.onHostAdded);
     this.hostAggregator.on('host-updated', this.onHostUpdated);
     this.hostAggregator.on('host-removed', this.onHostRemoved);
     this.hostAggregator.on('node-hosts-unreachable', this.onNodeHostsUnreachable);
     this.hostAggregator.on('node-hosts-removed', this.onNodeHostsRemoved);
+  }
+
+  /**
+   * Subscribe to wake verification events from the CommandRouter.
+   * Called after construction so the broker can broadcast wake.verified events.
+   */
+  subscribeToCommandRouter(commandRouter: CommandRouter): void {
+    if (this.commandRouter) {
+      this.commandRouter.off('wake-verification-complete', this.onWakeVerificationComplete);
+    }
+    this.commandRouter = commandRouter;
+    this.commandRouter.on('wake-verification-complete', this.onWakeVerificationComplete);
   }
 
   handleConnection(ws: WebSocket, auth: AuthContext): void {
@@ -197,6 +232,11 @@ export class HostStateStreamBroker {
     this.hostAggregator.off('host-removed', this.onHostRemoved);
     this.hostAggregator.off('node-hosts-unreachable', this.onNodeHostsUnreachable);
     this.hostAggregator.off('node-hosts-removed', this.onNodeHostsRemoved);
+
+    if (this.commandRouter) {
+      this.commandRouter.off('wake-verification-complete', this.onWakeVerificationComplete);
+      this.commandRouter = null;
+    }
 
     for (const client of this.clients) {
       client.close(1000, 'Server shutdown');

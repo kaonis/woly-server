@@ -215,6 +215,7 @@ describe('HostsController additional branches', () => {
       expect(commandRouter.routeWakeCommand).toHaveBeenCalledWith('desktop@lab', {
         idempotencyKey: 'wake-1',
         correlationId: 'cid-request',
+        verify: null,
       });
       expect(res.json).toHaveBeenCalledWith({
         success: true,
@@ -245,6 +246,7 @@ describe('HostsController additional branches', () => {
       expect(commandRouter.routeWakeCommand).toHaveBeenCalledWith('desktop@lab', {
         idempotencyKey: null,
         correlationId: 'cid-request',
+        verify: null,
       });
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({ correlationId: 'cid-request' })

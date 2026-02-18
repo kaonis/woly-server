@@ -50,4 +50,9 @@ export const config = {
     timeoutMs: parseInt(process.env.WAKE_VERIFY_TIMEOUT_MS || '10000', 10),
     pollIntervalMs: parseInt(process.env.WAKE_VERIFY_POLL_INTERVAL_MS || '1000', 10),
   },
+  /** Wake verification settings used when a CNC-routed wake command includes verify options. */
+  wakeVerificationCnc: {
+    timeoutMs: parseInt(process.env.WAKE_VERIFY_CNC_TIMEOUT_MS || '120000', 10), // 2 minutes
+    pollIntervalMs: parseInt(process.env.WAKE_VERIFY_CNC_POLL_INTERVAL_MS || '3000', 10), // 3 seconds
+  },
 };
