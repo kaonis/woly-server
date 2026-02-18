@@ -7,6 +7,16 @@ if (major < 24) {
 }
 
 try {
+  const { ensureProtocolBuild } = require('../../../scripts/ensure-protocol-build.cjs');
+  ensureProtocolBuild();
+} catch (error) {
+  const message = error && error.message ? error.message : String(error);
+  console.error('[preflight] Protocol preflight failed.');
+  console.error(`[preflight] ${message}`);
+  process.exit(1);
+}
+
+try {
   require('better-sqlite3');
   process.stdout.write('[preflight] Runtime checks passed.\n');
 } catch (error) {
