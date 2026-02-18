@@ -7,11 +7,19 @@ if ! command -v gitleaks >/dev/null 2>&1; then
   exit 1
 fi
 
+CONFIG_FILE=".gitleaks.toml"
+
 if gitleaks protect --help >/dev/null 2>&1; then
+  if [ -f "$CONFIG_FILE" ]; then
+    exec gitleaks protect --staged --redact --config "$CONFIG_FILE"
+  fi
   exec gitleaks protect --staged --redact
 fi
 
 if gitleaks git --help >/dev/null 2>&1; then
+  if [ -f "$CONFIG_FILE" ]; then
+    exec gitleaks git --staged --redact --config "$CONFIG_FILE" .
+  fi
   exec gitleaks git --staged --redact .
 fi
 

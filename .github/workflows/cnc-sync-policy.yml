@@ -63,6 +63,91 @@ jobs:
               }
             }
 
+            // Low-cost CI parity for commit-msg hook: validate PR commit subjects.
+            const conventionalCommitRegex =
+              /^(revert: )?(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([^)]+\))?!?: .+/;
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              per_page: 100,
+            });
+            const invalidCommitSubjects = [];
+            for (const commit of commits) {
+              const subject = (commit.commit?.message || '').split('\n')[0].trim();
+              if (!subject || /^Merge\b/.test(subject)) {
+                continue;
+              }
+              if (!conventionalCommitRegex.test(subject)) {
+                invalidCommitSubjects.push(`${commit.sha.slice(0, 7)}: ${subject}`);
+              }
+            }
+            if (invalidCommitSubjects.length > 0) {
+              errors.push(
+                `Non-conventional commit subjects detected: ${invalidCommitSubjects.slice(0, 5).join(' | ')}`
+              );
+            }
+
+            // Low-cost CI parity for pre-commit secret scanning: scan added diff lines for common secret patterns.
+            const secretPatterns = [
+              {
+                name: 'Private key',
+                regex: /-----BEGIN(?: RSA| EC| OPENSSH| DSA)? PRIVATE KEY-----/,
+              },
+              {
+                name: 'GitHub token',
+                regex: /\bgh[pousr]_[A-Za-z0-9_]{20,}\b/,
+              },
+              {
+                name: 'AWS access key',
+                regex: /\bAKIA[0-9A-Z]{16}\b/,
+              },
+              {
+                name: 'Google API key',
+                regex: /\bAIza[0-9A-Za-z\-_]{35}\b/,
+              },
+              {
+                name: 'Slack token',
+                regex: /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/,
+              },
+              {
+                name: 'Generic credential assignment',
+                regex: /(api[_-]?key|token|secret|password)\s*[:=]\s*["'][^"'\s]{16,}["']/i,
+              },
+            ];
+            const placeholderRegex =
+              /(example|sample|dummy|fake|test|changeme|placeholder|redacted|your[_-]?token|your[_-]?key)/i;
+            const secretHits = [];
+
+            for (const file of files) {
+              if (!file.patch) {
+                continue;
+              }
+
+              const addedLines = file.patch
+                .split('\n')
+                .filter((line) => line.startsWith('+') && !line.startsWith('+++'))
+                .map((line) => line.slice(1));
+
+              for (const line of addedLines) {
+                if (placeholderRegex.test(line)) {
+                  continue;
+                }
+
+                const match = secretPatterns.find((pattern) => pattern.regex.test(line));
+                if (match) {
+                  secretHits.push(`${file.filename}: ${match.name}`);
+                  break;
+                }
+              }
+            }
+
+            if (secretHits.length > 0) {
+              errors.push(
+                `Potential secrets detected in added lines: ${secretHits.slice(0, 5).join(' | ')}`
+              );
+            }
+
             if (touchesCncPaths && !isCncFeature) {
               errors.push('This PR touches CNC/protocol source paths. Check "This PR is a CNC feature change." in the PR template.');
             }

@@ -11,6 +11,9 @@ Actions workflows are manual-only, with low-cost policy/dependency exceptions.
 - Automatic runs are allowed only for low-cost checks:
   - `pull_request` on `.github/workflows/cnc-sync-policy.yml`
   - weekly `schedule` on `.github/workflows/dependency-health.yml`
+- The low-cost PR policy workflow also performs:
+  - conventional commit subject checks against PR commits
+  - added-line secret pattern screening for common leaked credential formats
 - GitHub CodeQL default setup is disabled (`state: not-configured`) to prevent automatic dynamic runs.
 - Each workflow job has `timeout-minutes: 8` to cap manual-run spend and prevent hangs.
 
@@ -81,6 +84,13 @@ npm run ci:policy:check
 npm run ci:policy:check -- --json
 ```
 
+Run branch protection guard to ensure `master` requires the CNC policy status check:
+
+```bash
+npm run ci:branch-protection:check
+npm run ci:branch-protection:check -- --json
+```
+
 Create the next rolling manual-review follow-up issue with the standard template:
 
 ```bash
@@ -134,6 +144,7 @@ Weekly checklist:
    - count merges since last review
    - count manually dispatched runs since last review
    - `npm run ci:policy:check`
+   - `npm run ci:branch-protection:check`
 3. Confirm local validation gate remains standard before merge:
    - `npm run validate:standard`
 4. Record decision in the review log:

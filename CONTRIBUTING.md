@@ -7,6 +7,7 @@ git clone https://github.com/kaonis/woly-server.git
 cd woly-server
 nvm use          # Node.js 24
 npm install      # All workspaces
+npm run dev:doctor # Verify required local tooling/hooks
 npm run build    # Protocol first, then apps
 npm run test     # Verify everything works
 ```
@@ -39,11 +40,18 @@ Install `gitleaks` locally so `pre-commit` can run:
 brew install gitleaks
 ```
 
+Optional policy check for maintainers:
+
+```bash
+npm run ci:branch-protection:check
+```
+
 ## CNC Mode Sync Requirements
 
 For CNC feature work, follow `docs/CNC_SYNC_POLICY.md`.
 
 Before merge:
+
 - link issues in both repos (`kaonis/woly-server` and `kaonis/woly`)
 - keep the 3-part chain explicit:
   1. protocol contract
@@ -99,6 +107,7 @@ npm run protocol:publish:next    # Publish with 'next' tag (for pre-releases)
 ```
 
 **Notes:**
+
 - `protocol:publish` automatically runs `protocol:build` before publishing
 - Requires npm authentication and publish permissions for `@kaonis` scope
 - The `publishConfig.access: "public"` in package.json ensures scoped packages are published publicly

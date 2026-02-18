@@ -1,0 +1,10 @@
+title = "woly-server gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow obvious placeholder-only credential examples"
+regexes = [
+  '''(?i)(example|sample|dummy|fake|test|changeme|placeholder|redacted)[-_]?(token|secret|api[_-]?key|password)''',
+]
