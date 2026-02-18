@@ -43,6 +43,15 @@ describe('buildCncCapabilitiesResponse', () => {
       wsConnectionsPerIp: expect.objectContaining({ maxCalls: expect.any(Number), windowMs: null }),
       macVendorLookup: expect.objectContaining({ maxCalls: 1, windowMs: 1000 }),
     });
+    expect(payload.capabilities.hostStateStreaming).toMatchObject({
+      supported: true,
+      transport: 'websocket',
+      routes: ['/ws/mobile/hosts'],
+    });
+    expect(payload.capabilities.commandStatusStreaming).toMatchObject({
+      supported: false,
+      transport: null,
+    });
     expect(cncCapabilitiesResponseSchema.safeParse(payload).success).toBe(true);
   });
 

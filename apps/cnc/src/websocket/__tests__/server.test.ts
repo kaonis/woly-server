@@ -2,12 +2,19 @@ import { EventEmitter } from 'events';
 import type { IncomingMessage, Server as HTTPServer } from 'http';
 import type WebSocket from 'ws';
 import config from '../../config';
+import type { AuthContext } from '../../types/auth';
 import type { NodeManager } from '../../services/nodeManager';
+import type { HostStateStreamBroker } from '../../services/hostStateStreamBroker';
 import { createWebSocketServer } from '../server';
 import { authenticateWsUpgrade } from '../upgradeAuth';
+import { authenticateMobileWsUpgrade } from '../mobileUpgradeAuth';
 
 jest.mock('../upgradeAuth', () => ({
   authenticateWsUpgrade: jest.fn(),
+}));
+
+jest.mock('../mobileUpgradeAuth', () => ({
+  authenticateMobileWsUpgrade: jest.fn(),
 }));
 
 type MockSocket = {
@@ -16,6 +23,7 @@ type MockSocket = {
 };
 
 type MockNodeManager = Pick<NodeManager, 'handleConnection'>;
+type MockHostStateStreamBroker = Pick<HostStateStreamBroker, 'handleConnection'>;
 
 function createUpgradeRequest(
   ip: string,
@@ -42,18 +50,30 @@ describe('createWebSocketServer', () => {
   const mockAuthenticateWsUpgrade = authenticateWsUpgrade as jest.MockedFunction<
     typeof authenticateWsUpgrade
   >;
+  const mockAuthenticateMobileWsUpgrade = authenticateMobileWsUpgrade as jest.MockedFunction<
+    typeof authenticateMobileWsUpgrade
+  >;
 
   let httpServer: HTTPServer;
   let nodeManager: MockNodeManager;
+  let hostStateStreamBroker: MockHostStateStreamBroker;
   let upgradedSocketsQueue: WebSocket[];
 
   beforeEach(() => {
     (config as any).wsMaxConnectionsPerIp = 1;
     (config as any).wsRequireTls = false;
     mockAuthenticateWsUpgrade.mockReturnValue({ kind: 'static-token', token: 'dev-token-home' });
+    mockAuthenticateMobileWsUpgrade.mockReturnValue({
+      sub: 'operator-mobile',
+      roles: ['operator'],
+      claims: {},
+    } as AuthContext);
     httpServer = new EventEmitter() as unknown as HTTPServer;
     nodeManager = {
       handleConnection: jest.fn().mockResolvedValue(undefined),
+    };
+    hostStateStreamBroker = {
+      handleConnection: jest.fn(),
     };
     upgradedSocketsQueue = [];
   });
@@ -64,7 +84,11 @@ describe('createWebSocketServer', () => {
   });
 
   function setupWss() {
-    const wss = createWebSocketServer(httpServer, nodeManager as NodeManager);
+    const wss = createWebSocketServer(
+      httpServer,
+      nodeManager as NodeManager,
+      hostStateStreamBroker as HostStateStreamBroker
+    );
     const handleUpgradeSpy = jest.spyOn(wss, 'handleUpgrade').mockImplementation(
       (request, _socket, _head, callback) => {
         const upgradedSocket = upgradedSocketsQueue.shift();
@@ -126,6 +150,72 @@ describe('createWebSocketServer', () => {
 
     expect(handleUpgradeSpy).not.toHaveBeenCalled();
     expect(socket.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes mobile host stream upgrades to stream broker', () => {
+    const { handleUpgradeSpy } = setupWss();
+    const mobileWs = new EventEmitter() as unknown as WebSocket;
+    upgradedSocketsQueue.push(mobileWs);
+    const socket = createMockSocket();
+
+    httpServer.emit(
+      'upgrade',
+      createUpgradeRequest('10.0.0.9', undefined, '/ws/mobile/hosts'),
+      socket,
+      Buffer.alloc(0)
+    );
+
+    expect(handleUpgradeSpy).toHaveBeenCalledTimes(1);
+    expect(nodeManager.handleConnection).not.toHaveBeenCalled();
+    expect(hostStateStreamBroker.handleConnection).toHaveBeenCalledTimes(1);
+    expect(socket.write).not.toHaveBeenCalled();
+    expect(socket.destroy).not.toHaveBeenCalled();
+  });
+
+  it('rejects mobile host stream upgrades when websocket auth fails', () => {
+    mockAuthenticateMobileWsUpgrade.mockReturnValue(null);
+    const { handleUpgradeSpy } = setupWss();
+    const socket = createMockSocket();
+
+    httpServer.emit(
+      'upgrade',
+      createUpgradeRequest('10.0.0.10', undefined, '/ws/mobile/hosts'),
+      socket,
+      Buffer.alloc(0)
+    );
+
+    expect(handleUpgradeSpy).not.toHaveBeenCalled();
+    expect(socket.write).toHaveBeenCalledWith('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    expect(socket.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('enforces per-IP limits independently for node and mobile stream channels', () => {
+    const { handleUpgradeSpy } = setupWss();
+    const nodeWs = new EventEmitter() as unknown as WebSocket;
+    const mobileWs = new EventEmitter() as unknown as WebSocket;
+    upgradedSocketsQueue.push(nodeWs, mobileWs);
+
+    const nodeSocket = createMockSocket();
+    httpServer.emit(
+      'upgrade',
+      createUpgradeRequest('10.0.0.11', '203.0.113.77', '/ws/node'),
+      nodeSocket,
+      Buffer.alloc(0)
+    );
+
+    const mobileSocket = createMockSocket();
+    httpServer.emit(
+      'upgrade',
+      createUpgradeRequest('10.0.0.12', '203.0.113.77', '/ws/mobile/hosts'),
+      mobileSocket,
+      Buffer.alloc(0)
+    );
+
+    expect(handleUpgradeSpy).toHaveBeenCalledTimes(2);
+    expect(nodeManager.handleConnection).toHaveBeenCalledTimes(1);
+    expect(hostStateStreamBroker.handleConnection).toHaveBeenCalledTimes(1);
+    expect(mobileSocket.write).not.toHaveBeenCalled();
+    expect(mobileSocket.destroy).not.toHaveBeenCalled();
   });
 
   it('rejects non-TLS upgrade requests when TLS is required', () => {

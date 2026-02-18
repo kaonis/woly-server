@@ -50,15 +50,23 @@ export function extractAuthTokenFromSubprotocol(request: IncomingMessage): strin
   return null;
 }
 
-export function extractAuthTokenFromQuery(request: IncomingMessage): string | null {
+export function extractAuthTokenFromQuery(
+  request: IncomingMessage,
+  queryParamNames: string[] = ['token']
+): string | null {
   if (!request.url) {
     return null;
   }
 
   try {
     const parsed = new URL(request.url, 'http://localhost');
-    const token = parsed.searchParams.get('token');
-    return typeof token === 'string' && token.length > 0 ? token : null;
+    for (const paramName of queryParamNames) {
+      const token = parsed.searchParams.get(paramName);
+      if (typeof token === 'string' && token.length > 0) {
+        return token;
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -71,7 +79,7 @@ export function extractNodeAuthToken(
   return (
     extractAuthTokenFromAuthorizationHeader(request) ||
     extractAuthTokenFromSubprotocol(request) ||
-    (options.allowQueryTokenAuth ? extractAuthTokenFromQuery(request) : null)
+    (options.allowQueryTokenAuth ? extractAuthTokenFromQuery(request, ['token']) : null)
   );
 }
 

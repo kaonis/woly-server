@@ -1,6 +1,7 @@
 import { IncomingMessage } from 'http';
 import {
   extractAuthTokenFromAuthorizationHeader,
+  extractAuthTokenFromQuery,
   extractAuthTokenFromSubprotocol,
   extractNodeAuthToken,
   isRequestTls,
@@ -61,6 +62,15 @@ describe('websocket auth helpers', () => {
     });
 
     expect(extractNodeAuthToken(request, { allowQueryTokenAuth: true })).toBe('header-token');
+  });
+
+  it('supports custom query token parameter names', () => {
+    const request = buildRequest({
+      url: '/ws/mobile/hosts?access_token=query-token',
+    });
+
+    expect(extractAuthTokenFromQuery(request, ['access_token', 'token'])).toBe('query-token');
+    expect(extractAuthTokenFromQuery(request, ['token'])).toBeNull();
   });
 
   it('detects TLS via socket encryption', () => {

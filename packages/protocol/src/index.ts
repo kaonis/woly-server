@@ -102,6 +102,7 @@ export interface CncCapabilitiesResponse {
     scan: CncCapabilityDescriptor;
     notesTags: CncCapabilityDescriptor;
     schedules: CncCapabilityDescriptor;
+    hostStateStreaming?: CncCapabilityDescriptor;
     commandStatusStreaming: CncCapabilityDescriptor;
   };
   rateLimits?: CncRateLimits;
@@ -347,6 +348,7 @@ export const cncCapabilitiesResponseSchema: z.ZodType<CncCapabilitiesResponse> =
     scan: cncCapabilityDescriptorSchema,
     notesTags: cncCapabilityDescriptorSchema,
     schedules: cncCapabilityDescriptorSchema,
+    hostStateStreaming: cncCapabilityDescriptorSchema.optional(),
     commandStatusStreaming: cncCapabilityDescriptorSchema,
   }),
   rateLimits: cncRateLimitsSchema.optional(),

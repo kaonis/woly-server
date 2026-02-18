@@ -279,6 +279,7 @@ describe('cncCapabilitiesResponseSchema', () => {
           scan: capability,
           notesTags: capability,
           schedules: { supported: false },
+          hostStateStreaming: { supported: true, transport: 'websocket' },
           commandStatusStreaming: { supported: false, transport: null },
         },
         rateLimits: {

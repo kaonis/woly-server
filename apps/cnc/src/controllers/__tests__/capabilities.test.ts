@@ -39,6 +39,12 @@ describe('CapabilitiesController', () => {
       protocol: '2.0.0',
     });
     expect(response.capabilities.schedules.routes).toEqual(['/api/schedules', '/api/schedules/:id']);
+    expect(response.capabilities.hostStateStreaming).toEqual({
+      supported: true,
+      transport: 'websocket',
+      routes: ['/ws/mobile/hosts'],
+      note: expect.any(String),
+    });
   });
 
   it('falls back and logs warnings when versions are invalid', () => {

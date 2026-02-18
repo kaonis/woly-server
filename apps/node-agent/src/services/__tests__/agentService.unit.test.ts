@@ -1151,6 +1151,36 @@ describe('AgentService command handlers', () => {
     );
   });
 
+  it('suppresses host-updated events when only lastSeen changes', async () => {
+    jest.useFakeTimers();
+    await service.start();
+
+    const firstUpdate: Host = {
+      ...sampleHost,
+      status: 'awake',
+      pingResponsive: 1,
+      lastSeen: '2026-02-18T10:00:00.000Z',
+    };
+    const secondUpdate: Host = {
+      ...sampleHost,
+      status: 'awake',
+      pingResponsive: 1,
+      lastSeen: '2026-02-18T10:05:00.000Z',
+    };
+
+    service.sendHostUpdated(firstUpdate);
+    jest.advanceTimersByTime(50);
+
+    service.sendHostUpdated(secondUpdate);
+    jest.advanceTimersByTime(50);
+
+    const hostUpdatedEvents = mockCncClient.send.mock.calls.filter(
+      ([message]) => (message as { type?: string })?.type === 'host-updated'
+    );
+
+    expect(hostUpdatedEvents).toHaveLength(1);
+  });
+
   it('flags stale hosts as asleep before sending to C&C', async () => {
     await service.start();
 
