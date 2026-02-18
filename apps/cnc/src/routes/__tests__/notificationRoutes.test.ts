@@ -35,7 +35,7 @@ jest.mock('../../models/PushNotification', () => ({
       id: 'device-1',
       userId: 'operator-1',
       platform: 'ios',
-      token: 'ios-token-12345678',
+      token: 'test-ios-token-12345678',
       createdAt: '2026-02-18T00:00:00.000Z',
       updatedAt: '2026-02-18T00:00:00.000Z',
       lastSeenAt: '2026-02-18T00:00:00.000Z',
@@ -45,7 +45,7 @@ jest.mock('../../models/PushNotification', () => ({
         id: 'device-1',
         userId: 'operator-1',
         platform: 'ios',
-        token: 'ios-token-12345678',
+        token: 'test-ios-token-12345678',
         createdAt: '2026-02-18T00:00:00.000Z',
         updatedAt: '2026-02-18T00:00:00.000Z',
         lastSeenAt: '2026-02-18T00:00:00.000Z',
@@ -151,7 +151,7 @@ describe('Notification Routes Authentication and Authorization', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({
         platform: 'ios',
-        token: 'ios-token-12345678',
+        token: 'test-ios-token-12345678',
       });
     expect(createResponse.status).toBe(201);
 
@@ -185,8 +185,8 @@ describe('Notification Routes Authentication and Authorization', () => {
     expect(mockedPushModel.upsertDevice).toHaveBeenCalledWith({
       userId: 'operator-1',
       platform: 'ios',
-      token: 'ios-token-12345678',
+      token: 'test-ios-token-12345678',
     });
-    expect(mockedPushModel.deleteDevice).toHaveBeenCalledWith('operator-1', 'ios-token-12345678');
+    expect(mockedPushModel.deleteDevice).toHaveBeenCalledWith('operator-1', 'test-ios-token-12345678');
   });
 });

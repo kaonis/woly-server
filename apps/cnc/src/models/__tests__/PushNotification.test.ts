@@ -20,7 +20,7 @@ describe('PushNotificationModel', () => {
     const created = await PushNotificationModel.upsertDevice({
       userId: 'operator-1',
       platform: 'ios',
-      token: 'ios-token-12345678',
+      token: 'test-ios-token-12345678',
     });
 
     expect(created.userId).toBe('operator-1');
@@ -28,7 +28,7 @@ describe('PushNotificationModel', () => {
 
     const listed = await PushNotificationModel.listDevicesByUser('operator-1');
     expect(listed).toHaveLength(1);
-    expect(listed[0].token).toBe('ios-token-12345678');
+    expect(listed[0].token).toBe('test-ios-token-12345678');
 
     const all = await PushNotificationModel.listAllDevices();
     expect(all).toHaveLength(1);
@@ -38,13 +38,13 @@ describe('PushNotificationModel', () => {
     await PushNotificationModel.upsertDevice({
       userId: 'operator-1',
       platform: 'ios',
-      token: 'shared-token-12345678',
+      token: 'test-shared-token-12345678',
     });
 
     const updated = await PushNotificationModel.upsertDevice({
       userId: 'operator-2',
       platform: 'android',
-      token: 'shared-token-12345678',
+      token: 'test-shared-token-12345678',
     });
 
     expect(updated.userId).toBe('operator-2');
@@ -54,29 +54,29 @@ describe('PushNotificationModel', () => {
     const user2Devices = await PushNotificationModel.listDevicesByUser('operator-2');
     expect(user1Devices).toHaveLength(0);
     expect(user2Devices).toHaveLength(1);
-    expect(user2Devices[0].token).toBe('shared-token-12345678');
+    expect(user2Devices[0].token).toBe('test-shared-token-12345678');
   });
 
   it('deletes device by user/token and by token', async () => {
     await PushNotificationModel.upsertDevice({
       userId: 'operator-1',
       platform: 'android',
-      token: 'android-token-12345678',
+      token: 'test-android-token-12345678',
     });
 
-    const missingDelete = await PushNotificationModel.deleteDevice('operator-2', 'android-token-12345678');
+    const missingDelete = await PushNotificationModel.deleteDevice('operator-2', 'test-android-token-12345678');
     expect(missingDelete).toBe(false);
 
-    const deleted = await PushNotificationModel.deleteDevice('operator-1', 'android-token-12345678');
+    const deleted = await PushNotificationModel.deleteDevice('operator-1', 'test-android-token-12345678');
     expect(deleted).toBe(true);
 
     await PushNotificationModel.upsertDevice({
       userId: 'operator-1',
       platform: 'android',
-      token: 'android-token-22345678',
+      token: 'test-android-token-22345678',
     });
 
-    await PushNotificationModel.deleteDeviceByToken('android-token-22345678');
+    await PushNotificationModel.deleteDeviceByToken('test-android-token-22345678');
     expect(await PushNotificationModel.listAllDevices()).toHaveLength(0);
   });
 

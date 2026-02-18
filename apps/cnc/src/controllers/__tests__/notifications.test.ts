@@ -57,7 +57,7 @@ describe('NotificationsController', () => {
   });
 
   it('returns 401 when auth context is missing', async () => {
-    const req = createMockRequest({ body: { platform: 'ios', token: 'token-token' } });
+    const req = createMockRequest({ body: { platform: 'ios', token: 'test-token-token' } });
     const res = createMockResponse();
 
     await controller.registerDevice(req, res);
@@ -84,7 +84,7 @@ describe('NotificationsController', () => {
       id: 'dev-1',
       userId: 'operator-1',
       platform: 'ios',
-      token: 'token-token-123',
+      token: 'test-device-token-123',
       createdAt: '2026-02-18T00:00:00.000Z',
       updatedAt: '2026-02-18T00:00:00.000Z',
       lastSeenAt: '2026-02-18T00:00:00.000Z',
@@ -95,7 +95,7 @@ describe('NotificationsController', () => {
       auth: { sub: 'operator-1' },
       body: {
         platform: 'ios',
-        token: 'token-token-123',
+        token: 'test-device-token-123',
         preferences: DEFAULT_NOTIFICATION_PREFERENCES,
       },
     });
@@ -106,7 +106,7 @@ describe('NotificationsController', () => {
     expect(mockedPushModel.upsertDevice).toHaveBeenCalledWith({
       userId: 'operator-1',
       platform: 'ios',
-      token: 'token-token-123',
+      token: 'test-device-token-123',
     });
     expect(mockedPushModel.upsertPreferences).toHaveBeenCalledWith(
       'operator-1',
@@ -122,7 +122,7 @@ describe('NotificationsController', () => {
         id: 'dev-1',
         userId: 'operator-1',
         platform: 'android',
-        token: 'android-token-1',
+        token: 'test-android-token-1',
         createdAt: '2026-02-18T00:00:00.000Z',
         updatedAt: '2026-02-18T00:00:00.000Z',
         lastSeenAt: '2026-02-18T00:00:00.000Z',
@@ -145,7 +145,7 @@ describe('NotificationsController', () => {
 
     const req = createMockRequest({
       auth: { sub: 'operator-1' },
-      params: { token: 'unknown-token-123' },
+      params: { token: 'test-unknown-token-123' },
     });
     const res = createMockResponse();
 
