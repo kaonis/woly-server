@@ -6,7 +6,10 @@ const path = require('node:path');
 
 const WORKFLOWS_DIR = path.join(process.cwd(), '.github', 'workflows');
 const MAX_TIMEOUT_MINUTES = 8;
-const ALLOWED_AUTOMATED_WORKFLOWS = new Set(['cnc-sync-policy.yml']);
+const ALLOWED_AUTOMATED_TRIGGERS = new Map([
+  ['cnc-sync-policy.yml', new Set(['pull_request'])],
+  ['dependency-health.yml', new Set(['schedule'])],
+]);
 
 function parseArgs(argv) {
   const options = {
@@ -63,7 +66,7 @@ function parseJobs(lines) {
       continue;
     }
 
-    const jobMatch = line.match(/^  ([a-zA-Z0-9_-]+):\s*$/);
+    const jobMatch = line.match(/^ {2}([a-zA-Z0-9_-]+):\s*$/);
     if (jobMatch) {
       activeJob = {
         id: jobMatch[1],
@@ -92,7 +95,7 @@ function validateWorkflow(filePath) {
   const lines = source.split('\n');
   const violations = [];
   const jobs = parseJobs(lines);
-  const allowsAutomatedPullRequest = ALLOWED_AUTOMATED_WORKFLOWS.has(workflowFile);
+  const allowedAutomatedTriggers = ALLOWED_AUTOMATED_TRIGGERS.get(workflowFile) ?? new Set();
 
   if (!/^\s*workflow_dispatch:\s*$/m.test(source)) {
     violations.push('missing `workflow_dispatch` trigger');
@@ -104,7 +107,7 @@ function validateWorkflow(filePath) {
       continue;
     }
 
-    if (forbidden === 'pull_request' && allowsAutomatedPullRequest) {
+    if (allowedAutomatedTriggers.has(forbidden)) {
       continue;
     }
 

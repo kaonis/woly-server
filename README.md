@@ -121,6 +121,9 @@ git worktree remove ../woly-server-<topic>
 | `npm run validate:standard`      | Run standard repo validation gate (`lint`, `typecheck`, `test:ci`, `build`, smoke) |
 | `npm run typecheck`              | Type-check all workspaces                                                          |
 | `npm run lint`                   | Lint all workspaces                                                                |
+| `npm run prepush:checks`         | Run pre-push local gate (`typecheck` + related tests)                              |
+| `npm run secrets:scan:staged`    | Run staged secret scanning with gitleaks                                           |
+| `npm run deps:check`             | Run recurring dependency health checks (`audit`, `outdated`, ESLint10 watchdog)    |
 | `npm run dev:node-agent`         | Start node agent in dev mode                                                       |
 | `npm run dev:cnc`                | Start C&C backend in dev mode                                                      |
 | `npm run format`                 | Format all files with Prettier                                                     |
@@ -229,6 +232,8 @@ For full production rollout guidance (topology, secrets, TLS, backup/restore, an
 - [docs/COMMAND_OUTCOME_METRICS.md](docs/COMMAND_OUTCOME_METRICS.md)
 
 ## CI
+
+- Dependency health workflow (`.github/workflows/dependency-health.yml`) runs weekly and supports manual dispatch.
 
 GitHub Actions is budget-scoped:
 

@@ -14,12 +14,14 @@ Define a repeatable dependency triage process so update decisions are explicit, 
 2. Event-driven triage: immediately after new Renovate/Mend dependency PR bursts.
 3. Owner: current platform on-call maintainer.
 4. Backup owner: repository maintainer with merge rights.
+5. Automation support: `.github/workflows/dependency-health.yml` runs weekly and can be manually dispatched.
 
 ## 3. Input Sources
 
 - Issue `#4` Dependency Dashboard state.
 - Open dependency update PRs.
 - CI/security signals (`npm audit`, CodeQL, failing dependency-related CI).
+- Weekly dependency-health workflow output (`npm run deps:check`).
 
 ## 4. Decision Categories
 
@@ -28,21 +30,25 @@ For each dependency PR/update, choose one category:
 ### A. Auto-merge safe
 
 Use when all conditions are true:
+
 - patch/minor change with no runtime contract impact.
 - CI and tests pass without source changes.
 - no security or licensing concerns detected.
 
 Action:
+
 - merge dependency PR after checks pass.
 
 ### B. Manual validation required
 
 Use when any condition is true:
+
 - major version update.
 - runtime-critical package (`express`, `ws`, `zod`, `pg`, `better-sqlite3`, auth/security middleware).
 - schema/typing behavior changes likely to affect protocol or API contracts.
 
 Action:
+
 - open/attach a scoped validation issue.
 - run targeted test matrix before merge.
 
@@ -51,6 +57,7 @@ Action:
 Use when update is blocked by compatibility risk, tooling limits, or upstream instability.
 
 Action:
+
 - document defer reason in issue `#4` comment.
 - include re-evaluation date or trigger.
 - create follow-up issue if work is required to unblock.
@@ -79,4 +86,5 @@ Helper commands for ESLint10 checkpoint comments:
 ## 7. Major Upgrade Planning Reference
 
 For active major dependency wave planning and current merge/defer decisions, see:
+
 - `docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md`

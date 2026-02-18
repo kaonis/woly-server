@@ -2,13 +2,15 @@
 
 Date: 2026-02-15
 
-This repository is currently in a temporary budget-control mode where all GitHub
-Actions workflows are manual-only.
+This repository is currently in a temporary budget-control mode where heavy GitHub
+Actions workflows are manual-only, with low-cost policy/dependency exceptions.
 
 ## Current Policy
 
-- Workflow triggers are limited to `workflow_dispatch`.
-- Automatic `push`, `pull_request`, `schedule`, and tag-triggered workflow runs are disabled.
+- Heavy workflows are limited to `workflow_dispatch`.
+- Automatic runs are allowed only for low-cost checks:
+  - `pull_request` on `.github/workflows/cnc-sync-policy.yml`
+  - weekly `schedule` on `.github/workflows/dependency-health.yml`
 - GitHub CodeQL default setup is disabled (`state: not-configured`) to prevent automatic dynamic runs.
 - Each workflow job has `timeout-minutes: 8` to cap manual-run spend and prevent hangs.
 
@@ -21,6 +23,7 @@ npm run validate:standard
 ```
 
 The gate includes:
+
 - `npm run lint`
 - `npm run typecheck`
 - `npm run test:ci`
@@ -40,6 +43,9 @@ gh workflow run eslint10-compat-watchdog.yml --ref master
 
 # Protocol publish workflow (safe validation mode)
 gh workflow run publish-protocol.yml --ref master -f dry-run=true
+
+# Dependency health workflow
+gh workflow run dependency-health.yml --ref master
 ```
 
 Run watchdog check locally without dispatching workflow:
