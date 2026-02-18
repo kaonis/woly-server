@@ -39,7 +39,7 @@ function resolveCapabilityVersion(
 const capabilityMatrix: CncCapabilitiesResponse['capabilities'] = {
   scan: {
     supported: true,
-    routes: ['/api/hosts/ports/:fqn', '/api/hosts/scan-ports/:fqn'],
+    routes: ['/api/hosts/scan', '/api/hosts/ports/:fqn', '/api/hosts/scan-ports/:fqn'],
     note: 'Per-host open-port telemetry is available through node-side TCP probing and cached in host payloads for short-lived reuse.',
   },
   notesTags: {

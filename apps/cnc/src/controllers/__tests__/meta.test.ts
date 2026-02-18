@@ -48,6 +48,11 @@ describe('buildCncCapabilitiesResponse', () => {
       transport: 'websocket',
       routes: ['/ws/mobile/hosts'],
     });
+    expect(payload.capabilities.scan.routes).toEqual([
+      '/api/hosts/scan',
+      '/api/hosts/ports/:fqn',
+      '/api/hosts/scan-ports/:fqn',
+    ]);
     expect(payload.capabilities.commandStatusStreaming).toMatchObject({
       supported: false,
       transport: null,

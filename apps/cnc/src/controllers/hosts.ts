@@ -505,6 +505,50 @@ export class HostsController {
 
   /**
    * @swagger
+   * /api/hosts/scan:
+   *   post:
+   *     summary: Trigger immediate host discovery scan across connected nodes
+   *     description: Dispatches scan commands to connected nodes and returns a normalized command lifecycle payload.
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Scan command dispatched to one or more connected nodes
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       409:
+   *         description: One or more node scans are already in progress
+   *       503:
+   *         $ref: '#/components/responses/ServiceUnavailable'
+   *       504:
+   *         $ref: '#/components/responses/GatewayTimeout'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
+   */
+  async scanHosts(req: Request, res: Response): Promise<void> {
+    try {
+      const correlationId = req.correlationId ?? null;
+      const result = await this.commandRouter.routeScanHostsCommand({ correlationId });
+      res.json(result);
+    } catch (error: unknown) {
+      logger.error('Failed to trigger host scan', { ...toLogError(error) });
+
+      const mapped = mapCommandError(error, 'Failed to trigger host scan');
+      const errorBody: { error: string; message: string; correlationId?: string } = {
+        error: mapped.errorTitle,
+        message: mapped.message,
+      };
+      if (req.correlationId) {
+        errorBody.correlationId = req.correlationId;
+      }
+
+      res.status(mapped.statusCode).json(errorBody);
+    }
+  }
+
+  /**
+   * @swagger
    * /api/hosts/ports/{fqn}:
    *   get:
    *     summary: Get latest host port-scan payload

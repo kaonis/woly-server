@@ -105,7 +105,10 @@ describe('Capabilities Route', () => {
           protocol: PROTOCOL_VERSION,
         },
         capabilities: {
-          scan: { supported: true },
+          scan: {
+            supported: true,
+            routes: ['/api/hosts/scan', '/api/hosts/ports/:fqn', '/api/hosts/scan-ports/:fqn'],
+          },
           notesTags: { supported: true, persistence: 'backend' },
           schedules: {
             supported: true,

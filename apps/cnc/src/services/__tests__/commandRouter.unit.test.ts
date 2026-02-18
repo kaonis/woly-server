@@ -29,6 +29,7 @@ interface CommandRouterInternals {
 
 class NodeManagerMock extends EventEmitter {
   getNodeStatus = jest.fn<Promise<'online' | 'offline'>, [string]>();
+  getConnectedNodes = jest.fn<string[], []>();
   sendCommand = jest.fn<void, [string, unknown]>();
 }
 
@@ -301,6 +302,51 @@ describe('CommandRouter unit behavior', () => {
         data: { immediate: false },
       }),
       { idempotencyKey: null, correlationId: 'corr-scan' }
+    );
+    router.cleanup();
+  });
+
+  it('routes host scans across all connected nodes and reports partial failures', async () => {
+    const { router, nodeManager } = createRouter();
+    nodeManager.getConnectedNodes.mockReturnValue(['node-1', 'node-2']);
+    jest.spyOn(router, 'routeScanCommand')
+      .mockResolvedValueOnce({
+        commandId: 'cmd-scan-node-1',
+        success: true,
+        message: 'ack node 1',
+        timestamp: new Date(),
+        correlationId: 'corr-scan',
+      })
+      .mockRejectedValueOnce(new Error('Node node-2 is offline'));
+
+    const result = await router.routeScanHostsCommand({ correlationId: 'corr-scan' });
+
+    expect(result.state).toBe('acknowledged');
+    expect(result.commandId).toBe('cmd-scan-node-1');
+    expect(result.correlationId).toBe('corr-scan');
+    expect(result.message).toBe('Scan command dispatched to 1 node(s); 1 node(s) failed to accept the command.');
+    expect(result.nodeResults).toEqual([
+      {
+        nodeId: 'node-1',
+        commandId: 'cmd-scan-node-1',
+        state: 'acknowledged',
+        message: 'ack node 1',
+      },
+      {
+        nodeId: 'node-2',
+        state: 'failed',
+        error: 'Node node-2 is offline',
+      },
+    ]);
+    router.cleanup();
+  });
+
+  it('throws when no nodes are connected for a scan dispatch', async () => {
+    const { router, nodeManager } = createRouter();
+    nodeManager.getConnectedNodes.mockReturnValue([]);
+
+    await expect(router.routeScanHostsCommand()).rejects.toThrow(
+      'All nodes are offline; no connected nodes available for scan'
     );
     router.cleanup();
   });
