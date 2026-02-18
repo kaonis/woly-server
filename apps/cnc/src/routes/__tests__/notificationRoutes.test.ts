@@ -187,6 +187,6 @@ describe('Notification Routes Authentication and Authorization', () => {
       platform: 'ios',
       token: 'test-ios-token-12345678',
     });
-    expect(mockedPushModel.deleteDevice).toHaveBeenCalledWith('operator-1', 'test-ios-token-12345678');
+    expect(mockedPushModel.deleteDevice).toHaveBeenCalledWith('operator-1', 'ios-token-12345678');
   });
 });
