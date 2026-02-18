@@ -2,7 +2,7 @@
 
 This document tracks improvement ideas and feature requests for the WoLy distributed Wake-on-LAN system. Each section groups related ideas by category and priority.
 
-> **Status:** 2026-02-15 — Reconciled with repository state and GitHub issues. Completed items are marked explicitly; active backlog items include issue links where available.
+> **Status:** 2026-02-18 — Reconciled with repository state and GitHub issues (including #340). Completed items are marked explicitly; active backlog items include issue links where available.
 
 ---
 
@@ -248,7 +248,7 @@ New features to improve functionality.
 
 | Priority | MEDIUM |
 |----------|--------|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#216`) |
 
 **Problem:** Users cannot add custom notes or metadata to hosts (e.g., "Main gaming PC", "NAS - backup server").
 
@@ -273,7 +273,7 @@ New features to improve functionality.
 
 | Priority | MEDIUM |
 |----------|--------|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#216`) |
 
 **Problem:** No way to organize hosts by category (e.g., "Workstations", "Servers", "IoT").
 
@@ -298,7 +298,7 @@ New features to improve functionality.
 
 | Priority | LOW |
 |----------|-----|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#255`) |
 
 **Problem:** No way to schedule automatic wake-up at specific times.
 
@@ -314,13 +314,16 @@ New features to improve functionality.
 - Automated morning wake-up for office computers
 - Energy-saving with scheduled sleep/wake cycles
 
+**Tracking Issue:**
+- https://github.com/kaonis/woly-server/issues/255
+
 ---
 
 ### 3.4 Wake-on-LAN Success Verification
 
 | Priority | MEDIUM |
 |----------|--------|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#217`) |
 
 **Problem:** After sending magic packet, no automatic verification that the host actually woke up.
 
@@ -528,7 +531,7 @@ New features to improve functionality.
 
 | Priority | MEDIUM |
 |----------|--------|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#218`) |
 
 **Problem:** Current tests are unit and integration. No E2E tests across both services.
 
@@ -728,7 +731,7 @@ New features to improve functionality.
 
 | Priority | MEDIUM |
 |----------|--------|
-| **Status** | Not Implemented |
+| **Status** | Implemented (`#219`) |
 
 **Problem:** No production deployment documentation.
 
@@ -847,7 +850,7 @@ See individual GitHub issues for implementation tracking. Each improvement shoul
 
 ## Next Steps
 
-1. **Execute active roadmap issues first** — Start with `#214`, `#215`, `#216`, `#217`, `#218`, `#219`
+1. **Execute active roadmap issues first** — Start with `#334`, `#336`, `#337`, `#338`, `#339`, `#342`, `#343`, `#344`, `#345`, `#346`, `#347`, `#348`, `#349`
 2. **Re-evaluate priority after each merge** — Keep this file aligned with real repo status
 3. **Create new issues only for net-new backlog gaps** — Avoid duplicates against closed work
 4. **Assign to milestones** — Group related improvements
@@ -855,4 +858,4 @@ See individual GitHub issues for implementation tracking. Each improvement shoul
 
 ---
 
-*Last updated: 2026-02-15*
+*Last updated: 2026-02-18*
