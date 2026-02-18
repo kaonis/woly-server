@@ -550,4 +550,338 @@ describe('CncClient Phase 1 auth lifecycle', () => {
     );
     expect(runtimeTelemetryMock.recordProtocolError).toHaveBeenCalledTimes(1);
   });
+
+  it('short-circuits connect when a connect attempt is already in progress', async () => {
+    ((client as unknown) as { isConnecting: boolean }).isConnecting = true;
+
+    await client.connect();
+
+    expect(mockSockets).toHaveLength(0);
+    expect(logger.debug).toHaveBeenCalledWith('Already connecting or connected to C&C');
+  });
+
+  it('clears heartbeat/reconnect timers on disconnect', async () => {
+    ((client as unknown) as { heartbeatTimer: NodeJS.Timeout | null }).heartbeatTimer = setInterval(
+      () => {},
+      1_000
+    );
+    ((client as unknown) as { reconnectTimer: NodeJS.Timeout | null }).reconnectTimer = setTimeout(
+      () => {},
+      1_000
+    );
+
+    client.disconnect();
+
+    expect(((client as unknown) as { heartbeatTimer: NodeJS.Timeout | null }).heartbeatTimer).toBeNull();
+    expect(((client as unknown) as { reconnectTimer: NodeJS.Timeout | null }).reconnectTimer).toBeNull();
+  });
+
+  it('warns when sending while disconnected', () => {
+    client.send({
+      type: 'heartbeat',
+      data: {
+        nodeId: 'node-1',
+        timestamp: new Date(),
+      },
+    });
+
+    expect(logger.warn).toHaveBeenCalledWith('Cannot send message: not connected to C&C', {
+      messageType: 'heartbeat',
+    });
+  });
+
+  it('handles websocket send failures gracefully', async () => {
+    await client.connect();
+    mockSockets[0].send = () => {
+      throw new Error('socket write failed');
+    };
+
+    client.send({
+      type: 'heartbeat',
+      data: {
+        nodeId: 'node-1',
+        timestamp: new Date(),
+      },
+    });
+
+    expect(logger.error).toHaveBeenCalledWith('Failed to send message to C&C', {
+      error: expect.any(Error),
+      messageType: 'heartbeat',
+    });
+  });
+
+  it('falls back to default network metadata when no external IPv4 interface exists', () => {
+    jest.spyOn(os, 'networkInterfaces').mockReturnValue({
+      lo0: [
+        {
+          address: '127.0.0.1',
+          netmask: '255.0.0.0',
+          family: 'IPv4',
+          mac: '00:00:00:00:00:00',
+          internal: true,
+          cidr: '127.0.0.1/8',
+        },
+      ] as any[],
+    });
+
+    const networkInfo = ((client as unknown) as { resolveNetworkInfo: () => { subnet: string; gateway: string } })
+      .resolveNetworkInfo();
+    expect(networkInfo).toEqual({
+      subnet: '0.0.0.0/0',
+      gateway: '0.0.0.0',
+    });
+  });
+
+  it('returns fallback gateway for malformed or out-of-range addresses', () => {
+    const deriveGatewayFromAddress = ((client as unknown) as { deriveGatewayFromAddress: (address: string) => string })
+      .deriveGatewayFromAddress;
+
+    expect(deriveGatewayFromAddress('invalid')).toBe('0.0.0.0');
+    expect(deriveGatewayFromAddress('300.1.1.1')).toBe('0.0.0.0');
+  });
+
+  it('logs structured validation details for malformed JSON frames', async () => {
+    await client.connect();
+
+    mockSockets[0].emit('message', Buffer.from('{invalid-json'));
+
+    expect(logger.error).toHaveBeenCalledWith(
+      'Protocol validation failed',
+      expect.objectContaining({
+        direction: 'inbound',
+        messageType: 'malformed-json',
+      })
+    );
+  });
+
+  it('dispatches wake/scan/update/delete command frames', async () => {
+    await client.connect();
+    const onWake = jest.fn();
+    const onScan = jest.fn();
+    const onUpdate = jest.fn();
+    const onDelete = jest.fn();
+    client.on('command:wake', onWake);
+    client.on('command:scan', onScan);
+    client.on('command:update-host', onUpdate);
+    client.on('command:delete-host', onDelete);
+
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'wake',
+          commandId: 'wake-1',
+          data: { hostName: 'PC-01', mac: 'AA:BB:CC:DD:EE:FF' },
+        })
+      )
+    );
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'scan',
+          commandId: 'scan-1',
+          data: { immediate: true },
+        })
+      )
+    );
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'update-host',
+          commandId: 'update-1',
+          data: { name: 'PC-01' },
+        })
+      )
+    );
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'delete-host',
+          commandId: 'delete-1',
+          data: { name: 'PC-01' },
+        })
+      )
+    );
+
+    expect(onWake).toHaveBeenCalledTimes(1);
+    expect(onScan).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it('catches and logs listener exceptions while dispatching commands', async () => {
+    await client.connect();
+    client.on('command:wake', () => {
+      throw new Error('handler exploded');
+    });
+
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'wake',
+          commandId: 'wake-err',
+          data: { hostName: 'PC-01', mac: 'AA:BB:CC:DD:EE:FF' },
+        })
+      )
+    );
+
+    expect(logger.error).toHaveBeenCalledWith(
+      'Protocol validation failed',
+      expect.objectContaining({
+        direction: 'inbound',
+        messageType: 'wake',
+      })
+    );
+  });
+
+  it('accepts registered frames without protocolVersion and starts heartbeat', async () => {
+    await client.connect();
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'registered',
+          data: {
+            nodeId: 'node-1',
+            heartbeatInterval: 250,
+          },
+        })
+      )
+    );
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Registration missing protocolVersion; assuming compatibility fallback',
+      expect.objectContaining({
+        supportedProtocolVersions: expect.any(Array),
+      })
+    );
+    expect(client.isConnected()).toBe(true);
+  });
+
+  it('records revoked-auth close events and disables reconnect only when flagged', async () => {
+    await client.connect();
+    mockSockets[0].emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'registered',
+          data: {
+            nodeId: 'node-1',
+            heartbeatInterval: 250,
+            protocolVersion: PROTOCOL_VERSION,
+          },
+        })
+      )
+    );
+    const onRevoked = jest.fn();
+    client.on('auth-revoked', onRevoked);
+
+    mockSockets[0].emit('close', 4003, Buffer.from('revoked'));
+
+    expect(onRevoked).toHaveBeenCalledTimes(1);
+    expect(runtimeTelemetryMock.recordAuthRevoked).toHaveBeenCalledTimes(1);
+    expect(((client as unknown) as { heartbeatTimer: NodeJS.Timeout | null }).heartbeatTimer).toBeNull();
+    expect(jest.getTimerCount()).toBeGreaterThan(0);
+  });
+
+  it('does not double-schedule reconnect when timer already exists', () => {
+    ((client as unknown) as { scheduleReconnect: () => void }).scheduleReconnect();
+    ((client as unknown) as { scheduleReconnect: () => void }).scheduleReconnect();
+
+    expect(runtimeTelemetryMock.recordReconnectScheduled).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses cached session tokens until refresh window and then refreshes', async () => {
+    mockedAgentConfig.sessionTokenUrl = 'https://cnc.example/api/nodes/session-token';
+    ((client as unknown) as { sessionToken: { token: string; expiresAtMs: number | null } | null }).sessionToken = {
+      token: 'test-cached',
+      expiresAtMs: Date.now() + 120_000,
+    };
+
+    await expect(
+      ((client as unknown) as { resolveConnectionToken: () => Promise<string> }).resolveConnectionToken()
+    ).resolves.toBe('test-cached');
+    expect(mockAxiosPost).not.toHaveBeenCalled();
+
+    ((client as unknown) as { sessionToken: { token: string; expiresAtMs: number | null } | null }).sessionToken = {
+      token: 'test-expiring',
+      expiresAtMs: Date.now() + 500,
+    };
+    mockAxiosPost.mockResolvedValueOnce({ data: { token: 'test-refresh', expiresInSeconds: 120 } });
+
+    await expect(
+      ((client as unknown) as { resolveConnectionToken: () => Promise<string> }).resolveConnectionToken()
+    ).resolves.toBe('test-refresh');
+    expect(logger.info).toHaveBeenCalledWith('Session token nearing expiry, requesting refresh');
+  });
+
+  it('validates session token response shape and expiry parsing', () => {
+    const parseSessionTokenResponse = (client as unknown) as {
+      parseSessionTokenResponse: (data: unknown) => { token: string; expiresAtMs: number | null };
+    };
+
+    expect(() => parseSessionTokenResponse.parseSessionTokenResponse(null)).toThrow(
+      'Session token response is invalid'
+    );
+    expect(() => parseSessionTokenResponse.parseSessionTokenResponse({})).toThrow(
+      'Session token response missing token'
+    );
+
+    expect(
+      parseSessionTokenResponse.parseSessionTokenResponse({
+        token: 'ok',
+        expiresAt: 1_700_000_000,
+      })
+    ).toEqual({
+      token: 'ok',
+      expiresAtMs: 1_700_000_000_000,
+    });
+
+    const parsed = parseSessionTokenResponse.parseSessionTokenResponse({
+      token: 'ok',
+      expiresInSeconds: 30,
+    });
+    expect(parsed.token).toBe('ok');
+    expect(parsed.expiresAtMs).toEqual(expect.any(Number));
+  });
+
+  it('handles bootstrap token expiry failures as auth-expired', () => {
+    const onExpired = jest.fn();
+    client.on('auth-expired', onExpired);
+
+    ((client as unknown) as { handleSessionTokenError: (error: unknown) => void }).handleSessionTokenError({
+      response: { status: 401 },
+    });
+
+    expect(onExpired).toHaveBeenCalledTimes(1);
+    expect(runtimeTelemetryMock.recordAuthExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes defensive helper behavior for message typing/correlation and log sanitization', () => {
+    const helpers = (client as unknown) as {
+      extractHttpStatus: (error: unknown) => number | null;
+      extractMessageType: (payload: unknown) => string;
+      extractCorrelationId: (payload: unknown) => string;
+      sanitizeProtocolLogData: (value: unknown, depth?: number) => unknown;
+    };
+
+    expect(helpers.extractHttpStatus('not-an-error')).toBeNull();
+    expect(helpers.extractMessageType(null)).toBe('unknown');
+    expect(helpers.extractCorrelationId({ data: { commandId: 'nested-cmd' } })).toBe('nested-cmd');
+    expect(helpers.extractCorrelationId('missing')).toEqual(expect.any(String));
+
+    const deepPayload = { a: { b: { c: { d: { e: { f: 'too-deep' } } } } } };
+    const sanitizedDeep = helpers.sanitizeProtocolLogData(deepPayload) as Record<string, unknown>;
+    expect(sanitizedDeep.a).toEqual(expect.objectContaining({ b: expect.any(Object) }));
+    expect(helpers.sanitizeProtocolLogData([1, 'two', { token: 'abc' }])).toEqual([
+      1,
+      'two',
+      { token: '[REDACTED]' },
+    ]);
+    expect(helpers.sanitizeProtocolLogData(Symbol('raw'))).toBe('Symbol(raw)');
+  });
 });
