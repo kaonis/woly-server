@@ -28,7 +28,7 @@
 - `hostSchema` — Validates `Host` object
 - `commandStateSchema` — Validates `CommandState`
 - `errorResponseSchema` — Validates `ErrorResponse` object
-- `cncCapabilitiesResponseSchema` / `cncCapabilityDescriptorSchema` — Validates CNC capabilities payload
+- `cncCapabilitiesResponseSchema` / `cncCapabilityDescriptorSchema` / `cncRateLimitDescriptorSchema` / `cncRateLimitsSchema` — Validates CNC capabilities and rate-limit payloads
 - `hostPortSchema` / `hostPortScanResponseSchema` — Validates host port scan payloads
 - `hostWakeScheduleSchema` / `hostSchedulesResponseSchema` / `createHostWakeScheduleRequestSchema` / `updateHostWakeScheduleRequestSchema` — Validates schedules payloads
 - `hostStateStreamEventSchema` — Validates mobile host-state stream events
@@ -37,8 +37,8 @@
 
 ### Constants
 
-- `PROTOCOL_VERSION` — Current protocol version (`'1.2.0'`)
-- `SUPPORTED_PROTOCOL_VERSIONS` — Array of supported versions (`['1.2.0', '1.1.1', '1.0.0']`)
+- `PROTOCOL_VERSION` — Current protocol version (`'1.3.0'`)
+- `SUPPORTED_PROTOCOL_VERSIONS` — Array of supported versions (`['1.3.0', '1.2.0', '1.1.1', '1.0.0']`)
 
 ## Usage
 
@@ -98,6 +98,7 @@ Output goes to `dist/`. Both `main` and `types` in package.json point there.
 - `1.0.x`: Base node ↔ C&C message contracts (`Host`, `NodeMessage`, `CncCommand`).
 - `1.1.x`: CNC app/backend API contracts (`CncCapabilitiesResponse`, schedules, host port scan DTOs/schemas) and wire protocol negotiation update.
 - `1.2.x`: Host metadata/scan enrichments (`openPorts`, `portsScannedAt`, `portsExpireAt`), ping/port-scan command/result payloads, and consumer typecheck fixture parity.
+- `1.3.x`: CNC capability-map enrichments (`hostStateStreaming`, optional `rateLimits`) and exported CNC rate-limit descriptor schemas.
 
 ## Testing
 
@@ -126,9 +127,9 @@ From the **monorepo root**, use the provided npm scripts:
 
 ```bash
 # 1. Bump version (patch/minor/major)
-npm run protocol:version:patch   # For bug fixes (1.2.0 → 1.2.1)
-npm run protocol:version:minor   # For new features (1.2.0 → 1.3.0)
-npm run protocol:version:major   # For breaking changes (1.2.0 → 2.0.0)
+npm run protocol:version:patch   # For bug fixes (1.3.0 → 1.3.1)
+npm run protocol:version:minor   # For new features (1.3.0 → 1.4.0)
+npm run protocol:version:major   # For breaking changes (1.3.0 → 2.0.0)
 
 # 2. Publish to npm (builds automatically)
 npm run protocol:publish         # Publish with 'latest' tag

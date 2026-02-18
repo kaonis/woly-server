@@ -14,7 +14,7 @@ const capabilities: CncCapabilitiesResponse = {
   mode: 'cnc',
   versions: {
     cncApi: '1.0.0',
-    protocol: '1.2.0',
+    protocol: '1.3.0',
   },
   capabilities: {
     scan: { supported: true },
@@ -22,6 +22,15 @@ const capabilities: CncCapabilitiesResponse = {
     schedules: { supported: true, routes: ['/api/hosts/:fqn/schedules'] },
     hostStateStreaming: { supported: true, transport: 'websocket', routes: ['/ws/mobile/hosts'] },
     commandStatusStreaming: { supported: false, transport: null },
+  },
+  rateLimits: {
+    strictAuth: { maxCalls: 5, windowMs: 900_000, scope: 'ip' },
+    auth: { maxCalls: 10, windowMs: 900_000, scope: 'ip' },
+    api: { maxCalls: 300, windowMs: 900_000, scope: 'ip' },
+    scheduleSync: { maxCalls: 3_000, windowMs: 900_000, scope: 'ip' },
+    wsInboundMessages: { maxCalls: 100, windowMs: 1_000, scope: 'connection' },
+    wsConnectionsPerIp: { maxCalls: 10, windowMs: null, scope: 'ip' },
+    macVendorLookup: { maxCalls: 1, windowMs: 1_000, scope: 'global' },
   },
 };
 
