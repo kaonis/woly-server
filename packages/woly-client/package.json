@@ -36,7 +36,7 @@
     "access": "public"
   },
   "devDependencies": {
-    "openapi-typescript-codegen": "^0.29.0",
+    "openapi-typescript-codegen": "^0.30.0",
     "typescript": "^5.9.3"
   }
 }
