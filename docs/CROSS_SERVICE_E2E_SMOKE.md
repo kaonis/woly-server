@@ -6,6 +6,9 @@ This smoke suite validates the core C&C <-> node-agent integration path in one r
 2. Seeded node-agent host inventory propagates to C&C aggregated hosts.
 3. Manual node-agent host create, update, and delete operations propagate to C&C.
 4. Wake command routing executes from C&C API to node agent and returns a terminal result.
+5. One-time wake schedule executes and records `lastTriggered`.
+6. Offline queue behavior: command is queued while node is disconnected and flushed after reconnect.
+7. JWT token exchange and role-based protected endpoint access are verified.
 
 ## Run Locally
 
@@ -24,5 +27,13 @@ The suite starts temporary C&C and node-agent processes with isolated SQLite fil
 
 ## Notes
 
-- Expected runtime is typically under 30 seconds.
+- Expected runtime is typically under 3 minutes.
 - Wake packet send can fail in restricted environments; the smoke suite accepts either success (`200`) or terminal failure (`500`) as long as routing completes without timeout.
+
+## Manual CI Dispatch
+
+Use the dedicated manual workflow in budget mode:
+
+```bash
+gh workflow run cross-service-e2e-smoke.yml --ref master
+```
