@@ -160,6 +160,23 @@ describe('CommandModel', () => {
     expect(afterSecondSend?.retryCount).toBe(2);
   });
 
+  it('does not overwrite acknowledged commands when markSent runs after ack', async () => {
+    await CommandModel.enqueue({
+      id: 'cmd-race-ack',
+      nodeId: 'node-1',
+      type: 'scan',
+      payload: { type: 'scan', commandId: 'cmd-race-ack', data: { immediate: true } },
+      idempotencyKey: null,
+    });
+
+    await CommandModel.markAcknowledged('cmd-race-ack');
+    await CommandModel.markSent('cmd-race-ack');
+
+    const record = await CommandModel.findById('cmd-race-ack');
+    expect(record?.state).toBe('acknowledged');
+    expect(record?.retryCount).toBe(0);
+  });
+
   it('preserves retry_count when marking command as acknowledged', async () => {
     const cmd = await CommandModel.enqueue({
       id: 'cmd-retry-ack',

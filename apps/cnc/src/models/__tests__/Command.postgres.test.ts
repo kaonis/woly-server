@@ -143,8 +143,9 @@ describe('CommandModel (PostgreSQL paths)', () => {
     expect(mockDb.query).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining('SET state = $2, sent_at = NOW(), retry_count = retry_count + 1'),
-      ['cmd-1', 'sent']
+      ['cmd-1', 'sent', 'queued']
     );
+    expect(mockDb.query.mock.calls[0][0]).toContain('WHERE id = $1 AND state = $3');
     expect(mockDb.query).toHaveBeenNthCalledWith(
       2,
       expect.stringContaining('SET state = $2, completed_at = NOW()'),
