@@ -155,15 +155,15 @@ export class CommandModel {
       ? `
         UPDATE commands
         SET state = ?, sent_at = CURRENT_TIMESTAMP, retry_count = retry_count + 1
-        WHERE id = ?
+        WHERE id = ? AND state = ?
       `
       : `
         UPDATE commands
         SET state = $2, sent_at = NOW(), retry_count = retry_count + 1
-        WHERE id = $1
+        WHERE id = $1 AND state = $3
       `;
 
-    await db.query(query, isSqlite ? ['sent', id] : [id, 'sent']);
+    await db.query(query, isSqlite ? ['sent', id, 'queued'] : [id, 'sent', 'queued']);
   }
 
   static async markAcknowledged(id: string): Promise<void> {
