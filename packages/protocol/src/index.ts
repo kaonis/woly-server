@@ -2,9 +2,10 @@ import { z } from 'zod';
 
 // --- Protocol versioning ---
 
-export const PROTOCOL_VERSION = '1.5.0' as const;
+export const PROTOCOL_VERSION = '1.6.0' as const;
 export const SUPPORTED_PROTOCOL_VERSIONS: readonly string[] = [
   PROTOCOL_VERSION,
+  '1.5.0',
   '1.4.0',
   '1.3.0',
   '1.2.0',
@@ -157,6 +158,8 @@ export interface CncCapabilitiesResponse {
     hostStateStreaming?: CncCapabilityDescriptor;
     commandStatusStreaming: CncCapabilityDescriptor;
     wakeVerification?: CncCapabilityDescriptor;
+    sleep?: CncCapabilityDescriptor;
+    shutdown?: CncCapabilityDescriptor;
   };
   rateLimits?: CncRateLimits;
 }
@@ -654,6 +657,8 @@ export const cncCapabilitiesResponseSchema: z.ZodType<CncCapabilitiesResponse> =
     hostStateStreaming: cncCapabilityDescriptorSchema.optional(),
     commandStatusStreaming: cncCapabilityDescriptorSchema,
     wakeVerification: cncCapabilityDescriptorSchema.optional(),
+    sleep: cncCapabilityDescriptorSchema.optional(),
+    shutdown: cncCapabilityDescriptorSchema.optional(),
   }),
   rateLimits: cncRateLimitsSchema.optional(),
 });

@@ -57,6 +57,21 @@ describe('buildCncCapabilitiesResponse', () => {
       supported: false,
       transport: null,
     });
+    expect(payload.capabilities.wakeVerification).toMatchObject({
+      supported: true,
+      transport: 'websocket',
+      routes: ['/ws/mobile/hosts'],
+    });
+    expect(payload.capabilities.sleep).toMatchObject({
+      supported: true,
+      routes: ['/api/hosts/:fqn/sleep'],
+      persistence: 'backend',
+    });
+    expect(payload.capabilities.shutdown).toMatchObject({
+      supported: true,
+      routes: ['/api/hosts/:fqn/shutdown'],
+      persistence: 'backend',
+    });
     expect(cncCapabilitiesResponseSchema.safeParse(payload).success).toBe(true);
   });
 

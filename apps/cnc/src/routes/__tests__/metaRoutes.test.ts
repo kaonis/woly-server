@@ -120,6 +120,21 @@ describe('Capabilities Route', () => {
             routes: ['/ws/mobile/hosts'],
           },
           commandStatusStreaming: { supported: false, transport: null },
+          wakeVerification: {
+            supported: true,
+            transport: 'websocket',
+            routes: ['/ws/mobile/hosts'],
+          },
+          sleep: {
+            supported: true,
+            routes: ['/api/hosts/:fqn/sleep'],
+            persistence: 'backend',
+          },
+          shutdown: {
+            supported: true,
+            routes: ['/api/hosts/:fqn/shutdown'],
+            persistence: 'backend',
+          },
         },
         rateLimits: {
           strictAuth: { scope: 'ip' },

@@ -8,8 +8,8 @@ The WoLy distributed system uses a shared protocol package (`@kaonis/woly-protoc
 
 **Package**: `@kaonis/woly-protocol`  
 **Purpose**: Shared TypeScript types and Zod runtime schemas for node ↔ C&C communication  
-**Current Package Version**: 1.5.0  
-**Current Protocol Version**: 1.5.0 (see `PROTOCOL_VERSION` constant)  
+**Current Package Version**: 1.6.0  
+**Current Protocol Version**: 1.6.0 (see `PROTOCOL_VERSION` constant)  
 **Location**: `packages/protocol/`
 
 ### Exports
@@ -26,6 +26,7 @@ The WoLy distributed system uses a shared protocol package (`@kaonis/woly-protoc
 - `1.3.x`: capability-map enrichments (`hostStateStreaming`, optional `rateLimits`) and exported CNC rate-limit schemas.
 - `1.4.x`: host uptime/history contracts, webhook contracts, merge/port metadata enrichments.
 - `1.5.x`: push-notification contracts and host power-control contracts.
+- `1.6.x`: capability-negotiation enrichments for remote power controls (`sleep`, `shutdown`).
 
 ## Versioning Policy
 
@@ -36,11 +37,9 @@ Protocol package follows strict semantic versioning:
 - **MAJOR** (x.0.0): Breaking changes to message structure or validation rules
   - Example: Removing a message type, changing required fields, removing supported versions
   - Requires coordinated deployment of both apps
-  
 - **MINOR** (0.x.0): Backward-compatible additions
   - Example: Adding new optional fields, new message types, new supported versions
   - Older nodes can continue working with newer C&C
-  
 - **PATCH** (0.0.x): Bug fixes in validation or types without semantic changes
   - Example: Fixing Zod schema edge cases, documentation updates
   - No deployment coordination required
@@ -50,13 +49,13 @@ Protocol package follows strict semantic versioning:
 From monorepo root:
 
 ```bash
-# Bug fix (1.5.0 → 1.5.1)
+# Bug fix (1.6.0 → 1.6.1)
 npm run protocol:version:patch
 
-# New feature (1.5.0 → 1.6.0)
+# New feature (1.6.0 → 1.7.0)
 npm run protocol:version:minor
 
-# Breaking change (1.5.0 → 2.0.0)
+# Breaking change (1.6.0 → 2.0.0)
 npm run protocol:version:major
 ```
 
@@ -64,14 +63,15 @@ npm run protocol:version:major
 
 ### Current Support
 
-| Protocol Version | Node Agent | C&C Backend | Status |
-|------------------|------------|-------------|--------|
-| 1.5.0 | ✅ 0.0.1+ | ✅ 1.0.0+ | Current |
-| 1.4.0 | ✅ 0.0.1+ | ✅ 1.0.0+ | Transitional support |
-| 1.3.0 | ✅ 0.0.1+ | ✅ 1.0.0+ | Transitional support |
-| 1.2.0 | ✅ 0.0.1+ | ✅ 1.0.0+ | Transitional support |
-| 1.1.1 | ✅ 0.0.1+ | ✅ 1.0.0+ | Transitional support |
-| 1.0.0 | ✅ 0.0.1+ | ✅ 1.0.0+ | Transitional support |
+| Protocol Version | Node Agent | C&C Backend | Status               |
+| ---------------- | ---------- | ----------- | -------------------- |
+| 1.6.0            | ✅ 0.0.1+  | ✅ 1.0.0+   | Current              |
+| 1.5.0            | ✅ 0.0.1+  | ✅ 1.0.0+   | Transitional support |
+| 1.4.0            | ✅ 0.0.1+  | ✅ 1.0.0+   | Transitional support |
+| 1.3.0            | ✅ 0.0.1+  | ✅ 1.0.0+   | Transitional support |
+| 1.2.0            | ✅ 0.0.1+  | ✅ 1.0.0+   | Transitional support |
+| 1.1.1            | ✅ 0.0.1+  | ✅ 1.0.0+   | Transitional support |
+| 1.0.0            | ✅ 0.0.1+  | ✅ 1.0.0+   | Transitional support |
 
 ### Runtime Version Negotiation
 
@@ -82,8 +82,16 @@ npm run protocol:version:major
 
 ```typescript
 // In protocol package
-export const PROTOCOL_VERSION = '1.5.0';
-export const SUPPORTED_PROTOCOL_VERSIONS = ['1.5.0', '1.4.0', '1.3.0', '1.2.0', '1.1.1', '1.0.0'];
+export const PROTOCOL_VERSION = '1.6.0';
+export const SUPPORTED_PROTOCOL_VERSIONS = [
+  '1.6.0',
+  '1.5.0',
+  '1.4.0',
+  '1.3.0',
+  '1.2.0',
+  '1.1.1',
+  '1.0.0',
+];
 ```
 
 ## Polling Snapshot Contract (CNC Clients)
@@ -128,6 +136,7 @@ protocol-compatibility:
 ```
 
 This job **blocks** the main build if:
+
 - Protocol contract tests fail
 - Apps cannot consume the protocol package
 - Message encoding/decoding round-trips fail
@@ -135,21 +144,25 @@ This job **blocks** the main build if:
 ### Contract Tests
 
 #### Protocol Package Tests
+
 - Location: `packages/protocol/src/__tests__/contract.cross-repo.test.ts`
 - Coverage: All message/command types, JSON serialization, version validation
 - Runs: 90+ tests total (32 contract tests + ~58 schema unit tests) covering full protocol surface area
 
 #### Consumer Typecheck Fixture
+
 - Location: `packages/protocol/fixtures/app-consumer/`
 - Purpose: ensures exported protocol types/schemas are consumable by app/backend integration code
 - Command: `npm run test:consumer-typecheck -w packages/protocol`
 
 #### Node Agent Contract Tests
+
 - Location: `apps/node-agent/src/__tests__/protocol.contract.unit.test.ts`
 - Coverage: Node → C&C message encoding, C&C → node command decoding
 - Verifies: App can successfully use protocol schemas
 
 #### C&C Contract Tests
+
 - Location: `apps/cnc/src/services/__tests__/protocol.contract.test.ts`
 - Coverage: C&C → node command encoding, node → C&C message decoding
 - Verifies: Backend can successfully use protocol schemas
@@ -169,6 +182,7 @@ Both apps consume the protocol package via npm workspace link:
 ```
 
 This ensures:
+
 - Apps always use the local protocol package source
 - Changes to protocol are immediately available to apps
 - No version drift between protocol and consumers in the monorepo
@@ -188,6 +202,7 @@ npm run protocol:publish:next
 **Note**: Monorepo apps continue using workspace links. Publishing is only required for external consumers.
 
 For publish readiness criteria, release steps, and rollback actions, use:
+
 - [`docs/PROTOCOL_PUBLISH_WORKFLOW.md`](./PROTOCOL_PUBLISH_WORKFLOW.md)
 
 ## Breaking Change Workflow
@@ -218,6 +233,7 @@ export const SUPPORTED_PROTOCOL_VERSIONS = ['1.0.0', '2.0.0'];
 ```
 
 This allows:
+
 - Old nodes (v1.0.0) to connect to new C&C (supporting both)
 - New nodes (v2.0.0) to connect to new C&C
 - Gradual rollout of node agents
@@ -263,6 +279,7 @@ export const SUPPORTED_PROTOCOL_VERSIONS = ['2.0.0'];
 **Cause**: Changes to protocol broke encoding/decoding guarantees
 
 **Fix**:
+
 1. Review changes to `packages/protocol/src/index.ts`
 2. Run `npm test -w packages/protocol` locally
 3. Fix validation failures in Zod schemas
@@ -273,6 +290,7 @@ export const SUPPORTED_PROTOCOL_VERSIONS = ['2.0.0'];
 **Cause**: Apps use protocol types/schemas that were removed or changed
 
 **Fix**:
+
 1. Run `npm run test -w apps/node-agent -- protocol.contract`
 2. Run `npm run test -w apps/cnc -- protocol.contract`
 3. Update app code to use new protocol API
@@ -287,6 +305,7 @@ npm run test -w apps/cnc -- mobileCompatibility.smoke
 ```
 
 This verifies:
+
 - `POST /api/auth/token` response shape used by `cnc-auth-service`
 - `GET /api/hosts` response shape used by `woly-service`
 - `GET /api/nodes` response shape used by `woly-service`
@@ -297,6 +316,7 @@ This verifies:
 **Cause**: Node agent protocol version not in C&C's `SUPPORTED_PROTOCOL_VERSIONS`
 
 **Fix**:
+
 1. Check node metadata: `data.metadata.protocolVersion`
 2. Check C&C supported versions
 3. Either upgrade node or add backward compatibility to C&C
@@ -311,7 +331,7 @@ This verifies:
 ✅ Add test coverage for new message types  
 ✅ Document breaking changes in CHANGELOG  
 ✅ Maintain backward compatibility during migrations  
-✅ Update compatibility matrix when bumping versions  
+✅ Update compatibility matrix when bumping versions
 
 ### DON'T
 
@@ -320,7 +340,7 @@ This verifies:
 ❌ Remove message types without deprecation period  
 ❌ Change required fields without dual-stack support  
 ❌ Skip CI checks  
-❌ Directly modify deployed node agents without C&C support  
+❌ Directly modify deployed node agents without C&C support
 
 ## References
 

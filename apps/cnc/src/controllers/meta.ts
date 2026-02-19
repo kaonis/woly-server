@@ -64,6 +64,24 @@ const capabilityMatrix: CncCapabilitiesResponse['capabilities'] = {
     transport: null,
     note: 'Dedicated frontend-facing stream is planned alongside kaonis/woly#311.',
   },
+  wakeVerification: {
+    supported: true,
+    transport: 'websocket',
+    routes: ['/ws/mobile/hosts'],
+    note: 'Post-WoL verification results stream as wake.verified events on /ws/mobile/hosts. Request with ?verify=true on the wake endpoint.',
+  },
+  sleep: {
+    supported: true,
+    routes: ['/api/hosts/:fqn/sleep'],
+    persistence: 'backend',
+    note: 'Remote host suspend command over node-agent SSH transport; execution is gated per-host by powerControl.enabled.',
+  },
+  shutdown: {
+    supported: true,
+    routes: ['/api/hosts/:fqn/shutdown'],
+    persistence: 'backend',
+    note: 'Remote host shutdown command over node-agent SSH transport; execution is gated per-host by powerControl.enabled.',
+  },
 };
 
 export function buildCncCapabilitiesResponse(
@@ -131,6 +149,12 @@ export class MetaController {
    *                     hostStateStreaming:
    *                       type: object
    *                     commandStatusStreaming:
+   *                       type: object
+   *                     wakeVerification:
+   *                       type: object
+   *                     sleep:
+   *                       type: object
+   *                     shutdown:
    *                       type: object
    *       401:
    *         $ref: '#/components/responses/Unauthorized'

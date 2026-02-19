@@ -104,6 +104,21 @@ describe('Capabilities Routes', () => {
             routes: ['/ws/mobile/hosts'],
           }),
           commandStatusStreaming: expect.objectContaining({ supported: false, transport: null }),
+          wakeVerification: expect.objectContaining({
+            supported: true,
+            transport: 'websocket',
+            routes: ['/ws/mobile/hosts'],
+          }),
+          sleep: expect.objectContaining({
+            supported: true,
+            routes: ['/api/hosts/:fqn/sleep'],
+            persistence: 'backend',
+          }),
+          shutdown: expect.objectContaining({
+            supported: true,
+            routes: ['/api/hosts/:fqn/shutdown'],
+            persistence: 'backend',
+          }),
         },
         rateLimits: {
           strictAuth: expect.objectContaining({ scope: 'ip' }),
