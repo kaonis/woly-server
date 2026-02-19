@@ -37,8 +37,8 @@
 
 ### Constants
 
-- `PROTOCOL_VERSION` — Current protocol version (`'1.3.0'`)
-- `SUPPORTED_PROTOCOL_VERSIONS` — Array of supported versions (`['1.3.0', '1.2.0', '1.1.1', '1.0.0']`)
+- `PROTOCOL_VERSION` — Current protocol version (`'1.5.0'`)
+- `SUPPORTED_PROTOCOL_VERSIONS` — Array of supported versions (`['1.5.0', '1.4.0', '1.3.0', '1.2.0', '1.1.1', '1.0.0']`)
 
 ## Usage
 
@@ -137,9 +137,9 @@ From the **monorepo root**, use the provided npm scripts:
 
 ```bash
 # 1. Bump version (patch/minor/major)
-npm run protocol:version:patch   # For bug fixes (1.3.0 → 1.3.1)
-npm run protocol:version:minor   # For new features (1.3.0 → 1.4.0)
-npm run protocol:version:major   # For breaking changes (1.3.0 → 2.0.0)
+npm run protocol:version:patch   # For bug fixes (1.5.0 → 1.5.1)
+npm run protocol:version:minor   # For new features (1.5.0 → 1.6.0)
+npm run protocol:version:major   # For breaking changes (1.5.0 → 2.0.0)
 
 # 2. Publish to npm (builds automatically)
 npm run protocol:publish         # Publish with 'latest' tag
