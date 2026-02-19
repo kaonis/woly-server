@@ -308,6 +308,48 @@ describe('AgentService command handlers', () => {
     expect(snapshot.commands.byType.wake.success).toBe(1);
   });
 
+  it('emits websocket command-result when tunnel dispatch overlaps an in-flight duplicate', async () => {
+    jest.useFakeTimers();
+    hostDbMock.getHost.mockResolvedValue(sampleHost);
+    ((service as unknown) as { isRunning: boolean }).isRunning = true;
+    ((wakeOnLan.wake as unknown) as jest.Mock).mockImplementation(
+      (_mac: string, _opts: unknown, callback: (error: Error | null) => void) => {
+        setTimeout(() => callback(null), 50);
+      }
+    );
+
+    const command = {
+      type: 'wake' as const,
+      commandId: 'cmd-wake-tunnel-overlap',
+      data: { hostName: sampleHost.name, mac: sampleHost.mac },
+    };
+
+    mockCncClient.send.mockClear();
+
+    const tunnelPromise = service.dispatchTunnelCommand(command);
+    await Promise.resolve();
+
+    // Simulate websocket fallback delivering the same command while tunnel execution is still running.
+    await ((service as unknown) as {
+      handleWakeCommand: (payload: typeof command) => Promise<void>;
+    }).handleWakeCommand(command);
+
+    await jest.advanceTimersByTimeAsync(60);
+    const tunnelResult = await tunnelPromise;
+
+    expect(tunnelResult.success).toBe(true);
+    expect(mockCncClient.send).toHaveBeenCalledTimes(1);
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: command.commandId,
+          success: true,
+        }),
+      })
+    );
+  });
+
   it('applies bounded wake retries and fails deterministically after max attempts', async () => {
     jest.useFakeTimers();
     hostDbMock.getHost.mockResolvedValue(sampleHost);

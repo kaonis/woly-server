@@ -159,7 +159,6 @@ export class AgentService extends EventEmitter {
   private readonly pendingHostUpdates: Map<string, Host> = new Map();
   private readonly commandExecutions: Map<string, CommandExecutionRecord> = new Map();
   private readonly bufferedCommandResults: Map<string, CommandResultMessage> = new Map();
-  private readonly suppressCncResultForCommandIds: Set<string> = new Set();
   private hostUpdateDebounceTimer: NodeJS.Timeout | null = null;
   private hostEventFlushTimer: NodeJS.Timeout | null = null;
   private readonly activeWakeVerifications: Map<string, { timer: NodeJS.Timeout }> = new Map();
@@ -261,19 +260,13 @@ export class AgentService extends EventEmitter {
       throw new Error('Agent service is not running');
     }
 
-    this.suppressCncResultForCommandIds.add(command.commandId);
-
-    try {
-      await this.dispatchInboundCommand(command);
-      const record = this.commandExecutions.get(command.commandId);
-      if (!record?.result) {
-        throw new Error(`No command result recorded for ${command.commandId}`);
-      }
-
-      return record.result;
-    } finally {
-      this.suppressCncResultForCommandIds.delete(command.commandId);
+    await this.dispatchInboundCommand(command);
+    const record = this.commandExecutions.get(command.commandId);
+    if (!record?.result) {
+      throw new Error(`No command result recorded for ${command.commandId}`);
     }
+
+    return record.result;
   }
 
   /**
@@ -688,14 +681,6 @@ export class AgentService extends EventEmitter {
     payload: CommandResultPayload,
     options?: { startedAtMs?: number; replay?: boolean }
   ): void {
-    if (this.suppressCncResultForCommandIds.delete(commandId)) {
-      logger.debug('Suppressed websocket command-result for tunnel-dispatched command', {
-        commandId,
-        commandType,
-      });
-      return;
-    }
-
     if (!options?.replay) {
       runtimeTelemetry.recordCommandResult(
         commandType,
