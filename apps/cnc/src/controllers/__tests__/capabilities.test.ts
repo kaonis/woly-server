@@ -57,6 +57,19 @@ describe('CapabilitiesController', () => {
     expect(response.capabilities.wakeVerification).toEqual({
       supported: true,
       transport: 'websocket',
+      routes: ['/ws/mobile/hosts'],
+      note: expect.any(String),
+    });
+    expect(response.capabilities.sleep).toEqual({
+      supported: true,
+      routes: ['/api/hosts/:fqn/sleep'],
+      persistence: 'backend',
+      note: expect.any(String),
+    });
+    expect(response.capabilities.shutdown).toEqual({
+      supported: true,
+      routes: ['/api/hosts/:fqn/shutdown'],
+      persistence: 'backend',
       note: expect.any(String),
     });
   });

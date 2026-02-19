@@ -465,13 +465,13 @@ describe('cncCapabilitiesResponseSchema', () => {
     ).toBe(true);
   });
 
-  it('accepts capabilities payload with optional wakeVerification', () => {
+  it('accepts capabilities payload with optional wake and power-control descriptors', () => {
     expect(
       cncCapabilitiesResponseSchema.safeParse({
         mode: 'cnc',
         versions: {
           cncApi: '1.0.0',
-          protocol: '1.3.0',
+          protocol: '1.6.0',
         },
         capabilities: {
           scan: capability,
@@ -480,6 +480,8 @@ describe('cncCapabilitiesResponseSchema', () => {
           hostStateStreaming: { supported: true, transport: 'websocket' },
           commandStatusStreaming: { supported: false, transport: null },
           wakeVerification: { supported: true, transport: 'websocket' },
+          sleep: { supported: true, persistence: 'backend' },
+          shutdown: { supported: true, persistence: 'backend' },
         },
       }).success
     ).toBe(true);
