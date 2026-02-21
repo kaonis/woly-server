@@ -780,6 +780,8 @@
               "scan",
               "scan-host-ports",
               "ping-host",
+              "sleep-host",
+              "shutdown-host",
               "ping"
             ],
             "description": "Command type",
