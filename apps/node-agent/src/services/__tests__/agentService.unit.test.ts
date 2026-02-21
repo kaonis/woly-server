@@ -608,6 +608,33 @@ describe('AgentService command handlers', () => {
     );
   });
 
+  it('treats scan-in-progress as a successful no-op for immediate scan commands', async () => {
+    scanOrchestratorMock.syncWithNetwork.mockResolvedValueOnce({
+      success: false,
+      code: 'SCAN_IN_PROGRESS',
+      error: 'Scan already in progress',
+    });
+
+    await ((service as unknown) as {
+      handleScanCommand: (command: unknown) => Promise<void>;
+    }).handleScanCommand({
+      type: 'scan',
+      commandId: 'cmd-scan-in-progress',
+      data: { immediate: true },
+    });
+
+    expect(mockCncClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'command-result',
+        data: expect.objectContaining({
+          commandId: 'cmd-scan-in-progress',
+          success: true,
+          message: 'Scan already in progress',
+        }),
+      })
+    );
+  });
+
   it('returns scan-orchestrator error when scan dependencies are incomplete', async () => {
     ((service as unknown) as { scanOrchestrator: unknown }).scanOrchestrator = null;
 

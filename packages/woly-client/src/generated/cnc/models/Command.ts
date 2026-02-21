@@ -10,7 +10,7 @@ export type Command = {
     /**
      * Command type
      */
-    type?: 'wake' | 'update-host' | 'delete-host' | 'scan' | 'scan-host-ports' | 'ping-host' | 'ping';
+    type?: 'wake' | 'update-host' | 'delete-host' | 'scan' | 'scan-host-ports' | 'ping-host' | 'sleep-host' | 'shutdown-host' | 'ping';
     /**
      * Target node ID
      */

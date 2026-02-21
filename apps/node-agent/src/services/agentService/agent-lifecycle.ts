@@ -1245,6 +1245,13 @@ export class AgentService extends EventEmitter {
       if (immediate) {
         const scanResult = await this.scanOrchestrator.syncWithNetwork();
         if (!scanResult.success) {
+          if (scanResult.code === 'SCAN_IN_PROGRESS') {
+            logger.info('Scan command skipped because a scan is already in progress', { commandId });
+            return {
+              success: true,
+              message: 'Scan already in progress',
+            };
+          }
           throw new Error(scanResult.error);
         }
         const hosts = await this.hostDb.getAllHosts();

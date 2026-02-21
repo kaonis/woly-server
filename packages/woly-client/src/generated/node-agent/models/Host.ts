@@ -47,5 +47,23 @@ export type Host = {
      * Optional tags for filtering/grouping hosts
      */
     tags?: Array<string>;
+    /**
+     * Optional per-host remote power-control configuration
+     */
+    powerControl?: {
+        enabled?: boolean;
+        transport?: 'ssh';
+        platform?: 'linux' | 'macos' | 'windows';
+        ssh?: {
+            username: string;
+            port?: number;
+            privateKeyPath?: string;
+            strictHostKeyChecking?: 'enforce' | 'accept-new' | 'off';
+        };
+        commands?: {
+            sleep?: string;
+            shutdown?: string;
+        };
+    } | null;
 };
 
