@@ -2,15 +2,17 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { HostPort } from './HostPort';
+import type { HostPowerControlConfig } from './HostPowerControlConfig';
 export type Host = {
     /**
      * Hostname
      */
-    name?: string;
+    name: string;
     /**
      * MAC address
      */
-    mac?: string;
+    mac: string;
     /**
      * Additional known MAC addresses for the same logical host
      */
@@ -18,7 +20,7 @@ export type Host = {
     /**
      * IP address
      */
-    ip?: string;
+    ip: string;
     /**
      * Configured Wake-on-LAN UDP destination port
      */
@@ -26,15 +28,15 @@ export type Host = {
     /**
      * Current host status (based on ARP response)
      */
-    status?: 'awake' | 'asleep';
+    status: 'awake' | 'asleep';
     /**
      * Last time host was detected online
      */
-    lastSeen?: string | null;
+    lastSeen: string | null;
     /**
      * Whether host was discovered automatically (1) or added manually (0)
      */
-    discovered?: number;
+    discovered: number;
     /**
      * ICMP ping responsiveness: 1 (responds), 0 (no response), null (not tested)
      */
@@ -48,13 +50,13 @@ export type Host = {
      */
     tags?: Array<string>;
     /**
+     * Optional remote power-control configuration for sleep/shutdown operations
+     */
+    powerControl?: HostPowerControlConfig | null;
+    /**
      * Cached open TCP ports from the most recent per-host scan (when still fresh)
      */
-    openPorts?: Array<{
-        port?: number;
-        protocol?: 'tcp';
-        service?: string;
-    }>;
+    openPorts?: Array<HostPort>;
     /**
      * Timestamp of the cached per-host port scan snapshot
      */
@@ -66,14 +68,14 @@ export type Host = {
     /**
      * ID of the node managing this host
      */
-    nodeId?: string;
+    nodeId: string;
     /**
      * Location inherited from managing node
      */
-    location?: string;
+    location: string;
     /**
      * Fully qualified name (hostname@location)
      */
-    fqn?: string;
+    fullyQualifiedName: string;
 };
 

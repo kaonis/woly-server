@@ -246,14 +246,7 @@ export class HostsController {
    *         content:
    *           application/json:
    *             schema:
-   *               type: object
-   *               properties:
-   *                 hosts:
-   *                   type: array
-   *                   items:
-   *                     $ref: '#/components/schemas/Host'
-   *                 stats:
-   *                   $ref: '#/components/schemas/HostStats'
+   *               $ref: '#/components/schemas/HostsResponse'
    *       304:
    *         description: Not Modified (If-None-Match matched current ETag)
    *       401:
@@ -560,24 +553,14 @@ export class HostsController {
    *       content:
    *         application/json:
    *           schema:
-   *             type: object
-   *             properties:
-   *               verify:
-   *                 type: boolean
-   *                 description: Enable asynchronous wake verification for this command
-   *               wolPort:
-   *                 type: integer
-   *                 minimum: 1
-   *                 maximum: 65535
-   *                 description: Optional WoL UDP destination port override for this wake request
-   *                 example: 7
+   *             $ref: '#/components/schemas/WakeupRequest'
    *     responses:
    *       200:
    *         description: Wake command sent successfully
    *         content:
    *           application/json:
    *             schema:
-   *               $ref: '#/components/schemas/CommandResult'
+   *               $ref: '#/components/schemas/WakeupResponse'
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
    *       404:
@@ -760,10 +743,104 @@ export class HostsController {
     }
   }
 
+  /**
+   * @swagger
+   * /api/hosts/{fqn}/sleep:
+   *   post:
+   *     summary: Put a host to sleep via its managing node
+   *     description: Dispatches a remote sleep (suspend) command through the host's managing node.
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Fully qualified name (hostname@location)
+   *         example: PHANTOM-MBP@home-network
+   *       - in: header
+   *         name: Idempotency-Key
+   *         schema:
+   *           type: string
+   *         description: Optional idempotency key to prevent duplicate commands
+   *         example: unique-request-id-123
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/HostPowerRequest'
+   *     responses:
+   *       200:
+   *         description: Sleep command sent successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/HostPowerResponse'
+   *       400:
+   *         $ref: '#/components/responses/BadRequest'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       503:
+   *         $ref: '#/components/responses/ServiceUnavailable'
+   *       504:
+   *         $ref: '#/components/responses/GatewayTimeout'
+   */
   async sleepHost(req: Request, res: Response): Promise<void> {
     await this.dispatchHostPowerAction(req, res, 'sleep');
   }
 
+  /**
+   * @swagger
+   * /api/hosts/{fqn}/shutdown:
+   *   post:
+   *     summary: Shut down a host via its managing node
+   *     description: Dispatches a remote shutdown command through the host's managing node.
+   *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Fully qualified name (hostname@location)
+   *         example: PHANTOM-MBP@home-network
+   *       - in: header
+   *         name: Idempotency-Key
+   *         schema:
+   *           type: string
+   *         description: Optional idempotency key to prevent duplicate commands
+   *         example: unique-request-id-123
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/HostPowerRequest'
+   *     responses:
+   *       200:
+   *         description: Shutdown command sent successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/HostPowerResponse'
+   *       400:
+   *         $ref: '#/components/responses/BadRequest'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       503:
+   *         $ref: '#/components/responses/ServiceUnavailable'
+   *       504:
+   *         $ref: '#/components/responses/GatewayTimeout'
+   */
   async shutdownHost(req: Request, res: Response): Promise<void> {
     await this.dispatchHostPowerAction(req, res, 'shutdown');
   }
@@ -788,6 +865,10 @@ export class HostsController {
    *     responses:
    *       200:
    *         description: Host ping command completed
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/HostPingResponse'
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
    *       404:
@@ -843,6 +924,10 @@ export class HostsController {
    *     responses:
    *       200:
    *         description: Scan command dispatched to one or more connected nodes
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/HostScanDispatchResponse'
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
    *       409:
@@ -897,6 +982,10 @@ export class HostsController {
    *     responses:
    *       200:
    *         description: Port payload shape returned
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/HostPortScanResponse'
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
    *       404:
@@ -990,6 +1079,10 @@ export class HostsController {
    *     responses:
    *       200:
    *         description: Scan dispatched/completed and payload returned
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/HostPortScanResponse'
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
    *       404:
@@ -1701,24 +1794,7 @@ export class HostsController {
    *         content:
    *           application/json:
    *             schema:
-   *               type: object
-   *               required:
-   *                 - mac
-   *                 - vendor
-   *                 - source
-   *               properties:
-   *                 mac:
-   *                   type: string
-   *                   description: MAC address as provided in request
-   *                   example: '80:6D:97:60:39:08'
-   *                 vendor:
-   *                   type: string
-   *                   description: Vendor/manufacturer name (or "Unknown Vendor" if not found)
-   *                   example: 'Apple, Inc.'
-   *                 source:
-   *                   type: string
-   *                   description: Data source (includes "cached" suffix for cached results)
-   *                   example: 'macvendors.com (cached)'
+   *               $ref: '#/components/schemas/MacVendorResponse'
    *       400:
    *         description: Bad request - MAC address missing or invalid format
    *         content:

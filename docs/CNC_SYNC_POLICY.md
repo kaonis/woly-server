@@ -50,8 +50,9 @@ npm run validate:standard
 ### In `woly`
 
 ```bash
-npm ci --legacy-peer-deps
+npm ci
 npm run typecheck
+npm run test:contracts
 npm run test:ci:coverage
 ```
 

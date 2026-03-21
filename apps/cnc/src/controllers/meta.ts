@@ -125,37 +125,7 @@ export class MetaController {
    *         content:
    *           application/json:
    *             schema:
-   *               type: object
-   *               properties:
-   *                 mode:
-   *                   type: string
-   *                   enum: [cnc]
-   *                 versions:
-   *                   type: object
-   *                   properties:
-   *                     cncApi:
-   *                       type: string
-   *                     protocol:
-   *                       type: string
-   *                 capabilities:
-   *                   type: object
-   *                   properties:
-   *                     scan:
-   *                       type: object
-   *                     notesTags:
-   *                       type: object
-   *                     schedules:
-   *                       type: object
-   *                     hostStateStreaming:
-   *                       type: object
-   *                     commandStatusStreaming:
-   *                       type: object
-   *                     wakeVerification:
-   *                       type: object
-   *                     sleep:
-   *                       type: object
-   *                     shutdown:
-   *                       type: object
+   *               $ref: '#/components/schemas/CapabilitiesResponse'
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
    *       403:

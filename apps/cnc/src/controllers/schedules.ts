@@ -75,12 +75,7 @@ export class SchedulesController {
    *         content:
    *           application/json:
    *             schema:
-   *               type: object
-   *               properties:
-   *                 schedules:
-   *                   type: array
-   *                   items:
-   *                     $ref: '#/components/schemas/HostWakeSchedule'
+   *               $ref: '#/components/schemas/HostSchedulesResponse'
    *             examples:
    *               default:
    *                 summary: Example aggregated schedules response
@@ -211,6 +206,10 @@ export class SchedulesController {
    *     responses:
    *       200:
    *         description: Host schedules
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/HostSchedulesResponse'
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
    *       404:
@@ -254,9 +253,19 @@ export class SchedulesController {
    *         required: true
    *         schema:
    *           type: string
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/CreateHostWakeScheduleRequest'
    *     responses:
    *       201:
    *         description: Created schedule
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/HostWakeSchedule'
    *       400:
    *         $ref: '#/components/responses/BadRequest'
    *       401:
@@ -323,9 +332,19 @@ export class SchedulesController {
    *         required: true
    *         schema:
    *           type: string
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/UpdateHostWakeScheduleRequest'
    *     responses:
    *       200:
    *         description: Updated schedule
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/HostWakeSchedule'
    *       400:
    *         $ref: '#/components/responses/BadRequest'
    *       401:
@@ -382,6 +401,10 @@ export class SchedulesController {
    *     responses:
    *       200:
    *         description: Deleted schedule
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/DeleteHostWakeScheduleResponse'
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
    *       404:

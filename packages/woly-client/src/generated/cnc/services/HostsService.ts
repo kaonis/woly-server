@@ -2,12 +2,23 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-import type { CommandResult } from '../models/CommandResult';
+import type { CreateHostWakeScheduleRequest } from '../models/CreateHostWakeScheduleRequest';
+import type { DeleteHostWakeScheduleResponse } from '../models/DeleteHostWakeScheduleResponse';
 import type { Host } from '../models/Host';
-import type { HostStats } from '../models/HostStats';
+import type { HostPingResponse } from '../models/HostPingResponse';
+import type { HostPortScanResponse } from '../models/HostPortScanResponse';
+import type { HostPowerRequest } from '../models/HostPowerRequest';
+import type { HostPowerResponse } from '../models/HostPowerResponse';
+import type { HostScanDispatchResponse } from '../models/HostScanDispatchResponse';
+import type { HostSchedulesResponse } from '../models/HostSchedulesResponse';
+import type { HostsResponse } from '../models/HostsResponse';
 import type { HostStatusHistoryResponse } from '../models/HostStatusHistoryResponse';
 import type { HostUptimeSummary } from '../models/HostUptimeSummary';
 import type { HostWakeSchedule } from '../models/HostWakeSchedule';
+import type { MacVendorResponse } from '../models/MacVendorResponse';
+import type { UpdateHostWakeScheduleRequest } from '../models/UpdateHostWakeScheduleRequest';
+import type { WakeupRequest } from '../models/WakeupRequest';
+import type { WakeupResponse } from '../models/WakeupResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
@@ -16,15 +27,12 @@ export class HostsService {
      * Get all aggregated hosts
      * Retrieve all hosts from all nodes with optional filtering by node ID
      * @param nodeId Optional node ID to filter hosts
-     * @returns any List of hosts with statistics
+     * @returns HostsResponse List of hosts with statistics
      * @throws ApiError
      */
     public static getApiHosts(
         nodeId?: string,
-    ): CancelablePromise<{
-        hosts?: Array<Host>;
-        stats?: HostStats;
-    }> {
+    ): CancelablePromise<HostsResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/hosts',
@@ -208,23 +216,14 @@ export class HostsService {
      * @param fqn Fully qualified name (hostname@location)
      * @param idempotencyKey Optional idempotency key to prevent duplicate commands
      * @param requestBody
-     * @returns CommandResult Wake command sent successfully
+     * @returns WakeupResponse Wake command sent successfully
      * @throws ApiError
      */
     public static postApiHostsWakeup(
         fqn: string,
         idempotencyKey?: string,
-        requestBody?: {
-            /**
-             * Enable asynchronous wake verification for this command
-             */
-            verify?: boolean;
-            /**
-             * Optional WoL UDP destination port override for this wake request
-             */
-            wolPort?: number;
-        },
-    ): CancelablePromise<CommandResult> {
+        requestBody?: WakeupRequest,
+    ): CancelablePromise<WakeupResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/hosts/wakeup/{fqn}',
@@ -245,15 +244,83 @@ export class HostsService {
         });
     }
     /**
+     * Put a host to sleep via its managing node
+     * Dispatches a remote sleep (suspend) command through the host's managing node.
+     * @param fqn Fully qualified name (hostname@location)
+     * @param requestBody
+     * @param idempotencyKey Optional idempotency key to prevent duplicate commands
+     * @returns HostPowerResponse Sleep command sent successfully
+     * @throws ApiError
+     */
+    public static postApiHostsSleep(
+        fqn: string,
+        requestBody: HostPowerRequest,
+        idempotencyKey?: string,
+    ): CancelablePromise<HostPowerResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/hosts/{fqn}/sleep',
+            path: {
+                'fqn': fqn,
+            },
+            headers: {
+                'Idempotency-Key': idempotencyKey,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Invalid request parameters`,
+                401: `Missing or invalid authentication`,
+                404: `Resource not found`,
+                503: `Service unavailable (e.g., node offline)`,
+                504: `Command timeout`,
+            },
+        });
+    }
+    /**
+     * Shut down a host via its managing node
+     * Dispatches a remote shutdown command through the host's managing node.
+     * @param fqn Fully qualified name (hostname@location)
+     * @param requestBody
+     * @param idempotencyKey Optional idempotency key to prevent duplicate commands
+     * @returns HostPowerResponse Shutdown command sent successfully
+     * @throws ApiError
+     */
+    public static postApiHostsShutdown(
+        fqn: string,
+        requestBody: HostPowerRequest,
+        idempotencyKey?: string,
+    ): CancelablePromise<HostPowerResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/hosts/{fqn}/shutdown',
+            path: {
+                'fqn': fqn,
+            },
+            headers: {
+                'Idempotency-Key': idempotencyKey,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Invalid request parameters`,
+                401: `Missing or invalid authentication`,
+                404: `Resource not found`,
+                503: `Service unavailable (e.g., node offline)`,
+                504: `Command timeout`,
+            },
+        });
+    }
+    /**
      * Ping a host via its managing node agent
      * Executes ICMP reachability from the node agent (not from the mobile app) and returns a normalized ping result.
      * @param fqn Fully qualified name (hostname@location)
-     * @returns any Host ping command completed
+     * @returns HostPingResponse Host ping command completed
      * @throws ApiError
      */
     public static getApiHostsPing(
         fqn: string,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<HostPingResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/hosts/ping/{fqn}',
@@ -272,10 +339,10 @@ export class HostsService {
     /**
      * Trigger immediate host discovery scan across connected nodes
      * Dispatches scan commands to connected nodes and returns a normalized command lifecycle payload.
-     * @returns any Scan command dispatched to one or more connected nodes
+     * @returns HostScanDispatchResponse Scan command dispatched to one or more connected nodes
      * @throws ApiError
      */
-    public static postApiHostsScan(): CancelablePromise<any> {
+    public static postApiHostsScan(): CancelablePromise<HostScanDispatchResponse> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/hosts/scan',
@@ -294,12 +361,12 @@ export class HostsService {
      * If a fresh scan is not available, a node-side probe is executed.
      *
      * @param fqn Fully qualified name (hostname@location)
-     * @returns any Port payload shape returned
+     * @returns HostPortScanResponse Port payload shape returned
      * @throws ApiError
      */
     public static getApiHostsPorts(
         fqn: string,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<HostPortScanResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/hosts/ports/{fqn}',
@@ -319,12 +386,12 @@ export class HostsService {
      * a mobile-compatible port payload shape including discovered open TCP ports.
      *
      * @param fqn Fully qualified name (hostname@location)
-     * @returns any Scan dispatched/completed and payload returned
+     * @returns HostPortScanResponse Scan dispatched/completed and payload returned
      * @throws ApiError
      */
     public static getApiHostsScanPorts(
         fqn: string,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<HostPortScanResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/hosts/scan-ports/{fqn}',
@@ -379,25 +446,12 @@ export class HostsService {
      * The external macvendors.com API is rate-limited to one request per second.
      *
      * @param mac MAC address to look up (case-insensitive, accepts colon or hyphen delimiters)
-     * @returns any Vendor information retrieved successfully
+     * @returns MacVendorResponse Vendor information retrieved successfully
      * @throws ApiError
      */
     public static getApiHostsMacVendor(
         mac: string,
-    ): CancelablePromise<{
-        /**
-         * MAC address as provided in request
-         */
-        mac: string;
-        /**
-         * Vendor/manufacturer name (or "Unknown Vendor" if not found)
-         */
-        vendor: string;
-        /**
-         * Data source (includes "cached" suffix for cached results)
-         */
-        source: string;
-    }> {
+    ): CancelablePromise<MacVendorResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/hosts/mac-vendor/{mac}',
@@ -416,15 +470,13 @@ export class HostsService {
      * List wake schedules across all hosts
      * @param enabled Optional filter for enabled/disabled schedules.
      * @param nodeId Optional node id filter.
-     * @returns any Aggregated schedules list
+     * @returns HostSchedulesResponse Aggregated schedules list
      * @throws ApiError
      */
     public static getApiSchedules(
         enabled?: boolean,
         nodeId?: string,
-    ): CancelablePromise<{
-        schedules?: Array<HostWakeSchedule>;
-    }> {
+    ): CancelablePromise<HostSchedulesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/schedules',
@@ -463,12 +515,12 @@ export class HostsService {
     /**
      * List wake schedules for a host
      * @param fqn
-     * @returns any Host schedules
+     * @returns HostSchedulesResponse Host schedules
      * @throws ApiError
      */
     public static getApiHostsSchedules(
         fqn: string,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<HostSchedulesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/hosts/{fqn}/schedules',
@@ -484,18 +536,22 @@ export class HostsService {
     /**
      * Create a wake schedule for a host
      * @param fqn
-     * @returns any Created schedule
+     * @param requestBody
+     * @returns HostWakeSchedule Created schedule
      * @throws ApiError
      */
     public static postApiHostsSchedules(
         fqn: string,
-    ): CancelablePromise<any> {
+        requestBody: CreateHostWakeScheduleRequest,
+    ): CancelablePromise<HostWakeSchedule> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/hosts/{fqn}/schedules',
             path: {
                 'fqn': fqn,
             },
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 400: `Invalid request parameters`,
                 401: `Missing or invalid authentication`,
@@ -506,18 +562,22 @@ export class HostsService {
     /**
      * Update wake schedule by id
      * @param id
-     * @returns any Updated schedule
+     * @param requestBody
+     * @returns HostWakeSchedule Updated schedule
      * @throws ApiError
      */
     public static putApiHostsSchedules(
         id: string,
-    ): CancelablePromise<any> {
+        requestBody: UpdateHostWakeScheduleRequest,
+    ): CancelablePromise<HostWakeSchedule> {
         return __request(OpenAPI, {
             method: 'PUT',
             url: '/api/hosts/schedules/{id}',
             path: {
                 'id': id,
             },
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 400: `Invalid request parameters`,
                 401: `Missing or invalid authentication`,
@@ -528,12 +588,12 @@ export class HostsService {
     /**
      * Delete wake schedule by id
      * @param id
-     * @returns any Deleted schedule
+     * @returns DeleteHostWakeScheduleResponse Deleted schedule
      * @throws ApiError
      */
     public static deleteApiHostsSchedules(
         id: string,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<DeleteHostWakeScheduleResponse> {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/api/hosts/schedules/{id}',
