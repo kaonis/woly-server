@@ -2,19 +2,24 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { CapabilityDescriptor } from './CapabilityDescriptor';
+import type { RateLimits } from './RateLimits';
 export type CapabilitiesResponse = {
     mode: 'cnc';
     versions: {
         cncApi: string;
         protocol: string;
     };
-    /**
-     * Capability descriptors keyed by feature name
-     */
-    capabilities: Record<string, any>;
-    /**
-     * Optional CNC rate limit descriptors
-     */
-    rateLimits?: Record<string, any>;
+    capabilities: {
+        scan: CapabilityDescriptor;
+        notesTags: CapabilityDescriptor;
+        schedules: CapabilityDescriptor;
+        hostStateStreaming: CapabilityDescriptor;
+        commandStatusStreaming: CapabilityDescriptor;
+        wakeVerification: CapabilityDescriptor;
+        sleep: CapabilityDescriptor;
+        shutdown: CapabilityDescriptor;
+    };
+    rateLimits?: RateLimits;
 };
 

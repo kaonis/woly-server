@@ -20,7 +20,7 @@ DATABASE_URL=./db/woly-cnc.db
 
 ```bash
 # Install dependencies
-npm install --legacy-peer-deps
+npm install
 
 # Initialize SQLite database
 npm run init-db
@@ -95,17 +95,20 @@ Both database implementations have been tested with:
 To switch from SQLite to PostgreSQL:
 
 1. Export data from SQLite:
+
    ```bash
    sqlite3 ./db/woly-cnc.db .dump > backup.sql
    ```
 
 2. Update `.env`:
+
    ```env
    DB_TYPE=postgres
    DATABASE_URL=postgresql://user:pass@host:5432/db
    ```
 
 3. Run init-db:
+
    ```bash
    npm run init-db
    ```

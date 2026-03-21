@@ -25,12 +25,7 @@ export class NodesController {
    *         content:
    *           application/json:
    *             schema:
-   *               type: object
-   *               properties:
-   *                 nodes:
-   *                   type: array
-   *                   items:
-   *                     $ref: '#/components/schemas/Node'
+   *               $ref: '#/components/schemas/NodesResponse'
    *       401:
    *         $ref: '#/components/responses/Unauthorized'
    *       403:

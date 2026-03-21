@@ -2,6 +2,12 @@ name: CNC Mobile Contract Gate
 
 on:
   workflow_dispatch:
+    inputs:
+      woly_ref:
+        description: Optional kaonis/woly ref to validate (branch, tag, or SHA)
+        required: false
+        default: master
+        type: string
 
 concurrency:
   group: cnc-mobile-contract-${{ github.workflow }}-${{ github.ref }}
@@ -9,15 +15,22 @@ concurrency:
 
 jobs:
   contract-gate:
-    name: Route/Protocol Contract Gate
+    name: Real Consumer Contract Gate
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 15
     permissions:
       contents: read
 
     steps:
-      - name: Checkout
+      - name: Checkout woly-server
         uses: actions/checkout@v6
+
+      - name: Checkout woly
+        uses: actions/checkout@v6
+        with:
+          repository: kaonis/woly
+          ref: ${{ inputs.woly_ref }}
+          path: woly
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -34,9 +47,15 @@ jobs:
       - name: Run protocol schema tests
         run: npm run test -w packages/protocol -- schemas.test
 
+      - name: Run generated client consumer typecheck
+        run: npm run client:consumer-typecheck
+
       - name: Run CNC mobile compatibility contract tests
         run: |
           npm run test -w apps/cnc -- src/routes/__tests__/hostRoutes.test.ts src/routes/__tests__/mobileCompatibility.smoke.test.ts src/routes/__tests__/metaRoutes.test.ts
 
       - name: Run CNC typecheck
         run: npm run typecheck -w apps/cnc
+
+      - name: Validate real woly consumer against local tarballs
+        run: npm run validate:woly-consumer -- --woly-path "$GITHUB_WORKSPACE/woly"

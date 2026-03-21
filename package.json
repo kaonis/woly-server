@@ -54,6 +54,7 @@
     "client:version:minor": "npm version minor --workspace=@kaonis/woly-client",
     "client:version:major": "npm version major --workspace=@kaonis/woly-client",
     "client:consumer-typecheck": "npm run test:consumer-typecheck --workspace=@kaonis/woly-client",
+    "validate:woly-consumer": "node scripts/validate-woly-consumer.cjs",
     "protocol:build": "npm run build --workspace=@kaonis/woly-protocol",
     "protocol:publish": "npm run protocol:build && npm publish --workspace=@kaonis/woly-protocol",
     "protocol:publish:next": "npm run protocol:build && npm publish --workspace=@kaonis/woly-protocol --tag next",

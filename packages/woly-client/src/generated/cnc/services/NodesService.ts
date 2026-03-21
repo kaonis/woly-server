@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { Node } from '../models/Node';
+import type { NodesResponse } from '../models/NodesResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
@@ -10,12 +11,10 @@ export class NodesService {
     /**
      * List all nodes
      * Retrieve a list of all registered nodes with connection status
-     * @returns any List of nodes
+     * @returns NodesResponse List of nodes
      * @throws ApiError
      */
-    public static getApiNodes(): CancelablePromise<{
-        nodes?: Array<Node>;
-    }> {
+    public static getApiNodes(): CancelablePromise<NodesResponse> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/nodes',

@@ -6,14 +6,18 @@ export type HostStats = {
     /**
      * Total number of hosts
      */
-    total?: number;
+    total: number;
     /**
      * Number of hosts currently awake
      */
-    awake?: number;
+    awake: number;
     /**
      * Number of hosts currently asleep
      */
-    asleep?: number;
+    asleep: number;
+    byLocation?: Record<string, {
+        total: number;
+        awake: number;
+    }>;
 };
 

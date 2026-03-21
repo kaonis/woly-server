@@ -24,6 +24,9 @@ npm run build -w packages/woly-client
 ```ts
 import { CncApi, NodeAgentApi } from '@kaonis/woly-client';
 
-const cnc = new CncApi.DefaultService();
-const agent = new NodeAgentApi.DefaultService();
+CncApi.OpenAPI.BASE = 'http://localhost:8080';
+NodeAgentApi.OpenAPI.BASE = 'http://localhost:8082';
+
+const capabilities = await CncApi.MetaService.getApiCapabilities();
+const health = await NodeAgentApi.HealthService.getHealth();
 ```

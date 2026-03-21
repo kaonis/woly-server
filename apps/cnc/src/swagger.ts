@@ -76,6 +76,41 @@ const options: swaggerJsdoc.Options = {
         },
       },
       schemas: {
+        NodeNetworkInfo: {
+          type: 'object',
+          properties: {
+            subnet: {
+              type: 'string',
+              example: '192.168.1.0/24',
+            },
+            gateway: {
+              type: 'string',
+              example: '192.168.1.1',
+            },
+          },
+          required: ['subnet', 'gateway'],
+        },
+        NodeMetadata: {
+          type: 'object',
+          properties: {
+            version: {
+              type: 'string',
+              example: '1.2.0',
+            },
+            platform: {
+              type: 'string',
+              example: 'darwin',
+            },
+            protocolVersion: {
+              type: 'string',
+              example: '1.6.0',
+            },
+            networkInfo: {
+              $ref: '#/components/schemas/NodeNetworkInfo',
+            },
+          },
+          required: ['version', 'platform', 'protocolVersion', 'networkInfo'],
+        },
         Node: {
           type: 'object',
           properties: {
@@ -84,10 +119,21 @@ const options: swaggerJsdoc.Options = {
               description: 'Unique node identifier',
               example: 'home-network',
             },
+            name: {
+              type: 'string',
+              description: 'Human-readable node name',
+              example: 'Home Node',
+            },
             location: {
               type: 'string',
               description: 'Physical or logical location of the node',
               example: 'Home Office',
+            },
+            publicUrl: {
+              type: 'string',
+              nullable: true,
+              description: 'Optional public URL exposed by the node for diagnostics',
+              example: 'https://home-node.example.com',
             },
             status: {
               type: 'string',
@@ -101,11 +147,28 @@ const options: swaggerJsdoc.Options = {
               description: 'Timestamp of last heartbeat received',
               example: '2026-02-09T13:00:00.000Z',
             },
+            capabilities: {
+              type: 'array',
+              description: 'Capabilities advertised by the node agent',
+              items: {
+                type: 'string',
+              },
+              example: ['wake', 'scan', 'telemetry'],
+            },
+            metadata: {
+              $ref: '#/components/schemas/NodeMetadata',
+            },
             createdAt: {
               type: 'string',
               format: 'date-time',
               description: 'Node registration timestamp',
               example: '2026-02-09T12:00:00.000Z',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Timestamp of the most recent node update',
+              example: '2026-02-09T13:00:00.000Z',
             },
             connected: {
               type: 'boolean',
@@ -113,6 +176,99 @@ const options: swaggerJsdoc.Options = {
               example: true,
             },
           },
+          required: [
+            'id',
+            'name',
+            'location',
+            'status',
+            'lastHeartbeat',
+            'capabilities',
+            'metadata',
+            'createdAt',
+            'updatedAt',
+            'connected',
+          ],
+        },
+        HostPort: {
+          type: 'object',
+          properties: {
+            port: {
+              type: 'integer',
+              example: 22,
+            },
+            protocol: {
+              type: 'string',
+              enum: ['tcp'],
+              example: 'tcp',
+            },
+            service: {
+              type: 'string',
+              example: 'SSH',
+            },
+          },
+          required: ['port', 'protocol', 'service'],
+        },
+        HostPowerControlCommandOverrides: {
+          type: 'object',
+          properties: {
+            sleep: {
+              type: 'string',
+              example: 'systemctl suspend',
+            },
+            shutdown: {
+              type: 'string',
+              example: 'shutdown -h now',
+            },
+          },
+        },
+        HostPowerControlSshConfig: {
+          type: 'object',
+          properties: {
+            username: {
+              type: 'string',
+              example: 'phantom',
+            },
+            port: {
+              type: 'integer',
+              example: 22,
+            },
+            privateKeyPath: {
+              type: 'string',
+              example: '/Users/phantom/.ssh/id_ed25519',
+            },
+            strictHostKeyChecking: {
+              type: 'string',
+              enum: ['enforce', 'accept-new', 'off'],
+              example: 'accept-new',
+            },
+          },
+          required: ['username'],
+        },
+        HostPowerControlConfig: {
+          type: 'object',
+          properties: {
+            enabled: {
+              type: 'boolean',
+              example: true,
+            },
+            transport: {
+              type: 'string',
+              enum: ['ssh'],
+              example: 'ssh',
+            },
+            platform: {
+              type: 'string',
+              enum: ['linux', 'macos', 'windows'],
+              example: 'linux',
+            },
+            ssh: {
+              $ref: '#/components/schemas/HostPowerControlSshConfig',
+            },
+            commands: {
+              $ref: '#/components/schemas/HostPowerControlCommandOverrides',
+            },
+          },
+          required: ['enabled', 'transport', 'platform', 'ssh'],
         },
         Host: {
           type: 'object',
@@ -188,26 +344,20 @@ const options: swaggerJsdoc.Options = {
               },
               example: ['prod', 'database'],
             },
+            powerControl: {
+              allOf: [
+                {
+                  $ref: '#/components/schemas/HostPowerControlConfig',
+                },
+              ],
+              nullable: true,
+              description: 'Optional remote power-control configuration for sleep/shutdown operations',
+            },
             openPorts: {
               type: 'array',
               description: 'Cached open TCP ports from the most recent per-host scan (when still fresh)',
               items: {
-                type: 'object',
-                properties: {
-                  port: {
-                    type: 'integer',
-                    example: 22,
-                  },
-                  protocol: {
-                    type: 'string',
-                    enum: ['tcp'],
-                    example: 'tcp',
-                  },
-                  service: {
-                    type: 'string',
-                    example: 'SSH',
-                  },
-                },
+                $ref: '#/components/schemas/HostPort',
               },
             },
             portsScannedAt: {
@@ -234,12 +384,50 @@ const options: swaggerJsdoc.Options = {
               description: 'Location inherited from managing node',
               example: 'Home Office',
             },
-            fqn: {
+            fullyQualifiedName: {
               type: 'string',
               description: 'Fully qualified name (hostname@location)',
               example: 'PHANTOM-MBP@home-network',
             },
           },
+          required: [
+            'name',
+            'mac',
+            'ip',
+            'status',
+            'lastSeen',
+            'discovered',
+            'nodeId',
+            'location',
+            'fullyQualifiedName',
+          ],
+        },
+        NodesResponse: {
+          type: 'object',
+          properties: {
+            nodes: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/Node',
+              },
+            },
+          },
+          required: ['nodes'],
+        },
+        HostsResponse: {
+          type: 'object',
+          properties: {
+            hosts: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/Host',
+              },
+            },
+            stats: {
+              $ref: '#/components/schemas/HostStats',
+            },
+          },
+          required: ['hosts', 'stats'],
         },
         HealthCheck: {
           type: 'object',
@@ -316,7 +504,31 @@ const options: swaggerJsdoc.Options = {
               description: 'Number of hosts currently asleep',
               example: 27,
             },
+            byLocation: {
+              type: 'object',
+              additionalProperties: {
+                type: 'object',
+                properties: {
+                  total: {
+                    type: 'integer',
+                    example: 12,
+                  },
+                  awake: {
+                    type: 'integer',
+                    example: 5,
+                  },
+                },
+                required: ['total', 'awake'],
+              },
+              example: {
+                'Home Office': {
+                  total: 12,
+                  awake: 5,
+                },
+              },
+            },
           },
+          required: ['total', 'awake', 'asleep'],
         },
         HostStatusHistoryEntry: {
           type: 'object',
@@ -582,6 +794,104 @@ const options: swaggerJsdoc.Options = {
           },
           required: ['success', 'id'],
         },
+        CapabilityDescriptor: {
+          type: 'object',
+          properties: {
+            supported: {
+              type: 'boolean',
+              example: true,
+            },
+            routes: {
+              type: 'array',
+              items: {
+                type: 'string',
+              },
+              example: ['/api/hosts/scan'],
+            },
+            persistence: {
+              type: 'string',
+              enum: ['backend', 'local', 'none'],
+              example: 'backend',
+            },
+            transport: {
+              type: 'string',
+              enum: ['websocket', 'sse'],
+              nullable: true,
+              example: 'websocket',
+            },
+            note: {
+              type: 'string',
+              example: 'Capability available in CNC mode.',
+            },
+          },
+          required: ['supported'],
+        },
+        RateLimitDescriptor: {
+          type: 'object',
+          properties: {
+            maxCalls: {
+              type: 'integer',
+              example: 60,
+            },
+            windowMs: {
+              type: 'integer',
+              nullable: true,
+              example: 60000,
+            },
+            scope: {
+              type: 'string',
+              enum: ['ip', 'connection', 'global'],
+              example: 'ip',
+            },
+            appliesTo: {
+              type: 'array',
+              items: {
+                type: 'string',
+              },
+              example: ['/api/auth/token'],
+            },
+            note: {
+              type: 'string',
+              example: 'Shared limiter for authenticated mobile API calls.',
+            },
+          },
+          required: ['maxCalls', 'windowMs', 'scope'],
+        },
+        RateLimits: {
+          type: 'object',
+          properties: {
+            strictAuth: {
+              $ref: '#/components/schemas/RateLimitDescriptor',
+            },
+            auth: {
+              $ref: '#/components/schemas/RateLimitDescriptor',
+            },
+            api: {
+              $ref: '#/components/schemas/RateLimitDescriptor',
+            },
+            scheduleSync: {
+              $ref: '#/components/schemas/RateLimitDescriptor',
+            },
+            wsInboundMessages: {
+              $ref: '#/components/schemas/RateLimitDescriptor',
+            },
+            wsConnectionsPerIp: {
+              $ref: '#/components/schemas/RateLimitDescriptor',
+            },
+            macVendorLookup: {
+              $ref: '#/components/schemas/RateLimitDescriptor',
+            },
+          },
+          required: [
+            'strictAuth',
+            'auth',
+            'api',
+            'scheduleSync',
+            'wsInboundMessages',
+            'wsConnectionsPerIp',
+            'macVendorLookup',
+          ],
+        },
         CapabilitiesResponse: {
           type: 'object',
           properties: {
@@ -606,13 +916,45 @@ const options: swaggerJsdoc.Options = {
             },
             capabilities: {
               type: 'object',
-              additionalProperties: true,
-              description: 'Capability descriptors keyed by feature name',
+              properties: {
+                scan: {
+                  $ref: '#/components/schemas/CapabilityDescriptor',
+                },
+                notesTags: {
+                  $ref: '#/components/schemas/CapabilityDescriptor',
+                },
+                schedules: {
+                  $ref: '#/components/schemas/CapabilityDescriptor',
+                },
+                hostStateStreaming: {
+                  $ref: '#/components/schemas/CapabilityDescriptor',
+                },
+                commandStatusStreaming: {
+                  $ref: '#/components/schemas/CapabilityDescriptor',
+                },
+                wakeVerification: {
+                  $ref: '#/components/schemas/CapabilityDescriptor',
+                },
+                sleep: {
+                  $ref: '#/components/schemas/CapabilityDescriptor',
+                },
+                shutdown: {
+                  $ref: '#/components/schemas/CapabilityDescriptor',
+                },
+              },
+              required: [
+                'scan',
+                'notesTags',
+                'schedules',
+                'hostStateStreaming',
+                'commandStatusStreaming',
+                'wakeVerification',
+                'sleep',
+                'shutdown',
+              ],
             },
             rateLimits: {
-              type: 'object',
-              additionalProperties: true,
-              description: 'Optional CNC rate limit descriptors',
+              $ref: '#/components/schemas/RateLimits',
             },
           },
           required: ['mode', 'versions', 'capabilities'],
@@ -706,6 +1048,375 @@ const options: swaggerJsdoc.Options = {
               example: '2026-02-18T00:00:00.000Z',
             },
           },
+          required: [
+            'id',
+            'hostFqn',
+            'hostName',
+            'hostMac',
+            'scheduledTime',
+            'frequency',
+            'enabled',
+            'notifyOnWake',
+            'timezone',
+            'createdAt',
+            'updatedAt',
+          ],
+        },
+        HostSchedulesResponse: {
+          type: 'object',
+          properties: {
+            schedules: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/HostWakeSchedule',
+              },
+            },
+          },
+          required: ['schedules'],
+        },
+        CreateHostWakeScheduleRequest: {
+          type: 'object',
+          properties: {
+            scheduledTime: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-20T10:00:00.000Z',
+            },
+            frequency: {
+              type: 'string',
+              enum: ['once', 'daily', 'weekly', 'weekdays', 'weekends'],
+              example: 'daily',
+            },
+            enabled: {
+              type: 'boolean',
+              example: true,
+            },
+            notifyOnWake: {
+              type: 'boolean',
+              example: true,
+            },
+            timezone: {
+              type: 'string',
+              example: 'UTC',
+            },
+          },
+          required: ['scheduledTime', 'frequency'],
+        },
+        UpdateHostWakeScheduleRequest: {
+          type: 'object',
+          properties: {
+            scheduledTime: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-20T10:00:00.000Z',
+            },
+            frequency: {
+              type: 'string',
+              enum: ['once', 'daily', 'weekly', 'weekdays', 'weekends'],
+              example: 'daily',
+            },
+            enabled: {
+              type: 'boolean',
+              example: true,
+            },
+            notifyOnWake: {
+              type: 'boolean',
+              example: true,
+            },
+            timezone: {
+              type: 'string',
+              example: 'UTC',
+            },
+          },
+        },
+        DeleteHostWakeScheduleResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean',
+              example: true,
+            },
+            id: {
+              type: 'string',
+              example: 'schedule-1',
+            },
+          },
+          required: ['success', 'id'],
+        },
+        WakeupRequest: {
+          type: 'object',
+          properties: {
+            verify: {
+              type: 'boolean',
+              description: 'Enable asynchronous wake verification for this command',
+            },
+            wolPort: {
+              type: 'integer',
+              minimum: 1,
+              maximum: 65535,
+              description: 'Optional WoL UDP destination port override for this wake request',
+              example: 7,
+            },
+          },
+        },
+        WakeVerificationPending: {
+          type: 'object',
+          properties: {
+            status: {
+              type: 'string',
+              enum: ['pending'],
+              example: 'pending',
+            },
+            startedAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-18T20:00:00.000Z',
+            },
+          },
+          required: ['status', 'startedAt'],
+        },
+        WakeupResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean',
+              example: true,
+            },
+            message: {
+              type: 'string',
+              example: 'Wake-on-LAN packet sent successfully',
+            },
+            nodeId: {
+              type: 'string',
+              example: 'home-network',
+            },
+            location: {
+              type: 'string',
+              example: 'Home Office',
+            },
+            commandId: {
+              type: 'string',
+              example: '123e4567-e89b-12d3-a456-426614174000',
+            },
+            state: {
+              type: 'string',
+              enum: ['queued', 'sent', 'acknowledged', 'failed', 'timed_out'],
+              example: 'acknowledged',
+            },
+            correlationId: {
+              type: 'string',
+              example: 'corr_2a8f6842-6f8f-4e8f-b6dc-f7dbd9a18e68',
+            },
+            wakeVerification: {
+              $ref: '#/components/schemas/WakeVerificationPending',
+            },
+          },
+          required: ['success', 'message', 'nodeId', 'location'],
+        },
+        HostPowerRequest: {
+          type: 'object',
+          properties: {
+            confirm: {
+              type: 'string',
+              enum: ['sleep', 'shutdown'],
+              example: 'sleep',
+            },
+          },
+          required: ['confirm'],
+        },
+        HostPowerResponse: {
+          type: 'object',
+          properties: {
+            success: {
+              type: 'boolean',
+              example: true,
+            },
+            action: {
+              type: 'string',
+              enum: ['sleep', 'shutdown'],
+              example: 'sleep',
+            },
+            message: {
+              type: 'string',
+              example: 'Sleep command sent successfully',
+            },
+            nodeId: {
+              type: 'string',
+              example: 'home-network',
+            },
+            location: {
+              type: 'string',
+              example: 'Home Office',
+            },
+            commandId: {
+              type: 'string',
+              example: '123e4567-e89b-12d3-a456-426614174000',
+            },
+            state: {
+              type: 'string',
+              enum: ['queued', 'sent', 'acknowledged', 'failed', 'timed_out'],
+              example: 'acknowledged',
+            },
+            correlationId: {
+              type: 'string',
+              example: 'corr_2a8f6842-6f8f-4e8f-b6dc-f7dbd9a18e68',
+            },
+          },
+          required: ['success', 'action', 'message', 'nodeId', 'location'],
+        },
+        HostPingResponse: {
+          type: 'object',
+          properties: {
+            target: {
+              type: 'string',
+              example: 'PHANTOM-MBP@home-network',
+            },
+            checkedAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-20T10:00:00.000Z',
+            },
+            latencyMs: {
+              type: 'number',
+              example: 24,
+            },
+            success: {
+              type: 'boolean',
+              example: true,
+            },
+            status: {
+              type: 'string',
+              enum: ['awake', 'asleep', 'unknown'],
+              example: 'awake',
+            },
+            source: {
+              type: 'string',
+              enum: ['node-agent'],
+              example: 'node-agent',
+            },
+            correlationId: {
+              type: 'string',
+              example: 'corr_2a8f6842-6f8f-4e8f-b6dc-f7dbd9a18e68',
+            },
+          },
+          required: ['target', 'checkedAt', 'latencyMs', 'success', 'status', 'source'],
+        },
+        HostScanDispatchResponse: {
+          type: 'object',
+          properties: {
+            state: {
+              type: 'string',
+              enum: ['queued', 'sent', 'acknowledged', 'failed', 'timed_out'],
+              example: 'queued',
+            },
+            commandId: {
+              type: 'string',
+              example: 'scan-123',
+            },
+            queuedAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-20T10:00:00.000Z',
+            },
+            startedAt: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              example: '2026-02-20T10:00:01.000Z',
+            },
+            completedAt: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              example: '2026-02-20T10:00:05.000Z',
+            },
+            lastScanAt: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              example: '2026-02-20T10:00:05.000Z',
+            },
+            message: {
+              type: 'string',
+              example: 'Host scan queued for connected nodes.',
+            },
+            error: {
+              type: 'string',
+              nullable: true,
+              example: null,
+            },
+          },
+          required: ['state', 'queuedAt'],
+        },
+        HostPortScanResponse: {
+          type: 'object',
+          properties: {
+            target: {
+              type: 'string',
+              example: 'PHANTOM-MBP@home-network',
+            },
+            scannedAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2026-02-20T10:05:00.000Z',
+            },
+            openPorts: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/HostPort',
+              },
+            },
+            scan: {
+              type: 'object',
+              properties: {
+                commandId: {
+                  type: 'string',
+                  example: 'scan-123',
+                },
+                state: {
+                  type: 'string',
+                  enum: ['queued', 'sent', 'acknowledged', 'failed', 'timed_out'],
+                  example: 'acknowledged',
+                },
+                nodeId: {
+                  type: 'string',
+                  example: 'home-network',
+                },
+                message: {
+                  type: 'string',
+                  example: 'Port scan completed; found 2 open TCP port(s).',
+                },
+              },
+            },
+            message: {
+              type: 'string',
+              example: 'Port scan completed; found 2 open TCP port(s).',
+            },
+            correlationId: {
+              type: 'string',
+              example: 'corr_2a8f6842-6f8f-4e8f-b6dc-f7dbd9a18e68',
+            },
+          },
+          required: ['target', 'scannedAt', 'openPorts'],
+        },
+        MacVendorResponse: {
+          type: 'object',
+          properties: {
+            mac: {
+              type: 'string',
+              example: 'AA:BB:CC:DD:EE:FF',
+            },
+            vendor: {
+              type: 'string',
+              nullable: true,
+              example: 'Acme Networks',
+            },
+            source: {
+              type: 'string',
+              example: 'macvendors.com (cached)',
+            },
+          },
+          required: ['mac', 'vendor', 'source'],
         },
         SystemStats: {
           type: 'object',

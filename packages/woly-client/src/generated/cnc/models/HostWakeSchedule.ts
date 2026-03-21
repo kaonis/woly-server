@@ -3,18 +3,18 @@
 /* tslint:disable */
 /* eslint-disable */
 export type HostWakeSchedule = {
-    id?: string;
-    hostFqn?: string;
-    hostName?: string;
-    hostMac?: string;
-    scheduledTime?: string;
-    frequency?: 'once' | 'daily' | 'weekly' | 'weekdays' | 'weekends';
-    enabled?: boolean;
-    notifyOnWake?: boolean;
-    timezone?: string;
+    id: string;
+    hostFqn: string;
+    hostName: string;
+    hostMac: string;
+    scheduledTime: string;
+    frequency: 'once' | 'daily' | 'weekly' | 'weekdays' | 'weekends';
+    enabled: boolean;
+    notifyOnWake: boolean;
+    timezone: string;
     lastTriggered?: string | null;
     nextTrigger?: string | null;
-    createdAt?: string;
-    updatedAt?: string;
+    createdAt: string;
+    updatedAt: string;
 };
 

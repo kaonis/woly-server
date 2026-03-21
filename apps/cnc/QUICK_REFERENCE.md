@@ -1,9 +1,10 @@
 # WoLy C&C Backend - Quick Reference
 
 ## 🚀 Quick Start
+
 ```bash
 # Development
-npm install --legacy-peer-deps
+npm install
 npm run dev
 
 # Production
@@ -13,6 +14,7 @@ docker-compose up -d
 ## 📡 Endpoints
 
 ### REST API
+
 ```bash
 GET    /health                      # Health check
 GET    /api/nodes                   # List all nodes
@@ -23,11 +25,13 @@ DELETE /api/admin/nodes/:id         # Delete node
 ```
 
 ### WebSocket
+
 ```
 ws://localhost:8080/ws/node?token=<auth-token>
 ```
 
 ## 🔑 Environment Variables
+
 ```env
 PORT=8080
 TRUST_PROXY=false
@@ -41,6 +45,7 @@ LOG_LEVEL=info
 ## 📨 WebSocket Messages
 
 ### Node → C&C
+
 ```javascript
 // Register
 { type: 'register', data: { nodeId, name, location, authToken, metadata } }
@@ -50,6 +55,7 @@ LOG_LEVEL=info
 ```
 
 ### C&C → Node
+
 ```javascript
 // Registration confirmed
 { type: 'registered', data: { nodeId, status, heartbeatInterval } }
@@ -59,6 +65,7 @@ LOG_LEVEL=info
 ```
 
 ## 🧪 Testing
+
 ```bash
 npm test           # Watch mode
 npm run test:ci    # Single run
@@ -66,6 +73,7 @@ npm run test:coverage
 ```
 
 ## 📊 Database
+
 ```sql
 -- Check nodes
 SELECT id, name, location, status, last_heartbeat FROM nodes;
@@ -75,6 +83,7 @@ SELECT node_id, name, ip, status FROM aggregated_hosts;
 ```
 
 ## 🐳 Docker
+
 ```bash
 docker-compose up -d              # Start all services
 docker-compose logs -f cnc-backend # View logs
@@ -83,6 +92,7 @@ docker-compose ps                 # Check status
 ```
 
 ## 🔧 Scripts
+
 ```bash
 npm run dev          # Development with hot reload
 npm run build        # Compile TypeScript
@@ -93,6 +103,7 @@ npm run format       # Format with Prettier
 ```
 
 ## 🏗️ Architecture
+
 ```
 Mobile App → C&C Backend (this) → Node Agents → LANs
              ├─ Node Manager
@@ -102,6 +113,7 @@ Mobile App → C&C Backend (this) → Node Agents → LANs
 ```
 
 ## 📝 Key Files
+
 ```
 src/server.ts           # Main server
 src/services/nodeManager.ts  # Node lifecycle
@@ -124,6 +136,7 @@ src/types.ts            # Type definitions
 → Change `PORT` in `.env` or stop conflicting service
 
 ## 🔗 Documentation
+
 - `README.md` - Full documentation
 - `SETUP_GUIDE.md` - Testing guide
 - `PHASE1_SUMMARY.md` - Implementation details
