@@ -35,5 +35,5 @@ The suite starts temporary C&C and node-agent processes with isolated SQLite fil
 Use the dedicated manual workflow in budget mode:
 
 ```bash
-gh workflow run cross-service-e2e-smoke.yml --ref master
+gh workflow run cross-service-e2e-smoke.yml --ref main
 ```

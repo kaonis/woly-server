@@ -83,11 +83,11 @@ npm run build -w packages/protocol
 
 ## Contribution Workflow (Worktree-First)
 
-Before editing files or creating an implementation branch, start from a fresh worktree based on `origin/master`:
+Before editing files or creating an implementation branch, start from a fresh worktree based on `origin/main`:
 
 ```bash
 git fetch origin
-git worktree add ../woly-server-<topic> -b codex/<issue>-<topic> origin/master
+git worktree add ../woly-server-<topic> -b codex/<issue>-<topic> origin/main
 cd ../woly-server-<topic>
 ```
 
@@ -97,8 +97,8 @@ For Codex-created branches, keep the `codex/` prefix; for manually created contr
 Before merge, run a required review pass for every change (peer review preferred; self-review required at minimum):
 
 ```bash
-git diff --stat origin/master...HEAD
-git diff origin/master...HEAD
+git diff --stat origin/main...HEAD
+git diff origin/main...HEAD
 gh pr view --comments
 ```
 
@@ -189,7 +189,7 @@ Policy docs:
 
 - [docs/CNC_SYNC_POLICY.md](docs/CNC_SYNC_POLICY.md)
 - [docs/ROADMAP_CNC_SYNC_V1.md](docs/ROADMAP_CNC_SYNC_V1.md)
-- [woly/docs/CNC_SYNC_POLICY.md](https://github.com/kaonis/woly/blob/master/docs/CNC_SYNC_POLICY.md)
+- [woly/docs/CNC_SYNC_POLICY.md](https://github.com/kaonis/woly/blob/main/docs/CNC_SYNC_POLICY.md)
 
 Each CNC feature PR must link protocol/backend/frontend issues and include local validation evidence.
 
@@ -308,7 +308,7 @@ Dependency update review cadence and decision rules are documented in:
 - [docs/DEPENDENCY_TRIAGE_WORKFLOW.md](docs/DEPENDENCY_TRIAGE_WORKFLOW.md)
 - [docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md](docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md)
 
-**Note:** Branch protection requirements should match the current CI mode (manual-only vs automatic). Use `npm run ci:branch-protection:check` to verify `master` requires the CNC policy status check.
+**Note:** Branch protection requirements should match the current CI mode (manual-only vs automatic). Use `npm run ci:branch-protection:check` to verify `main` requires the CNC policy status check.
 
 ## Tech Stack
 

@@ -34,7 +34,7 @@ test('buildSummary counts allowlisted and unexpected non-manual runs separately'
       event: 'workflow_dispatch',
       workflowName: 'CI',
       createdAt: '2026-02-16T18:00:00Z',
-      headBranch: 'master',
+      headBranch: 'main',
       conclusion: 'success',
     },
     {
@@ -50,7 +50,7 @@ test('buildSummary counts allowlisted and unexpected non-manual runs separately'
       event: 'schedule',
       workflowName: 'Dependency Health',
       createdAt: '2026-02-16T18:01:30Z',
-      headBranch: 'master',
+      headBranch: 'main',
       conclusion: 'success',
     },
     {

@@ -4,7 +4,7 @@ This playbook defines the Phase 6 rollout and rollback process for node-agent re
 
 ## Preconditions
 
-- PR merged to `master` with green CI and CodeQL.
+- PR merged to `main` with green CI and CodeQL.
 - Compatibility entry updated for node-agent + C&C protocol versions.
 - On-call owner assigned for rollout window.
 
@@ -50,6 +50,7 @@ Rollback immediately if any occur:
 ## Post-Rollout Notes
 
 Record:
+
 - rollout start/end timestamps,
 - canary cohort,
 - observed telemetry deltas,

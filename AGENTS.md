@@ -4,13 +4,13 @@ These rules define how CNC features are shipped without frontend/backend drift.
 
 ## Worktree-First Workflow (Required)
 
-Before any file modifications or branch work, create a new worktree from `origin/master`.
+Before any file modifications or branch work, create a new worktree from `origin/main`.
 
 Required baseline flow:
 
 ```bash
 git fetch origin
-git worktree add ../woly-server-<topic> -b codex/<issue>-<topic> origin/master
+git worktree add ../woly-server-<topic> -b codex/<issue>-<topic> origin/main
 cd ../woly-server-<topic>
 ```
 
@@ -27,17 +27,17 @@ Rules:
 
 Use this full lifecycle for every change:
 
-1. Create a fresh worktree from `origin/master`:
+1. Create a fresh worktree from `origin/main`:
    ```bash
    git fetch origin
-   git worktree add ../woly-server-<topic> -b codex/<issue>-<topic> origin/master
+   git worktree add ../woly-server-<topic> -b codex/<issue>-<topic> origin/main
    cd ../woly-server-<topic>
    ```
 2. Implement and validate in that worktree only.
 3. Complete the required review pass on the final diff:
    ```bash
-   git diff --stat origin/master...HEAD
-   git diff origin/master...HEAD
+   git diff --stat origin/main...HEAD
+   git diff origin/main...HEAD
    gh pr view --comments
    ```
 4. Push branch and open/update PR from that same worktree.

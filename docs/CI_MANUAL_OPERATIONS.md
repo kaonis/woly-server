@@ -39,22 +39,22 @@ Use either GitHub UI (`Actions` tab) or GitHub CLI:
 
 ```bash
 # Main CI workflow
-gh workflow run ci.yml --ref master
+gh workflow run ci.yml --ref main
 
 # ESLint 10 compatibility watchdog
-gh workflow run eslint10-compat-watchdog.yml --ref master
+gh workflow run eslint10-compat-watchdog.yml --ref main
 
 # Protocol publish workflow (safe validation mode)
-gh workflow run publish-protocol.yml --ref master -f dry-run=true
+gh workflow run publish-protocol.yml --ref main -f dry-run=true
 
 # Client publish workflow (safe validation mode)
-gh workflow run publish-client.yml --ref master -f dry-run=true
+gh workflow run publish-client.yml --ref main -f dry-run=true
 
 # Dependency health workflow
-gh workflow run dependency-health.yml --ref master
+gh workflow run dependency-health.yml --ref main
 
 # Cross-service E2E smoke workflow
-gh workflow run cross-service-e2e-smoke.yml --ref master
+gh workflow run cross-service-e2e-smoke.yml --ref main
 ```
 
 Run watchdog check locally without dispatching workflow:
@@ -90,7 +90,7 @@ npm run ci:policy:check
 npm run ci:policy:check -- --json
 ```
 
-Run branch protection guard to ensure `master` requires the CNC policy status check:
+Run branch protection guard to ensure `main` requires the CNC policy status check:
 
 ```bash
 npm run ci:branch-protection:check

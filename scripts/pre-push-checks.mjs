@@ -17,7 +17,7 @@ function runStreaming(cmd, args) {
 function getMergeBase() {
   const candidates = [
     ["merge-base", "HEAD", "@{upstream}"],
-    ["merge-base", "HEAD", "origin/master"],
+    ["merge-base", "HEAD", "origin/main"],
     ["rev-parse", "HEAD~1"],
   ];
 
@@ -37,18 +37,16 @@ function getChangedSourceFiles(baseRef) {
     return [];
   }
 
-  let output = "";
   try {
-    output = run("git", ["diff", "--name-only", "--diff-filter=ACMR", `${baseRef}...HEAD`]);
+    const output = run("git", ["diff", "--name-only", "--diff-filter=ACMR", `${baseRef}...HEAD`]);
+    return output
+      .split("\n")
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .filter((filepath) => /\.(cjs|mjs|js|jsx|ts|tsx)$/.test(filepath));
   } catch {
     return [];
   }
-
-  return output
-    .split("\n")
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .filter((filepath) => /\.(cjs|mjs|js|jsx|ts|tsx)$/.test(filepath));
 }
 
 function getWorkspaceChangedFiles(changedFiles, workspacePrefix) {

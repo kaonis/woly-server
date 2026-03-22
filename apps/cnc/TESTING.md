@@ -29,5 +29,5 @@ The suite is expected to finish in under 3 minutes in CI.
 For budget mode, use the dedicated manual workflow:
 
 ```bash
-gh workflow run cross-service-e2e-smoke.yml --ref master
+gh workflow run cross-service-e2e-smoke.yml --ref main
 ```
