@@ -2,7 +2,7 @@
 
 ## Branching Policy
 
-1. Do not push directly to `master`.
+1. Do not push directly to `main`.
 2. Create a feature branch for every change.
 3. Open a pull request for review before merge.
 
@@ -16,7 +16,7 @@
 3. Push branch:
    - `git push -u origin <branch>`
 4. Open PR:
-   - `gh pr create --fill --base master --head <branch>`
+   - `gh pr create --fill --base main --head <branch>`
 
 ## Branch Name Examples
 

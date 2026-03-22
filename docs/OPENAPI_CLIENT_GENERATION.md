@@ -33,7 +33,7 @@ npm run client:consumer-typecheck
 Manual workflow:
 
 ```bash
-gh workflow run publish-client.yml --ref master -f dry-run=true
+gh workflow run publish-client.yml --ref main -f dry-run=true
 ```
 
 Or locally:

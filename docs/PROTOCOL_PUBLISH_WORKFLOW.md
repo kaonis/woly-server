@@ -38,7 +38,7 @@ All items must be true before running `npm run protocol:publish` or `npm run pro
    - `npm run protocol:version:major`
 3. Run readiness verification commands from Section 2.
 4. Merge PR after CI is green.
-5. Publish from `master`:
+5. Publish from `main`:
    - stable: `npm run protocol:publish`
    - prerelease/canary: `npm run protocol:publish:next`
 6. Create release communication entry (issue/PR comment) with:

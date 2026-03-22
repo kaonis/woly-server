@@ -297,7 +297,7 @@ After running `npm run test:coverage`:
 
 Tests run automatically on:
 
-- Every push to `master` or `main`
+- Every push to `main` when automatic CI is enabled
 - Every pull request
 
 The CI pipeline:

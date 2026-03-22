@@ -81,7 +81,7 @@ function buildBody(afterIssue) {
     '- Update active roadmap progress and dependency checkpoint notes.',
     '',
     '## Definition of Done',
-    '- PR merged to `master`',
+    '- PR merged to `main`',
     '- Manual review log updated for the reviewed period',
     '',
   ].join('\n');

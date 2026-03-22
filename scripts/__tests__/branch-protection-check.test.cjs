@@ -3,9 +3,9 @@ const test = require('node:test');
 
 const { parseArgs, evaluateProtection } = require('../branch-protection-check.cjs');
 
-test('parseArgs defaults to master branch', () => {
+test('parseArgs defaults to main branch', () => {
   const options = parseArgs([]);
-  assert.equal(options.branch, 'master');
+  assert.equal(options.branch, 'main');
   assert.equal(options.json, false);
 });
 

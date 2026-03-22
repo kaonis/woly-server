@@ -21,10 +21,10 @@ cp apps/cnc/.env.example apps/cnc/.env
 
 ## Development Workflow
 
-1. Create a branch from `master`
+1. Create a branch from `main`
 2. Make changes
 3. Run `npm run build && npm run typecheck && npm run test` to verify
-4. Push and open a PR against `master`
+4. Push and open a PR against `main`
 
 ## Git Hooks and Commit Policy
 
