@@ -29,7 +29,7 @@ The C&C backend provides:
 
 ### Prerequisites
 
-- Node.js 24+ (see root `.nvmrc`)
+- Node.js 24 or 25 (see root `.nvmrc`; Node 26 is not supported by the pinned SQLite runtime)
 - npm 10+
 - **PostgreSQL 16+** (optional — SQLite supported for dev)
 
@@ -141,7 +141,7 @@ npm run test:coverage
 npm rebuild better-sqlite3 --build-from-source
 ```
 
-- Node.js v24+ is required. See root `.nvmrc`.
+- Node.js v24 or v25 is required. See root `.nvmrc`.
 
 ## API Endpoints
 
@@ -204,12 +204,14 @@ ws://localhost:8080/ws/node
 ```
 
 Nodes connect via WebSocket for:
+
 - Registration
 - Heartbeat messages
 - Host event streaming
 - Command reception
 
 Authentication priority:
+
 1. `Authorization: Bearer <token>` header
 2. `Sec-WebSocket-Protocol` bearer token (`bearer,<token>` or `bearer.<token>`)
 3. Query token (`?token=...`) only when `WS_ALLOW_QUERY_TOKEN_AUTH=true`
@@ -218,37 +220,37 @@ Authentication priority:
 
 Environment variables (`.env`):
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | HTTP server port | `8080` |
-| `NODE_ENV` | Environment | `development` |
-| `CORS_ORIGINS` | Comma-separated browser origins allowed in production (e.g. `https://woly.expo.app`) | `''` |
-| `TRUST_PROXY` | Express `trust proxy` setting. Use `1` behind one reverse proxy, or keep `false` when directly exposed | `false` |
-| `DB_TYPE` | Database type: `postgres` or `sqlite` | `postgres` |
-| `DATABASE_URL` | Database connection (PostgreSQL URL or SQLite path) | Required |
-| `NODE_AUTH_TOKENS` | Comma-separated auth tokens | Required |
-| `OPERATOR_TOKENS` | Comma-separated operator tokens for `/api/auth/token` | Defaults to `NODE_AUTH_TOKENS` |
-| `ADMIN_TOKENS` | Comma-separated admin tokens (optional) | `''` |
-| `JWT_SECRET` | JWT signing secret | Required |
-| `JWT_ISSUER` | Expected JWT issuer claim (`iss`) | `woly-cnc` |
-| `JWT_AUDIENCE` | Expected JWT audience claim (`aud`) | `woly-api` |
-| `JWT_TTL_SECONDS` | Issued JWT lifetime (seconds) | `3600` |
-| `WS_REQUIRE_TLS` | Require TLS for node WebSocket upgrades | `true` in production, else `false` |
-| `WS_ALLOW_QUERY_TOKEN_AUTH` | Allow legacy query token auth (`?token=`) | `false` in production, else `true` |
-| `API_RATE_LIMIT_WINDOW_MS` | General API rate-limit window (ms) | `900000` |
-| `API_RATE_LIMIT_MAX` | General API max requests per window | `300` in production, `10000` in development |
-| `SCHEDULE_RATE_LIMIT_WINDOW_MS` | Host schedule API rate-limit window (ms) | `900000` |
-| `SCHEDULE_RATE_LIMIT_MAX` | Host schedule API max requests per window | `3000` in production, `20000` in development |
-| `NODE_HEARTBEAT_INTERVAL` | Expected heartbeat interval (ms) | `30000` |
-| `NODE_TIMEOUT` | Node offline threshold (ms) | `90000` |
-| `COMMAND_TIMEOUT` | Command acknowledgement timeout (ms) | `30000` |
-| `COMMAND_RETENTION_DAYS` | Retention window for historical command rows | `30` |
-| `COMMAND_MAX_RETRIES` | Maximum command retries before terminal failure | `3` |
-| `COMMAND_RETRY_BASE_DELAY_MS` | Base delay for retry backoff (ms) | `1000` |
-| `SCHEDULE_WORKER_ENABLED` | Enable backend wake schedule execution worker | `true` |
-| `SCHEDULE_POLL_INTERVAL_MS` | Wake schedule polling interval (ms) | `60000` |
-| `SCHEDULE_BATCH_SIZE` | Max due schedules processed per worker tick | `25` |
-| `LOG_LEVEL` | Logging level | `info` |
+| Variable                        | Description                                                                                            | Default                                      |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| `PORT`                          | HTTP server port                                                                                       | `8080`                                       |
+| `NODE_ENV`                      | Environment                                                                                            | `development`                                |
+| `CORS_ORIGINS`                  | Comma-separated browser origins allowed in production (e.g. `https://woly.expo.app`)                   | `''`                                         |
+| `TRUST_PROXY`                   | Express `trust proxy` setting. Use `1` behind one reverse proxy, or keep `false` when directly exposed | `false`                                      |
+| `DB_TYPE`                       | Database type: `postgres` or `sqlite`                                                                  | `postgres`                                   |
+| `DATABASE_URL`                  | Database connection (PostgreSQL URL or SQLite path)                                                    | Required                                     |
+| `NODE_AUTH_TOKENS`              | Comma-separated auth tokens                                                                            | Required                                     |
+| `OPERATOR_TOKENS`               | Comma-separated operator tokens for `/api/auth/token`                                                  | Defaults to `NODE_AUTH_TOKENS`               |
+| `ADMIN_TOKENS`                  | Comma-separated admin tokens (optional)                                                                | `''`                                         |
+| `JWT_SECRET`                    | JWT signing secret                                                                                     | Required                                     |
+| `JWT_ISSUER`                    | Expected JWT issuer claim (`iss`)                                                                      | `woly-cnc`                                   |
+| `JWT_AUDIENCE`                  | Expected JWT audience claim (`aud`)                                                                    | `woly-api`                                   |
+| `JWT_TTL_SECONDS`               | Issued JWT lifetime (seconds)                                                                          | `3600`                                       |
+| `WS_REQUIRE_TLS`                | Require TLS for node WebSocket upgrades                                                                | `true` in production, else `false`           |
+| `WS_ALLOW_QUERY_TOKEN_AUTH`     | Allow legacy query token auth (`?token=`)                                                              | `false` in production, else `true`           |
+| `API_RATE_LIMIT_WINDOW_MS`      | General API rate-limit window (ms)                                                                     | `900000`                                     |
+| `API_RATE_LIMIT_MAX`            | General API max requests per window                                                                    | `300` in production, `10000` in development  |
+| `SCHEDULE_RATE_LIMIT_WINDOW_MS` | Host schedule API rate-limit window (ms)                                                               | `900000`                                     |
+| `SCHEDULE_RATE_LIMIT_MAX`       | Host schedule API max requests per window                                                              | `3000` in production, `20000` in development |
+| `NODE_HEARTBEAT_INTERVAL`       | Expected heartbeat interval (ms)                                                                       | `30000`                                      |
+| `NODE_TIMEOUT`                  | Node offline threshold (ms)                                                                            | `90000`                                      |
+| `COMMAND_TIMEOUT`               | Command acknowledgement timeout (ms)                                                                   | `30000`                                      |
+| `COMMAND_RETENTION_DAYS`        | Retention window for historical command rows                                                           | `30`                                         |
+| `COMMAND_MAX_RETRIES`           | Maximum command retries before terminal failure                                                        | `3`                                          |
+| `COMMAND_RETRY_BASE_DELAY_MS`   | Base delay for retry backoff (ms)                                                                      | `1000`                                       |
+| `SCHEDULE_WORKER_ENABLED`       | Enable backend wake schedule execution worker                                                          | `true`                                       |
+| `SCHEDULE_POLL_INTERVAL_MS`     | Wake schedule polling interval (ms)                                                                    | `60000`                                      |
+| `SCHEDULE_BATCH_SIZE`           | Max due schedules processed per worker tick                                                            | `25`                                         |
+| `LOG_LEVEL`                     | Logging level                                                                                          | `info`                                       |
 
 ## WebSocket Protocol
 
@@ -376,8 +378,8 @@ pg_isready
 1. Check auth token matches `NODE_AUTH_TOKENS` in C&C `.env`
 2. Verify node token is provided via `Authorization` header or `Sec-WebSocket-Protocol`
 3. If using legacy query tokens, ensure `WS_ALLOW_QUERY_TOKEN_AUTH=true`
-3. Check C&C backend logs for connection attempts
-4. Ensure no firewall blocking port 8080
+4. Check C&C backend logs for connection attempts
+5. Ensure no firewall blocking port 8080
 
 ### Node Marked Offline
 

@@ -88,8 +88,8 @@ npm run test:ci
 
 ## Runtime Prerequisites
 
-- Node.js v24+ is supported.
-- `.nvmrc` provides a baseline local version for consistency, but newer Node versions are supported.
+- Node.js v24 or v25 is supported.
+- `.nvmrc` provides the baseline local version for consistency; Node 24 and 25 are supported by the pinned SQLite runtime.
 - Test preflight verifies that local socket bind is allowed because Supertest-based suites require it.
 - If preflight fails on socket bind, run tests outside restricted/sandboxed execution environments.
 
