@@ -45,7 +45,7 @@ const {
 test('findLatestSinceCheckpoint returns the latest valid checkpoint', () => {
   const markdown = [
     '- Budget: `ci:audit:manual --since 2026-02-15T17:07:43Z`',
-    '- Budget: `ci:audit:manual --since 2026-02-15T21:31:02Z --fail-on-unexpected`',
+    '- Budget: `ci:audit:manual -- --since 2026-02-15T21:31:02Z --fail-on-unexpected`',
   ].join('\n');
 
   const latest = findLatestSinceCheckpoint(markdown);
