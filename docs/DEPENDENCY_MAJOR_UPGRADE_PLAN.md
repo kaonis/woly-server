@@ -25,6 +25,7 @@ This plan covers the currently deferred or high-risk major dependency updates:
 - eslint-config-prettier v10
 
 Primary impact:
+
 - lint configuration and rule behavior changes
 - developer/CI lint task stability
 
@@ -33,6 +34,7 @@ Primary impact:
 - Zod v4
 
 Primary impact:
+
 - runtime validation behavior across `packages/protocol`, `apps/cnc`, and `apps/node-agent`
 - potential contract/serialization edge differences
 
@@ -41,6 +43,7 @@ Primary impact:
 - npm v11
 
 Primary impact:
+
 - workspace install/task behavior
 - lockfile and CI reproducibility
 
@@ -63,17 +66,17 @@ Primary impact:
 
 ## 4. Decision Table (2026-02-15)
 
-| Dependency | Decision | Rationale | Tracking |
-|---|---|---|---|
-| ESLint v9 | Merged | Adopted with typescript-eslint v8 via PR #151 | #146 |
-| ESLint v10 | Deferred pending upstream compatibility | Still blocked: latest `@typescript-eslint/*@8.55.0` peers `eslint ^8.57.0 || ^9.0.0`; Renovate PR #11 currently unstable | #150 |
-| typescript-eslint v8 | Merged | Upgraded with ESLint v9 toolchain migration via PR #151 | #146 |
-| eslint-config-prettier v10 | Merged | Upgraded with ESLint v9 toolchain migration via PR #151 | #146 |
-| Zod v4 | Merged | Runtime schema compatibility validated across protocol/C&C/node-agent and merged via PR #152 | #147 |
-| npm v11 | Merged | Workspace tooling and CI remained stable; adopted via PR #17 | #148 |
-| ESLint flat config mode | Merged | Migrated to root `eslint.config.js` and removed legacy `.eslintrc` mode via PR #155 | #154 |
-| Turbo v2.8.9 | Merged | Adopted and validated with local + CI gates via PR #157 (issue #156) | #156 |
-| ESLint 10 watchdog automation | Merged | Added scheduled/manual watchdog workflow with sticky issue updates via PR #160 | #159 |
+| Dependency                    | Decision                                | Rationale                                                                                                                  | Tracking |
+| ----------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------- |
+| ESLint v9                     | Merged                                  | Adopted with typescript-eslint v8 via PR #151                                                                              | #146     |
+| ESLint v10                    | Deferred pending upstream compatibility | Still blocked: latest `@typescript-eslint/*@8.55.0` peers `eslint ^8.57.0 \|\| ^9.0.0`; Renovate PR #11 currently unstable | #150     |
+| typescript-eslint v8          | Merged                                  | Upgraded with ESLint v9 toolchain migration via PR #151                                                                    | #146     |
+| eslint-config-prettier v10    | Merged                                  | Upgraded with ESLint v9 toolchain migration via PR #151                                                                    | #146     |
+| Zod v4                        | Merged                                  | Runtime schema compatibility validated across protocol/C&C/node-agent and merged via PR #152                               | #147     |
+| npm v11                       | Merged                                  | Workspace tooling and CI remained stable; adopted via PR #17                                                               | #148     |
+| ESLint flat config mode       | Merged                                  | Migrated to root `eslint.config.js` and removed legacy `.eslintrc` mode via PR #155                                        | #154     |
+| Turbo v2.8.9                  | Merged                                  | Adopted and validated with local + CI gates via PR #157 (issue #156)                                                       | #156     |
+| ESLint 10 watchdog automation | Merged                                  | Added scheduled/manual watchdog workflow with sticky issue updates via PR #160                                             | #159     |
 
 ## 5. Exit Criteria for #144
 
@@ -200,3 +203,15 @@ Issue #144 is complete when:
   - Ran policy guard:
     - `npm run ci:policy:check` (PASS; approved exceptions remain `pull_request` for `cnc-sync-policy.yml` and `schedule` for `dependency-health.yml`).
   - Aligned audit allowlist logic in `scripts/manual-ci-run-audit.cjs` to match policy guard exceptions.
+- 2026-07-03 (maintenance dependency/policy checkpoint):
+  - Ran dependency inventory and applied conservative security maintenance:
+    - `npm audit fix` for non-major audit remediations.
+    - `npm install --save-dev @typescript-eslint/eslint-plugin@^8.62.1 @typescript-eslint/parser@^8.62.1`.
+    - `npm update brace-expansion`.
+  - Result: `npm audit --omit=dev --audit-level=high` PASS and full `npm audit --audit-level=moderate` reports 0 vulnerabilities.
+  - ESLint 10 watchdog status is now compatible with current metadata:
+    - `eslint`: `10.6.0`
+    - `@typescript-eslint/eslint-plugin`: `8.62.1`
+    - `@typescript-eslint/parser`: `8.62.1`
+    - peer `eslint` range: `^8.57.0 || ^9.0.0 || ^10.0.0`
+  - Major upgrade deferrals remain unchanged: TypeScript 6 and lint-staged 17 stay out of this security maintenance round.

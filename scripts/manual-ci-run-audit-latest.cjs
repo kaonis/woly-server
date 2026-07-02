@@ -15,7 +15,7 @@ function hasSinceArg(argv) {
 }
 
 function findLatestSinceCheckpoint(markdown) {
-  const regex = /ci:audit:manual\s+--since\s+([^\s`]+)/g;
+  const regex = /ci:audit:manual\s+(?:--\s+)?--since\s+([^\s`]+)/g;
   let match;
   let latest = null;
 
