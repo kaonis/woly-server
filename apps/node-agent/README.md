@@ -17,7 +17,7 @@
 
 ### Prerequisites
 
-- Node.js 24+ (see root `.nvmrc`)
+- Node.js 24 or 25 (see root `.nvmrc`; Node 26 is not supported by the pinned SQLite runtime)
 - npm 10+
 
 ### From monorepo root

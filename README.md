@@ -42,7 +42,7 @@ woly-server/
 
 ## Prerequisites
 
-- **Node.js 24+** (see `.nvmrc`)
+- **Node.js 24 or 25** (see `.nvmrc`; Node 26 is not supported by the pinned SQLite runtime)
 - **npm 10+**
 - PostgreSQL 16+ (optional, cnc supports SQLite for dev)
 

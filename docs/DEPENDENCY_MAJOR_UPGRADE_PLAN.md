@@ -215,3 +215,7 @@ Issue #144 is complete when:
     - `@typescript-eslint/parser`: `8.62.1`
     - peer `eslint` range: `^8.57.0 || ^9.0.0 || ^10.0.0`
   - Major upgrade deferrals remain unchanged: TypeScript 6 and lint-staged 17 stay out of this security maintenance round.
+- 2026-07-03 (maintenance runtime compatibility checkpoint):
+  - Observed `npm ci` failure on Node `v26.3.0` because pinned `better-sqlite3@12.6.2` supports Node `20.x || 22.x || 23.x || 24.x || 25.x` and native rebuild fails against Node 26.
+  - Constrained repo and app engine ranges to `>=24.0.0 <26.0.0`, enabled npm `engine-strict`, and aligned CNC/node-agent test preflights to fail fast on unsupported Node versions.
+  - Node 26 adoption remains deferred until the SQLite runtime is upgraded and local gates pass under Node 26.
