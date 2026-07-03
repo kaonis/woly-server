@@ -33,6 +33,7 @@ Each CNC feature PR must link all of the following:
 ## 4. CI Budget Rule
 
 GitHub Actions runs only bare-minimum policy checks on pull requests.
+The approved scheduled exception is the weekly dependency health watchdog.
 Heavy validation runs locally before merge.
 
 ## 5. Required Local Pre-Merge Gates

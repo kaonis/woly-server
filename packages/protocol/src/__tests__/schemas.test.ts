@@ -632,6 +632,16 @@ describe('hostPortScanResponseSchema', () => {
       }).success
     ).toBe(false);
   });
+
+  it.each([0, 65536])('rejects TCP port %i outside the valid range', (port) => {
+    expect(
+      hostPortScanResponseSchema.safeParse({
+        target: 'Office-Mac@Home',
+        scannedAt: '2026-02-15T00:00:00.000Z',
+        openPorts: [{ port, protocol: 'tcp', service: 'HTTP' }],
+      }).success
+    ).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
