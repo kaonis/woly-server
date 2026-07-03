@@ -104,11 +104,11 @@ class ScanOrchestrator {
         const batchResults = await Promise.all(
           batch.map(async (host) => {
             let isAlive: boolean;
-
-            const pingResult = await this.discovery.isHostAlive(host.ip);
-            const pingResponsive = pingResult ? 1 : 0;
+            let pingResponsive: number | null = null;
 
             if (config.network.usePingValidation) {
+              const pingResult = await this.discovery.isHostAlive(host.ip);
+              pingResponsive = pingResult ? 1 : 0;
               isAlive = pingResult;
               if (!isAlive) {
                 logger.debug(

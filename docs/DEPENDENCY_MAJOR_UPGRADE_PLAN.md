@@ -219,3 +219,10 @@ Issue #144 is complete when:
   - Observed `npm ci` failure on Node `v26.3.0` because pinned `better-sqlite3@12.6.2` supports Node `20.x || 22.x || 23.x || 24.x || 25.x` and native rebuild fails against Node 26.
   - Constrained repo and app engine ranges to `>=24.0.0 <26.0.0`, enabled npm `engine-strict`, and aligned CNC/node-agent test preflights to fail fast on unsupported Node versions.
   - Node 26 adoption remains deferred until the SQLite runtime is upgraded and local gates pass under Node 26.
+- 2026-07-03 (maintenance review checkpoint):
+  - Confirmed the default shell still runs Node `v26.3.0`; `npm ci` correctly fails fast under the repo engine guard.
+  - Re-ran install and dependency inventory under Node `v24.13.0` / npm `11.6.2`:
+    - `npm ci` PASS.
+    - `npm run deps:check` PASS for high-severity production audit and ESLint 10 watchdog.
+    - `npm outdated` remains informational; no dependency upgrade was applied in this review round.
+  - Node 26 adoption remains deferred pending `better-sqlite3` compatibility and successful local gates.
