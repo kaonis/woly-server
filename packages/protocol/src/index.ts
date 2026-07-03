@@ -529,7 +529,7 @@ export const hostStatusSchema = z.enum(['awake', 'asleep']);
 export const hostNotesSchema = z.string().max(2_000).nullable();
 export const hostTagsSchema = z.array(z.string().min(1).max(64)).max(32);
 export const hostPortSchema: z.ZodType<HostPort> = z.object({
-  port: z.number().int().positive(),
+  port: z.number().int().min(1).max(65535),
   protocol: z.literal('tcp'),
   service: z.string().min(1),
 });

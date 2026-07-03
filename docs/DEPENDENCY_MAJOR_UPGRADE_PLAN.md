@@ -66,17 +66,17 @@ Primary impact:
 
 ## 4. Decision Table (2026-02-15)
 
-| Dependency                    | Decision                                | Rationale                                                                                                                  | Tracking |
-| ----------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------- |
-| ESLint v9                     | Merged                                  | Adopted with typescript-eslint v8 via PR #151                                                                              | #146     |
-| ESLint v10                    | Deferred pending upstream compatibility | Still blocked: latest `@typescript-eslint/*@8.55.0` peers `eslint ^8.57.0 \|\| ^9.0.0`; Renovate PR #11 currently unstable | #150     |
-| typescript-eslint v8          | Merged                                  | Upgraded with ESLint v9 toolchain migration via PR #151                                                                    | #146     |
-| eslint-config-prettier v10    | Merged                                  | Upgraded with ESLint v9 toolchain migration via PR #151                                                                    | #146     |
-| Zod v4                        | Merged                                  | Runtime schema compatibility validated across protocol/C&C/node-agent and merged via PR #152                               | #147     |
-| npm v11                       | Merged                                  | Workspace tooling and CI remained stable; adopted via PR #17                                                               | #148     |
-| ESLint flat config mode       | Merged                                  | Migrated to root `eslint.config.js` and removed legacy `.eslintrc` mode via PR #155                                        | #154     |
-| Turbo v2.8.9                  | Merged                                  | Adopted and validated with local + CI gates via PR #157 (issue #156)                                                       | #156     |
-| ESLint 10 watchdog automation | Merged                                  | Added scheduled/manual watchdog workflow with sticky issue updates via PR #160                                             | #159     |
+| Dependency                    | Decision                            | Rationale                                                                                                               | Tracking |
+| ----------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------- |
+| ESLint v9                     | Merged                              | Adopted with typescript-eslint v8 via PR #151                                                                           | #146     |
+| ESLint v10                    | Unblocked by upstream compatibility | Latest `@typescript-eslint/*@8.62.1` peers include `eslint ^10.0.0`; continue through Renovate PR #398 with local gates | #150     |
+| typescript-eslint v8          | Merged                              | Upgraded with ESLint v9 toolchain migration via PR #151                                                                 | #146     |
+| eslint-config-prettier v10    | Merged                              | Upgraded with ESLint v9 toolchain migration via PR #151                                                                 | #146     |
+| Zod v4                        | Merged                              | Runtime schema compatibility validated across protocol/C&C/node-agent and merged via PR #152                            | #147     |
+| npm v11                       | Merged                              | Workspace tooling and CI remained stable; adopted via PR #17                                                            | #148     |
+| ESLint flat config mode       | Merged                              | Migrated to root `eslint.config.js` and removed legacy `.eslintrc` mode via PR #155                                     | #154     |
+| Turbo v2.8.9                  | Merged                              | Adopted and validated with local + CI gates via PR #157 (issue #156)                                                    | #156     |
+| ESLint 10 watchdog automation | Merged                              | Added scheduled/manual watchdog workflow with sticky issue updates via PR #160                                          | #159     |
 
 ## 5. Exit Criteria for #144
 
