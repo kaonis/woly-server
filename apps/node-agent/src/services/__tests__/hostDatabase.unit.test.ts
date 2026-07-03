@@ -42,6 +42,7 @@ describe('HostDatabase', () => {
   beforeEach(async () => {
     // Clear all mocks before each test
     jest.clearAllMocks();
+    config.network.usePingValidation = false;
 
     // Default MAC normalization used throughout HostDatabase.
     (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
@@ -515,7 +516,7 @@ describe('HostDatabase', () => {
       expect(hostAfter?.lastSeen).not.toBe(lastSeenBefore);
     });
 
-    it('should handle ping failures during sync', async () => {
+    it('should skip ping checks during default ARP-only sync', async () => {
       const mockDiscoveredHosts: DiscoveredHost[] = [
         { ip: '192.168.1.200', mac: 'AA:BB:CC:DD:EE:FF', hostname: 'OfflineHost' },
       ];
@@ -531,8 +532,30 @@ describe('HostDatabase', () => {
       const host = await db.getHost('OfflineHost');
       // Host found via ARP is marked as awake even if ping fails (default mode)
       expect(host?.status).toBe('awake');
-      // But pingResponsive should be 0 (doesn't respond to ping)
-      expect(host?.pingResponsive).toBe(0);
+      // Ping was not attempted because validation is disabled by default.
+      expect(host?.pingResponsive).toBe(null);
+      expect(networkDiscovery.isHostAlive).not.toHaveBeenCalled();
+    });
+
+    it('should clear stale ping responsiveness during default ARP-only sync', async () => {
+      await db.addHost('PreviouslyPingedHost', 'AA:BB:CC:DD:EE:20', '192.168.1.220');
+      await db.updateHostSeen('AA:BB:CC:DD:EE:20', 'asleep', 0);
+
+      const mockDiscoveredHosts: DiscoveredHost[] = [
+        { ip: '192.168.1.220', mac: 'AA:BB:CC:DD:EE:20', hostname: 'PreviouslyPingedHost' },
+      ];
+
+      (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
+      (networkDiscovery.isHostAlive as jest.Mock).mockRejectedValue(
+        new Error('ping should not be called')
+      );
+
+      await scanOrchestrator.syncWithNetwork();
+
+      const host = await db.getHost('PreviouslyPingedHost');
+      expect(host?.status).toBe('awake');
+      expect(host?.pingResponsive).toBe(null);
+      expect(networkDiscovery.isHostAlive).not.toHaveBeenCalled();
     });
 
     it('should use ARP-only status when usePingValidation=false (default)', async () => {
@@ -548,21 +571,21 @@ describe('HostDatabase', () => {
       (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
         mac.toUpperCase().replace(/-/g, ':')
       );
-      // First host blocks ping, second responds
-      (networkDiscovery.isHostAlive as jest.Mock)
-        .mockResolvedValueOnce(false)
-        .mockResolvedValueOnce(true);
+      (networkDiscovery.isHostAlive as jest.Mock).mockRejectedValue(
+        new Error('ping should not be called')
+      );
 
       await scanOrchestrator.syncWithNetwork();
 
       // Both hosts should be marked awake because ARP found them
       const host1 = await db.getHost('PingBlockedHost');
       expect(host1?.status).toBe('awake');
-      expect(host1?.pingResponsive).toBe(0);
+      expect(host1?.pingResponsive).toBe(null);
 
       const host2 = await db.getHost('PingResponsiveHost');
       expect(host2?.status).toBe('awake');
-      expect(host2?.pingResponsive).toBe(1);
+      expect(host2?.pingResponsive).toBe(null);
+      expect(networkDiscovery.isHostAlive).not.toHaveBeenCalled();
     });
 
     it('should use ping result for status when usePingValidation=true', async () => {
@@ -670,6 +693,7 @@ describe('HostDatabase', () => {
     });
 
     it('should ping hosts concurrently in batches', async () => {
+      config.network.usePingValidation = true;
       // Create 25 mock hosts to test batching (with default concurrency of 10)
       const mockDiscoveredHosts: DiscoveredHost[] = Array.from({ length: 25 }, (_, i) => ({
         ip: `192.168.1.${100 + i}`,
@@ -703,9 +727,11 @@ describe('HostDatabase', () => {
         expect(host?.status).toBe('awake');
         expect(host?.pingResponsive).toBe(1);
       }
+      config.network.usePingValidation = false;
     });
 
-    it('should handle mixed ping results in concurrent batches', async () => {
+    it('should handle mixed ping results in concurrent batches when validation is enabled', async () => {
+      config.network.usePingValidation = true;
       const mockDiscoveredHosts: DiscoveredHost[] = [
         { ip: '192.168.1.100', mac: 'AA:BB:CC:DD:EE:01', hostname: 'Host1' },
         { ip: '192.168.1.101', mac: 'AA:BB:CC:DD:EE:02', hostname: 'Host2' },
@@ -725,18 +751,18 @@ describe('HostDatabase', () => {
 
       await scanOrchestrator.syncWithNetwork();
 
-      // All hosts should be marked as awake (ARP discovery overrides ping)
       const host1 = await db.getHost('Host1');
       expect(host1?.status).toBe('awake');
       expect(host1?.pingResponsive).toBe(1);
 
       const host2 = await db.getHost('Host2');
-      expect(host2?.status).toBe('awake');
+      expect(host2?.status).toBe('asleep');
       expect(host2?.pingResponsive).toBe(0);
 
       const host3 = await db.getHost('Host3');
       expect(host3?.status).toBe('awake');
       expect(host3?.pingResponsive).toBe(1);
+      config.network.usePingValidation = false;
     });
   });
 

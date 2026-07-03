@@ -278,7 +278,8 @@ PING_TIMEOUT=2000       # 2 seconds
 USE_PING_VALIDATION=false  # Use ping to validate awake status (default: false, ARP is sufficient)
 # Note: ARP discovery means a host is responding on the network (awake)
 # Ping validation is optional but may fail even for awake hosts due to firewalls
-# All hosts are always ping-tested to track pingResponsive status (separate from awake/asleep)
+# With validation disabled, scans do not ping discovered hosts and pingResponsive stays null
+# With validation enabled, ping results drive awake/asleep status and pingResponsive
 
 # Caching
 MAC_VENDOR_TTL=86400000        # 24 hours
