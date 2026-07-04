@@ -15,7 +15,7 @@ function hasSinceArg(argv) {
 }
 
 function findLatestSinceCheckpoint(markdown) {
-  const regex = /ci:audit:manual\s+(?:--\s+)?--since\s+([^\s`]+)/g;
+  const regex = /ci:audit:(?:manual|latest)\s+(?:--\s+)?--since\s+([^\s`]+)/g;
   let match;
   let latest = null;
 
@@ -30,7 +30,7 @@ function findLatestSinceCheckpoint(markdown) {
 
   if (!latest) {
     throw new Error(
-      `No valid ci:audit:manual --since checkpoint found in ${REVIEW_LOG_PATH}`
+      `No valid ci:audit:manual/latest --since checkpoint found in ${REVIEW_LOG_PATH}`
     );
   }
 

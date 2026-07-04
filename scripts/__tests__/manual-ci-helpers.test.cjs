@@ -52,10 +52,20 @@ test('findLatestSinceCheckpoint returns the latest valid checkpoint', () => {
   assert.equal(latest, '2026-02-15T21:31:02Z');
 });
 
+test('findLatestSinceCheckpoint accepts latest audit checkpoints', () => {
+  const markdown = [
+    '- Budget: `ci:audit:manual -- --since 2026-02-15T21:31:02Z --fail-on-unexpected`',
+    '- Budget: `ci:audit:latest -- --since 2026-07-04T07:45:00Z --fail-on-unexpected`',
+  ].join('\n');
+
+  const latest = findLatestSinceCheckpoint(markdown);
+  assert.equal(latest, '2026-07-04T07:45:00Z');
+});
+
 test('findLatestSinceCheckpoint throws when no checkpoint exists', () => {
   assert.throws(
     () => findLatestSinceCheckpoint('no checkpoint lines here'),
-    /No valid ci:audit:manual --since checkpoint/
+    /No valid ci:audit:manual\/latest --since checkpoint/
   );
 });
 
