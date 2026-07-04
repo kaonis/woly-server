@@ -99,6 +99,9 @@ Output goes to `dist/`. Both `main` and `types` in package.json point there.
 - `1.1.x`: CNC app/backend API contracts (`CncCapabilitiesResponse`, schedules, host port scan DTOs/schemas) and wire protocol negotiation update.
 - `1.2.x`: Host metadata/scan enrichments (`openPorts`, `portsScannedAt`, `portsExpireAt`), ping/port-scan command/result payloads, and consumer typecheck fixture parity.
 - `1.3.x`: CNC capability-map enrichments (`hostStateStreaming`, optional `rateLimits`) and exported CNC rate-limit descriptor schemas.
+- `1.4.x`: Host uptime/history contracts, webhook contracts, merge/port metadata enrichments.
+- `1.5.x`: Push-notification contracts and host power-control contracts.
+- `1.6.x`: Capability-negotiation enrichments for remote power controls (`sleep`, `shutdown`).
 
 ## CNC Polling Identity Notes
 

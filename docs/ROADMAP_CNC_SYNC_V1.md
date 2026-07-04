@@ -1,11 +1,13 @@
 # CNC Sync Roadmap V1 (woly + woly-server + protocol)
 
 ## Scope
+
 - Mode: CNC only.
 - Out of scope: standalone node-agent API compatibility work, except where temporary compatibility is needed during migration.
 - Protocol location: `woly-protocol/protocol` repo was not found locally; canonical protocol package is `packages/protocol` in `woly-server`.
 
 ## Audit Baseline (What is currently out of sync)
+
 1. Frontend expects CNC host scan endpoints (`/api/hosts/ports/:fqn`, `/api/hosts/scan-ports/:fqn`) in `/Users/phantom/projects/woly/src/services/woly-service.ts`, but CNC routes in `/Users/phantom/projects/woly-server/apps/cnc/src/routes/index.ts` do not expose them.
 2. CNC command routing already supports scan in `/Users/phantom/projects/woly-server/apps/cnc/src/services/commandRouter.ts`, but route/controller wiring is missing.
 3. Frontend host type in `/Users/phantom/projects/woly/src/types.ts` does not include protocol host fields like `notes` and `tags` that already exist in `/Users/phantom/projects/woly-server/packages/protocol/src/index.ts` and backend update validation in `/Users/phantom/projects/woly-server/apps/cnc/src/controllers/hosts.ts`.
@@ -14,7 +16,9 @@
 6. Mobile compatibility smoke coverage in `/Users/phantom/projects/woly-server/apps/cnc/src/routes/__tests__/mobileCompatibility.smoke.test.ts` validates core hosts/nodes only, not richer CNC interactions.
 
 ## Cross-Repo Issue Map
+
 ### woly-server
+
 - #253 CNC: Add host port-scan API endpoints used by mobile app
   - https://github.com/kaonis/woly-server/issues/253
 - #254 CNC: Add capabilities endpoint for frontend feature negotiation
@@ -27,6 +31,7 @@
   - https://github.com/kaonis/woly-server/issues/257
 
 ### woly
+
 - #307 App: CNC-only networking mode (de-prioritize standalone fallback)
   - https://github.com/kaonis/woly/issues/307
 - #308 App: Adopt @kaonis/woly-protocol shared types for CNC entities
@@ -39,36 +44,46 @@
   - https://github.com/kaonis/woly/issues/311
 
 ## Delivery Order
+
 1. Contract and capability handshake
+
 - Complete #254, #257, #308.
 - Goal: app and backend share typed contracts and explicit capability negotiation.
 
 2. Scan parity in CNC mode
+
 - Complete #253, #311, then tighten #307 for CNC-only scan path.
 - Goal: port scan feature works through CNC APIs without standalone probing.
 
 3. Host metadata parity (notes/tags)
+
 - Complete #309 with backend contract validation and compatibility tests (#256).
 - Goal: notes/tags are truly server-synced and reflected across clients.
 
 4. Schedules as shared backend state
+
 - Complete #255 and #310.
 - Goal: schedules are authoritative in CNC backend, app uses local state only as cache/offline queue.
 
 5. Hardening gate
+
 - Finish #256 and block merge on contract + compatibility checks for CNC routes.
 
 ## Operating Model (How to keep frontend/backend in sync)
+
 1. Feature starts as a protocol/API contract change, then backend implementation, then frontend wiring.
 2. Every feature has linked issues in both repos and a clear dependency chain.
 3. No merge to default branch unless:
+
 - protocol types compile for app consumption,
 - backend compatibility tests pass,
 - frontend typecheck/tests pass against current contract.
+
 4. App should detect capabilities on startup and disable unsupported UI actions.
 5. Prefer additive API evolution; remove deprecated behavior only after app release has switched.
 
 ## Definition of Done for each CNC feature
+
 - Shared type/DTO exists in protocol package (or explicit adapter with rationale).
 - Backend endpoint/command path is implemented and documented.
 - Frontend uses CNC-only path for that feature.
@@ -76,9 +91,13 @@
 - Migration notes are added for any behavior changes.
 
 ## Decision Log Updates
+
 - 2026-02-18 (issue #323): Classified app-local LAN Wake-on-LAN fallback (`kaonis/woly`) as a protocol no-op with no CNC contract delta; capability negotiation and protocol request/response shapes remain unchanged.
 - 2026-02-18 (issue #324): Verified backend impact is unchanged for app-local LAN Wake-on-LAN fallback; existing remote wake endpoint (`POST /api/hosts/wakeup/:fqn`) and command flow remain unchanged.
 
 ## Rolling Manual-CI Progress
+
 - 2026-02-18: Completed weekly manual-first operations review for issue #280 using `npm run ci:audit:manual -- --since 2026-02-16T18:35:12Z --fail-on-unexpected` (PASS) and `npm run ci:policy:check` (PASS).
 - 2026-02-18: Logged review decision in `docs/CI_MANUAL_REVIEW_LOG.md` and checkpoint updates in `docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md`.
+- 2026-07-03: Completed maintenance dependency/policy review using local-first gates; `npm audit --omit=dev --audit-level=high`, ESLint 10 watchdog, and workflow policy checks passed.
+- 2026-07-03: Confirmed Node 26 remains deferred because of the pinned SQLite runtime; validation and dependency inventory must run under supported Node 24/25 until the runtime compatibility gate is updated.

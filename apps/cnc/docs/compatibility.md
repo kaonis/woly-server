@@ -1,11 +1,14 @@
 # Compatibility Matrix (C&C <-> Node)
 
-Date: 2026-02-17
+Date: 2026-07-04
 
-| C&C Version | Node Version | Protocol Version | WS Auth Mode | Notes |
-|---|---|---|---|---|
-| 1.0.0 | 0.0.1 | 1.1.1 (current) | query token | Current baseline for new deployments; negotiated at registration |
-| 1.0.0 | 0.0.1 | 1.0.0 (legacy) | query token | Transitional compatibility while older nodes are still deployed |
+| C&C Version | Node Version | Protocol Version             | WS Auth Mode | Notes                                                                         |
+| ----------- | ------------ | ---------------------------- | ------------ | ----------------------------------------------------------------------------- |
+| 1.0.0       | 0.0.1        | 1.6.0 (current)              | query token  | Current baseline for new deployments; negotiated at registration              |
+| 1.0.0       | 0.0.1        | 1.5.0 - 1.0.0 (transitional) | query token  | Backward-compatible transitional support while older nodes are still deployed |
+
+The canonical protocol version list and migration notes live in
+[`docs/PROTOCOL_COMPATIBILITY.md`](../../../docs/PROTOCOL_COMPATIBILITY.md).
 
 ## Rules
 
