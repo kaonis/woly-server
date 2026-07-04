@@ -245,3 +245,13 @@ Period reviewed: maintenance review loop after 2026-07-03T15:34:54Z
 - Budget and throughput assessment: Scoped audit (`ci:audit:latest -- --since 2026-07-03T15:34:54Z --fail-on-unexpected`) observed no unexpected workflow events; dependency and health inventory ran locally under Node 24 after the Node 26 engine guard correctly blocked install; no GitHub Actions runs were needed.
 - Decision: Continue manual-only
 - Follow-up actions: Keep treating `npm outdated` as inventory, keep Node 26 deferred until the SQLite runtime supports it, and continue local-first validation before merge.
+
+Date: 2026-07-05
+Reviewer: Codex autonomous loop
+Period reviewed: maintenance dependency/runtime round
+
+- Unexpected automatic workflow runs observed: No
+- Local gate policy followed: Yes
+- Budget and throughput assessment: Dependency and policy inventory ran locally; the only dependency change was the scoped `better-sqlite3` runtime update needed to validate Node 26 support, with no extra GitHub Actions runs required.
+- Decision: Continue manual-only
+- Follow-up actions: Keep TypeScript 6 and lint-staged 17 deferred to their major-upgrade tracks; continue treating `npm outdated` as inventory outside scoped maintenance fixes.

@@ -15,7 +15,7 @@ Actions workflows are manual-only, with low-cost policy/dependency exceptions.
   - conventional commit subject checks against PR commits
   - added-line secret pattern screening for common leaked credential formats
 - GitHub CodeQL default setup is disabled (`state: not-configured`) to prevent automatic dynamic runs.
-- Each workflow job has `timeout-minutes: 8` to cap manual-run spend and prevent hangs.
+- Each workflow job has `timeout-minutes` capped at 8 to limit manual-run spend and prevent hangs.
 
 ## Required Local Gate Before PR
 
@@ -39,22 +39,22 @@ Use either GitHub UI (`Actions` tab) or GitHub CLI:
 
 ```bash
 # Main CI workflow
-gh workflow run ci.yml --ref main
+gh workflow run ci.yml --ref master
 
 # ESLint 10 compatibility watchdog
-gh workflow run eslint10-compat-watchdog.yml --ref main
+gh workflow run eslint10-compat-watchdog.yml --ref master
 
 # Protocol publish workflow (safe validation mode)
-gh workflow run publish-protocol.yml --ref main -f dry-run=true
+gh workflow run publish-protocol.yml --ref master -f dry-run=true
 
 # Client publish workflow (safe validation mode)
-gh workflow run publish-client.yml --ref main -f dry-run=true
+gh workflow run publish-client.yml --ref master -f dry-run=true
 
 # Dependency health workflow
-gh workflow run dependency-health.yml --ref main
+gh workflow run dependency-health.yml --ref master
 
 # Cross-service E2E smoke workflow
-gh workflow run cross-service-e2e-smoke.yml --ref main
+gh workflow run cross-service-e2e-smoke.yml --ref master
 ```
 
 Run watchdog check locally without dispatching workflow:
@@ -90,7 +90,7 @@ npm run ci:policy:check
 npm run ci:policy:check -- --json
 ```
 
-Run branch protection guard to ensure `main` requires the CNC policy status check:
+Run branch protection guard to ensure `master` requires the CNC policy status check:
 
 ```bash
 npm run ci:branch-protection:check

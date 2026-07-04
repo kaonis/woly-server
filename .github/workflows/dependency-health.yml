@@ -50,22 +50,22 @@ jobs:
             result_label="FAIL"
           fi
 
-          cat <<EOF > dependency-health-comment.md
-          <!-- dependency-health-checkpoint -->
-          ## Dependency Health Checkpoint
-
-          Checked at: \`${checked_at}\`
-
-          - Workflow run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
-          - Trigger: \`${GITHUB_EVENT_NAME}\`
-          - Step outcome: \`${DEP_CHECK_OUTCOME}\` (\`${DEP_CHECK_CONCLUSION}\`)
-          - Result: **${result_label}**
-
-          Checks executed:
-          - \`npm run deps:check:audit\` (blocking; high+ runtime vulnerabilities)
-          - \`npm run deps:check:outdated\` (non-blocking inventory)
-          - \`npm run deps:check-eslint10\` (compatibility signal)
-          EOF
+          {
+            printf '%s\n' '<!-- dependency-health-checkpoint -->'
+            printf '%s\n' '## Dependency Health Checkpoint'
+            printf '\n'
+            printf 'Checked at: `%s`\n' "${checked_at}"
+            printf '\n'
+            printf '%s\n' "- Workflow run: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            printf '%s\n' "- Trigger: \`${GITHUB_EVENT_NAME}\`"
+            printf '%s\n' "- Step outcome: \`${DEP_CHECK_OUTCOME}\` (\`${DEP_CHECK_CONCLUSION}\`)"
+            printf '%s\n' "- Result: **${result_label}**"
+            printf '\n'
+            printf '%s\n' 'Checks executed:'
+            printf '%s\n' '- `npm run deps:check:audit` (blocking; high+ runtime vulnerabilities)'
+            printf '%s\n' '- `npm run deps:check:outdated` (non-blocking inventory)'
+            printf '%s\n' '- `npm run deps:check-eslint10` (compatibility signal)'
+          } > dependency-health-comment.md
 
       - name: Post/update dependency dashboard checkpoint
         if: always()

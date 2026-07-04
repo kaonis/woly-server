@@ -29,7 +29,7 @@ The C&C backend provides:
 
 ### Prerequisites
 
-- Node.js 24 or 25 (see root `.nvmrc`; Node 26 is not supported by the pinned SQLite runtime)
+- Node.js 24, 25, or 26 (see root `.nvmrc`)
 - npm 10+
 - **PostgreSQL 16+** (optional — SQLite supported for dev)
 
@@ -141,7 +141,7 @@ npm run test:coverage
 npm rebuild better-sqlite3 --build-from-source
 ```
 
-- Node.js v24 or v25 is required. See root `.nvmrc`.
+- Node.js v24, v25, or v26 is required. See root `.nvmrc`.
 
 ## API Endpoints
 

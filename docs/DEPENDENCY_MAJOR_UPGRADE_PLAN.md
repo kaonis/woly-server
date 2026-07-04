@@ -226,3 +226,10 @@ Issue #144 is complete when:
     - `npm run deps:check` PASS for high-severity production audit and ESLint 10 watchdog.
     - `npm outdated` remains informational; no dependency upgrade was applied in this review round.
   - Node 26 adoption remains deferred pending `better-sqlite3` compatibility and successful local gates.
+- 2026-07-05 (maintenance runtime compatibility checkpoint):
+  - Upgraded the SQLite runtime dependency in both services:
+    - `@woly-server/cnc`: `better-sqlite3` `^12.6.2` -> `^12.11.1`.
+    - `@woly-server/node-agent`: `better-sqlite3` `^12.6.2` -> `^12.11.1`.
+  - Current `better-sqlite3@12.11.1` metadata includes Node `26.x` in its supported engine range.
+  - Relaxed repo, CNC, and node-agent Node engine ranges from `>=24.0.0 <26.0.0` to `>=24.0.0 <27.0.0`.
+  - TypeScript 6, lint-staged 17, and other major upgrades remain deferred; `npm outdated` remains inventory unless a scoped compatibility/security reason is documented.

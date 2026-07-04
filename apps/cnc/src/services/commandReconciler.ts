@@ -1,3 +1,7 @@
+import {
+  clearInterval as nodeClearInterval,
+  setInterval as nodeSetInterval,
+} from 'node:timers';
 import { CommandModel } from '../models/Command';
 import logger from '../utils/logger';
 
@@ -30,9 +34,16 @@ export async function pruneOldCommands(retentionDays: number): Promise<number> {
 
 let pruningInterval: NodeJS.Timeout | null = null;
 
+const setPruningInterval = (callback: () => void, ms: number): NodeJS.Timeout =>
+  (globalThis.setInterval ?? nodeSetInterval)(callback, ms);
+
+const clearPruningInterval = (interval: NodeJS.Timeout): void => {
+  (globalThis.clearInterval ?? nodeClearInterval)(interval);
+};
+
 export function startCommandPruning(retentionDays: number): void {
   if (pruningInterval) {
-    clearInterval(pruningInterval);
+    clearPruningInterval(pruningInterval);
     pruningInterval = null;
   }
 
@@ -49,7 +60,7 @@ export function startCommandPruning(retentionDays: number): void {
   // Schedule periodic pruning every 24 hours
   const intervalHours = 24;
   const intervalMs = intervalHours * 60 * 60 * 1000;
-  pruningInterval = setInterval(() => {
+  pruningInterval = setPruningInterval(() => {
     pruneOldCommands(retentionDays);
   }, intervalMs);
 
@@ -58,7 +69,7 @@ export function startCommandPruning(retentionDays: number): void {
 
 export function stopCommandPruning(): void {
   if (pruningInterval) {
-    clearInterval(pruningInterval);
+    clearPruningInterval(pruningInterval);
     pruningInterval = null;
     logger.info('Command pruning stopped');
   }

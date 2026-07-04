@@ -17,7 +17,7 @@ function runStreaming(cmd, args) {
 function getMergeBase() {
   const candidates = [
     ["merge-base", "HEAD", "@{upstream}"],
-    ["merge-base", "HEAD", "origin/main"],
+    ["merge-base", "HEAD", "origin/master"],
     ["rev-parse", "HEAD~1"],
   ];
 
