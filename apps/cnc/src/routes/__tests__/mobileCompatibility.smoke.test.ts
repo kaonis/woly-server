@@ -155,7 +155,7 @@ describe('Mobile API compatibility smoke checks', () => {
         metadata: {
           version: '1.0.0',
           platform: 'darwin',
-          protocolVersion: '1.1.1',
+          protocolVersion: PROTOCOL_VERSION,
           networkInfo: {
             subnet: '192.168.1.0/24',
             gateway: '192.168.1.1',

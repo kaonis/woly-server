@@ -57,6 +57,10 @@ for (const target of targets) {
     }
   );
 
+  if (result.error) {
+    throw new Error(`Failed to generate ${target.name} client: ${result.error.message}`);
+  }
+
   if (result.status !== 0) {
     throw new Error(`Failed to generate ${target.name} client (exit ${result.status ?? 'unknown'})`);
   }

@@ -14,7 +14,7 @@ const capabilities: CncCapabilitiesResponse = {
   mode: 'cnc',
   versions: {
     cncApi: '1.0.0',
-    protocol: '1.3.0',
+    protocol: '1.6.0',
   },
   capabilities: {
     scan: { supported: true },
@@ -22,6 +22,9 @@ const capabilities: CncCapabilitiesResponse = {
     schedules: { supported: true, routes: ['/api/hosts/:fqn/schedules'] },
     hostStateStreaming: { supported: true, transport: 'websocket', routes: ['/ws/mobile/hosts'] },
     commandStatusStreaming: { supported: false, transport: null },
+    wakeVerification: { supported: true },
+    sleep: { supported: true, routes: ['/api/hosts/sleep/:fqn'] },
+    shutdown: { supported: true, routes: ['/api/hosts/shutdown/:fqn'] },
   },
   rateLimits: {
     strictAuth: { maxCalls: 5, windowMs: 900_000, scope: 'ip' },
