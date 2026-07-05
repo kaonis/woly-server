@@ -1,6 +1,10 @@
 # Manual CI Review Log
 
-Record weekly decisions for temporary manual-only CI mode.
+Record weekly decisions for manual-first budget-mode CI.
+
+Approved automation exceptions are the low-cost CNC sync policy check on pull
+requests and the scheduled dependency health watchdog. Other heavy gates remain
+local-first before merge.
 
 ## Template
 
@@ -11,7 +15,7 @@ Period reviewed:
 - Unexpected automatic workflow runs observed: Yes/No
 - Local gate policy followed: Yes/No
 - Budget and throughput assessment: <brief summary>
-- Decision: Continue manual-only / Start rollback
+- Decision: Continue manual-first budget mode / Start rollback
 - Follow-up actions:
 
 ## Entries

@@ -6,7 +6,8 @@ Source: Dependency Dashboard (`#4`)
 
 ## 1. Scope
 
-This plan covers the currently deferred or high-risk major dependency updates:
+This plan is a historical wave log plus active-deferral checkpoint for high-risk
+major dependency updates:
 
 - ESLint v9 and v10
 - typescript-eslint v8
@@ -15,6 +16,11 @@ This plan covers the currently deferred or high-risk major dependency updates:
 - npm v11
 - Turbo v2.8.9
 - ESLint 10 compatibility watchdog automation
+
+Current active deferrals are tracked in checkpoint updates. As of the 2026-07-05
+maintenance rounds, TypeScript 6, lint-staged 17, commitlint 21, and
+openapi-typescript-codegen 0.31 remain inventory items unless a scoped
+compatibility or security reason is documented.
 
 ## 2. Risk Profile
 

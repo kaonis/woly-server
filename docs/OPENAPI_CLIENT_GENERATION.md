@@ -42,6 +42,9 @@ Or locally:
 npm run client:publish
 ```
 
+The local publish script runs `client:consumer-typecheck` first, which rebuilds
+the package and verifies the external-consumer compile fixture before publish.
+
 ## Mobile App Consumption
 
 The mobile app (`kaonis/woly`) can consume the generated package directly:

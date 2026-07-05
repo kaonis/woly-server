@@ -45,7 +45,7 @@ describe('commandReconciler', () => {
       expect(mockedCommandModel.reconcileStaleInFlight).toHaveBeenCalledWith(30_000);
       expect(mockedLogger.warn).toHaveBeenCalledWith(
         'Reconciled stale in-flight commands on startup',
-        { count: 3 }
+        { count: 3 },
       );
     });
 
@@ -55,7 +55,7 @@ describe('commandReconciler', () => {
       await reconcileCommandsOnStartup({ commandTimeoutMs: 60_000 });
 
       expect(mockedLogger.info).toHaveBeenCalledWith(
-        'No stale in-flight commands to reconcile on startup'
+        'No stale in-flight commands to reconcile on startup',
       );
     });
 
@@ -64,13 +64,12 @@ describe('commandReconciler', () => {
       mockedCommandModel.reconcileStaleInFlight.mockRejectedValueOnce(error);
 
       await expect(
-        reconcileCommandsOnStartup({ commandTimeoutMs: 10_000 })
+        reconcileCommandsOnStartup({ commandTimeoutMs: 10_000 }),
       ).resolves.toBeUndefined();
 
-      expect(mockedLogger.error).toHaveBeenCalledWith(
-        'Failed to reconcile commands on startup',
-        { error }
-      );
+      expect(mockedLogger.error).toHaveBeenCalledWith('Failed to reconcile commands on startup', {
+        error,
+      });
     });
   });
 
@@ -95,10 +94,10 @@ describe('commandReconciler', () => {
       const result = await pruneOldCommands(30);
 
       expect(result).toBe(0);
-      expect(mockedLogger.error).toHaveBeenCalledWith(
-        'Failed to prune old commands',
-        { error, retentionDays: 30 }
-      );
+      expect(mockedLogger.error).toHaveBeenCalledWith('Failed to prune old commands', {
+        error,
+        retentionDays: 30,
+      });
     });
   });
 
@@ -112,7 +111,7 @@ describe('commandReconciler', () => {
       expect(setIntervalSpy).not.toHaveBeenCalled();
       expect(clearIntervalSpy).not.toHaveBeenCalled();
       expect(mockedLogger.info).toHaveBeenCalledWith(
-        'Command pruning disabled (COMMAND_RETENTION_DAYS <= 0)'
+        'Command pruning disabled (COMMAND_RETENTION_DAYS <= 0)',
       );
 
       setIntervalSpy.mockRestore();
@@ -136,6 +135,49 @@ describe('commandReconciler', () => {
 
       setIntervalSpy.mockRestore();
       clearIntervalSpy.mockRestore();
+    });
+
+    it('falls back to node timers when Jest removes interval globals', async () => {
+      const originalSetInterval = globalThis.setInterval;
+      const originalClearInterval = globalThis.clearInterval;
+      mockedCommandModel.pruneOldCommands.mockResolvedValue(0);
+
+      Object.defineProperty(globalThis, 'setInterval', {
+        configurable: true,
+        writable: true,
+        value: undefined,
+      });
+      Object.defineProperty(globalThis, 'clearInterval', {
+        configurable: true,
+        writable: true,
+        value: undefined,
+      });
+
+      try {
+        startCommandPruning(7);
+        await Promise.resolve();
+
+        expect(mockedCommandModel.pruneOldCommands).toHaveBeenCalledWith(7);
+        expect(mockedLogger.info).toHaveBeenCalledWith('Command pruning scheduled', {
+          retentionDays: 7,
+          intervalHours: 24,
+        });
+
+        stopCommandPruning();
+
+        expect(mockedLogger.info).toHaveBeenCalledWith('Command pruning stopped');
+      } finally {
+        Object.defineProperty(globalThis, 'setInterval', {
+          configurable: true,
+          writable: true,
+          value: originalSetInterval,
+        });
+        Object.defineProperty(globalThis, 'clearInterval', {
+          configurable: true,
+          writable: true,
+          value: originalClearInterval,
+        });
+      }
     });
 
     it('stops and logs when pruning is active', async () => {
