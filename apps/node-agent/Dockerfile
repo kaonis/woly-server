@@ -34,7 +34,7 @@ COPY --from=builder /app/apps/node-agent/dist/ ./apps/node-agent/dist/
 RUN npm ci --workspace=apps/node-agent --workspace=packages/protocol --omit=dev
 
 # Create directories for database and logs
-RUN mkdir -p /app/apps/node-agent/db /app/apps/node-agent/logs
+RUN mkdir -p /app/apps/node-agent/db /app/logs
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \

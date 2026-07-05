@@ -17,7 +17,7 @@ services:
       - LOG_LEVEL=info
     volumes:
       - ./db:/data
-      - ./logs:/app/apps/node-agent/logs
+      - ./logs:/app/logs
     restart: unless-stopped
     # Required for network scanning - use host network for ARP access
     network_mode: host

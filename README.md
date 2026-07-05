@@ -42,7 +42,7 @@ woly-server/
 
 ## Prerequisites
 
-- **Node.js 24 or 25** (see `.nvmrc`; Node 26 is not supported by the pinned SQLite runtime)
+- **Node.js 24, 25, or 26** (`.nvmrc` pins the baseline local runtime to Node 24)
 - **npm 10+**
 - PostgreSQL 16+ (optional, cnc supports SQLite for dev)
 
@@ -312,15 +312,15 @@ Dependency update review cadence and decision rules are documented in:
 
 ## Tech Stack
 
-| Layer      | Technology                          |
-| ---------- | ----------------------------------- |
-| Runtime    | Node.js 24, TypeScript 5.9          |
-| Framework  | Express 5                           |
-| Databases  | SQLite (better-sqlite3), PostgreSQL |
-| Testing    | Jest 30, Supertest                  |
-| Validation | Zod, Joi                            |
-| Build      | Turborepo, tsc                      |
-| CI         | GitHub Actions                      |
+| Layer      | Technology                                                |
+| ---------- | --------------------------------------------------------- |
+| Runtime    | Node.js 24 baseline, Node 24-26 supported, TypeScript 5.9 |
+| Framework  | Express 5                                                 |
+| Databases  | SQLite (better-sqlite3), PostgreSQL                       |
+| Testing    | Jest 30, Supertest                                        |
+| Validation | Zod, Joi                                                  |
+| Build      | Turborepo, tsc                                            |
+| CI         | GitHub Actions                                            |
 
 ## Contributing
 

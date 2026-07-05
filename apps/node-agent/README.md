@@ -17,7 +17,7 @@
 
 ### Prerequisites
 
-- Node.js 24, 25, or 26 (see root `.nvmrc`)
+- Node.js 24, 25, or 26 (root `.nvmrc` pins the baseline local runtime)
 - npm 10+
 
 ### From monorepo root
@@ -430,7 +430,7 @@ docker run -d \
   --name woly-backend \
   --net host \
   -v $(pwd)/apps/node-agent/db:/data \
-  -v $(pwd)/apps/node-agent/logs:/app/apps/node-agent/logs \
+  -v $(pwd)/apps/node-agent/logs:/app/logs \
   -e NODE_ENV=production \
   -e DB_PATH=/data/woly.db \
   woly-node-agent:latest

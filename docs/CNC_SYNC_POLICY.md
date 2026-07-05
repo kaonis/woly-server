@@ -67,6 +67,13 @@ Each CNC feature PR must include:
 - Exact local commands run
 - Pass/fail summary from local validation
 
+CNC backend source-path maintenance PRs that do not change protocol contracts,
+backend API/command behavior, or frontend integration requirements may use the
+maintenance-only classification in the PR template instead of the CNC feature
+classification. These PRs must include a concrete maintenance rationale and
+complete the Review Pass checklist. Protocol source changes remain CNC feature
+changes and must use the full feature classification.
+
 ## 7. Review Pass Requirement
 
 Every PR must complete a final review pass before merge (peer review preferred; self-review required at minimum), and all review comments/threads must be resolved with follow-up commits or explicit rationale.

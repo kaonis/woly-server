@@ -1,6 +1,11 @@
 ## CNC Sync Classification
 
 - [ ] This PR is a CNC feature change.
+- [ ] This PR touches CNC backend source paths for maintenance only.
+
+Maintenance rationale (required when maintenance-only checkbox is checked):
+
+- N/A
 
 ## Linked Issues (required when CNC feature checkbox is checked)
 
