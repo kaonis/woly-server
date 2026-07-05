@@ -6,14 +6,17 @@
 - Out of scope: standalone node-agent API compatibility work, except where temporary compatibility is needed during migration.
 - Protocol location: `woly-protocol/protocol` repo was not found locally; canonical protocol package is `packages/protocol` in `woly-server`.
 
-## Audit Baseline (What is currently out of sync)
+## Audit Baseline (Originally Identified Gaps)
 
-1. Frontend expects CNC host scan endpoints (`/api/hosts/ports/:fqn`, `/api/hosts/scan-ports/:fqn`) in `/Users/phantom/projects/woly/src/services/woly-service.ts`, but CNC routes in `/Users/phantom/projects/woly-server/apps/cnc/src/routes/index.ts` do not expose them.
-2. CNC command routing already supports scan in `/Users/phantom/projects/woly-server/apps/cnc/src/services/commandRouter.ts`, but route/controller wiring is missing.
+This section records the original CNC sync gaps. Some backend-side gaps have
+since landed and are tracked in the rolling progress log below.
+
+1. Host scan CNC endpoints (`/api/hosts/ports/:fqn`, `/api/hosts/scan-ports/:fqn`) are now exposed by `/Users/phantom/projects/woly-server/apps/cnc/src/routes/index.ts`, advertised in capabilities, and covered by mobile compatibility smoke tests.
+2. CNC command routing and route/controller wiring for scan parity are now present in `/Users/phantom/projects/woly-server/apps/cnc`.
 3. Frontend host type in `/Users/phantom/projects/woly/src/types.ts` does not include protocol host fields like `notes` and `tags` that already exist in `/Users/phantom/projects/woly-server/packages/protocol/src/index.ts` and backend update validation in `/Users/phantom/projects/woly-server/apps/cnc/src/controllers/hosts.ts`.
 4. Frontend edit flow in `/Users/phantom/projects/woly/app/edit/[id].tsx` only updates `name`, `ip`, `mac`.
-5. Notes/schedules/scan history are local-only state (`/Users/phantom/projects/woly/src/stores/notes-store.ts`, `/Users/phantom/projects/woly/src/stores/schedules-store.ts`, `/Users/phantom/projects/woly/src/stores/scan-history-store.ts`).
-6. Mobile compatibility smoke coverage in `/Users/phantom/projects/woly-server/apps/cnc/src/routes/__tests__/mobileCompatibility.smoke.test.ts` validates core hosts/nodes only, not richer CNC interactions.
+5. Notes and scan history remain local-only state (`/Users/phantom/projects/woly/src/stores/notes-store.ts`, `/Users/phantom/projects/woly/src/stores/scan-history-store.ts`). Wake schedules are now backed by CNC APIs, with app migration tracked separately.
+6. Mobile compatibility smoke coverage now includes richer CNC interactions such as scan endpoints, capabilities, and schedule sync.
 
 ## Cross-Repo Issue Map
 

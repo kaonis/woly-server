@@ -5,6 +5,7 @@ import type {
   HostWakeSchedule,
 } from '@kaonis/woly-protocol';
 import {
+  PROTOCOL_VERSION,
   cncCapabilitiesResponseSchema,
   hostPortScanResponseSchema,
   hostWakeScheduleSchema,
@@ -14,17 +15,21 @@ const capabilities: CncCapabilitiesResponse = {
   mode: 'cnc',
   versions: {
     cncApi: '1.0.0',
-    protocol: '1.6.0',
+    protocol: PROTOCOL_VERSION,
   },
   capabilities: {
     scan: { supported: true },
     notesTags: { supported: true, persistence: 'backend' },
-    schedules: { supported: true, routes: ['/api/hosts/:fqn/schedules'] },
+    schedules: {
+      supported: true,
+      persistence: 'backend',
+      routes: ['/api/schedules', '/api/schedules/:id'],
+    },
     hostStateStreaming: { supported: true, transport: 'websocket', routes: ['/ws/mobile/hosts'] },
     commandStatusStreaming: { supported: false, transport: null },
     wakeVerification: { supported: true },
-    sleep: { supported: true, routes: ['/api/hosts/sleep/:fqn'] },
-    shutdown: { supported: true, routes: ['/api/hosts/shutdown/:fqn'] },
+    sleep: { supported: true, routes: ['/api/hosts/:fqn/sleep'] },
+    shutdown: { supported: true, routes: ['/api/hosts/:fqn/shutdown'] },
   },
   rateLimits: {
     strictAuth: { maxCalls: 5, windowMs: 900_000, scope: 'ip' },

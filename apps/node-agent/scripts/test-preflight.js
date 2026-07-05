@@ -4,14 +4,18 @@ const net = require('net');
 
 const major = Number(process.versions.node.split('.')[0]);
 if (major < 24 || major >= 27) {
-  console.error(`[preflight] Node.js ${process.version} detected. Node.js v24, v25, or v26 is required.`);
+  console.error(
+    `[preflight] Node.js ${process.version} detected. Node.js v24, v25, or v26 is required.`,
+  );
   process.exit(1);
 }
 
 const server = net.createServer();
 server.once('error', (error) => {
   console.error(`[preflight] Local socket bind failed (${error.code || 'UNKNOWN'}).`);
-  console.error('[preflight] Test suites using supertest need loopback bind permission in this environment.');
+  console.error(
+    '[preflight] Test suites using supertest need loopback bind permission in this environment.',
+  );
   process.exit(1);
 });
 
@@ -28,11 +32,13 @@ server.listen(0, '127.0.0.1', () => {
     }
 
     try {
-      require('better-sqlite3');
+      const Database = require('better-sqlite3');
+      const db = new Database(':memory:');
+      db.close();
       process.stdout.write('[preflight] Runtime checks passed.\n');
     } catch (error) {
       const message = error && error.message ? error.message : String(error);
-      console.error('[preflight] better-sqlite3 failed to load.');
+      console.error('[preflight] better-sqlite3 failed to open an in-memory database.');
       console.error(`[preflight] ${message}`);
       console.error(`[preflight] node execPath: ${process.execPath}`);
       console.error(`[preflight] node modules ABI: ${process.versions.modules}`);

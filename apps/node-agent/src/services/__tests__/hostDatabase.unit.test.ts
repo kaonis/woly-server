@@ -46,7 +46,7 @@ describe('HostDatabase', () => {
 
     // Default MAC normalization used throughout HostDatabase.
     (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
-      mac.toUpperCase().replace(/-/g, ':')
+      mac.toUpperCase().replace(/-/g, ':'),
     );
 
     // Use in-memory database for each test
@@ -57,8 +57,12 @@ describe('HostDatabase', () => {
   });
 
   afterEach(async () => {
-    scanOrchestrator.stopPeriodicSync();
-    await db.close();
+    if (scanOrchestrator) {
+      scanOrchestrator.stopPeriodicSync();
+    }
+    if (db) {
+      await db.close();
+    }
   });
 
   describe('initialization', () => {
@@ -105,7 +109,7 @@ describe('HostDatabase', () => {
 
       // Verify directory creation was not logged (directory existed)
       expect(logger.info).not.toHaveBeenCalledWith(
-        expect.stringContaining('Created database directory')
+        expect.stringContaining('Created database directory'),
       );
 
       // Clean up
@@ -127,7 +131,7 @@ describe('HostDatabase', () => {
     it('should not duplicate data on re-initialization', async () => {
       // Add a test host
       await db.addHost('TestHost1', 'AA:BB:CC:DD:EE:01', '192.168.1.201');
-      
+
       const hostsBefore = await db.getAllHosts();
       const countBefore = hostsBefore.length;
 
@@ -144,7 +148,7 @@ describe('HostDatabase', () => {
     it('should retrieve all hosts', async () => {
       // Add test host first since seed data is removed
       await db.addHost('TestHost1', 'AA:BB:CC:DD:EE:01', '192.168.1.201');
-      
+
       const hosts = await db.getAllHosts();
 
       expect(Array.isArray(hosts)).toBe(true);
@@ -208,7 +212,7 @@ describe('HostDatabase', () => {
           name: 'EventHostAdd',
           mac: 'AA:BB:CC:DD:EE:89',
           ip: '192.168.1.189',
-        })
+        }),
       );
     });
 
@@ -342,7 +346,7 @@ describe('HostDatabase', () => {
           name: 'EventHostUpdate',
           status: 'awake',
           notes: 'updated via event test',
-        })
+        }),
       );
     });
 
@@ -354,7 +358,7 @@ describe('HostDatabase', () => {
       await expect(
         db.updateHost('NoOpHost', {
           ip: '192.168.1.213',
-        })
+        }),
       ).resolves.toBeUndefined();
       expect(onUpdated).not.toHaveBeenCalled();
     });
@@ -363,7 +367,7 @@ describe('HostDatabase', () => {
       await expect(
         db.updateHost('MissingHost', {
           ip: '192.168.1.250',
-        })
+        }),
       ).rejects.toThrow('Host MissingHost not found');
     });
 
@@ -391,7 +395,7 @@ describe('HostDatabase', () => {
     it('should update host status (awake/asleep)', async () => {
       // Add test host first
       await db.addHost('StatusTestHost', 'AA:BB:CC:DD:EE:03', '192.168.1.203');
-      
+
       await db.updateHostStatus('StatusTestHost', 'awake');
 
       const host = await db.getHost('StatusTestHost');
@@ -405,7 +409,7 @@ describe('HostDatabase', () => {
     it('should update lastSeen timestamp on host update', async () => {
       // Add test host first
       await db.addHost('TimestampTestHost', 'AA:BB:CC:DD:EE:04', '192.168.1.204');
-      
+
       const hostBefore = await db.getHost('TimestampTestHost');
       const lastSeenBefore = hostBefore?.lastSeen;
 
@@ -435,7 +439,7 @@ describe('HostDatabase', () => {
     it('should mark host as discovered when updating', async () => {
       // Add test host first
       await db.addHost('DiscoveredTestHost', 'AA:BB:CC:DD:EE:05', '192.168.1.205');
-      
+
       await db.updateHostSeen('AA:BB:CC:DD:EE:05', 'awake');
 
       const host = await db.getHost('DiscoveredTestHost');
@@ -445,7 +449,7 @@ describe('HostDatabase', () => {
 
     it('should throw error when updating non-existent MAC', async () => {
       await expect(db.updateHostSeen('FF:FF:FF:FF:FF:FF', 'awake')).rejects.toThrow(
-        'Host with MAC FF:FF:FF:FF:FF:FF not found in database'
+        'Host with MAC FF:FF:FF:FF:FF:FF not found in database',
       );
     });
   });
@@ -454,14 +458,14 @@ describe('HostDatabase', () => {
     it('should sync discovered hosts with database', async () => {
       // Add test host first
       await db.addHost('SyncTestHost', 'AA:BB:CC:DD:EE:06', '192.168.1.206');
-      
+
       const mockDiscoveredHosts: DiscoveredHost[] = [
         { ip: '192.168.1.206', mac: 'AA:BB:CC:DD:EE:06', hostname: 'SyncTestHost' },
       ];
 
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
       (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
-        mac.toUpperCase().replace(/-/g, ':')
+        mac.toUpperCase().replace(/-/g, ':'),
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(true);
 
@@ -479,7 +483,7 @@ describe('HostDatabase', () => {
 
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
       (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
-        mac.toUpperCase().replace(/-/g, ':')
+        mac.toUpperCase().replace(/-/g, ':'),
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(true);
 
@@ -494,14 +498,14 @@ describe('HostDatabase', () => {
     it('should update existing hosts during sync', async () => {
       // Add test host first
       await db.addHost('UpdateSyncHost', 'AA:BB:CC:DD:EE:08', '192.168.1.208');
-      
+
       const mockDiscoveredHosts: DiscoveredHost[] = [
         { ip: '192.168.1.208', mac: 'AA:BB:CC:DD:EE:08', hostname: 'UpdateSyncHost' },
       ];
 
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
       (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
-        mac.toUpperCase().replace(/-/g, ':')
+        mac.toUpperCase().replace(/-/g, ':'),
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(true);
 
@@ -523,7 +527,7 @@ describe('HostDatabase', () => {
 
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
       (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
-        mac.toUpperCase().replace(/-/g, ':')
+        mac.toUpperCase().replace(/-/g, ':'),
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(false);
 
@@ -547,7 +551,7 @@ describe('HostDatabase', () => {
 
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
       (networkDiscovery.isHostAlive as jest.Mock).mockRejectedValue(
-        new Error('ping should not be called')
+        new Error('ping should not be called'),
       );
 
       await scanOrchestrator.syncWithNetwork();
@@ -569,10 +573,10 @@ describe('HostDatabase', () => {
 
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
       (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
-        mac.toUpperCase().replace(/-/g, ':')
+        mac.toUpperCase().replace(/-/g, ':'),
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockRejectedValue(
-        new Error('ping should not be called')
+        new Error('ping should not be called'),
       );
 
       await scanOrchestrator.syncWithNetwork();
@@ -599,7 +603,7 @@ describe('HostDatabase', () => {
 
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
       (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
-        mac.toUpperCase().replace(/-/g, ':')
+        mac.toUpperCase().replace(/-/g, ':'),
       );
       // First host fails ping, second succeeds
       (networkDiscovery.isHostAlive as jest.Mock)
@@ -632,7 +636,7 @@ describe('HostDatabase', () => {
 
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
       (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
-        mac.toUpperCase().replace(/-/g, ':')
+        mac.toUpperCase().replace(/-/g, ':'),
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(false);
 
@@ -640,7 +644,7 @@ describe('HostDatabase', () => {
 
       // Verify debug log was called
       expect(logger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('found via ARP but did not respond to ping - marking as asleep')
+        expect.stringContaining('found via ARP but did not respond to ping - marking as asleep'),
       );
 
       // Verify the host status is actually asleep
@@ -664,7 +668,7 @@ describe('HostDatabase', () => {
 
     it('should handle network discovery failures', async () => {
       (networkDiscovery.scanNetworkARP as jest.Mock).mockRejectedValue(
-        new Error('Network scan failed')
+        new Error('Network scan failed'),
       );
 
       await scanOrchestrator.syncWithNetwork();
@@ -681,7 +685,7 @@ describe('HostDatabase', () => {
 
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
       (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
-        mac.toUpperCase().replace(/-/g, ':')
+        mac.toUpperCase().replace(/-/g, ':'),
       );
       (networkDiscovery.isHostAlive as jest.Mock).mockResolvedValue(true);
 
@@ -703,7 +707,7 @@ describe('HostDatabase', () => {
 
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
       (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
-        mac.toUpperCase().replace(/-/g, ':')
+        mac.toUpperCase().replace(/-/g, ':'),
       );
 
       // Track call timing to verify concurrency
@@ -740,7 +744,7 @@ describe('HostDatabase', () => {
 
       (networkDiscovery.scanNetworkARP as jest.Mock).mockResolvedValue(mockDiscoveredHosts);
       (networkDiscovery.formatMAC as jest.Mock).mockImplementation((mac: string) =>
-        mac.toUpperCase().replace(/-/g, ':')
+        mac.toUpperCase().replace(/-/g, ':'),
       );
 
       // Mock alternating ping results
@@ -838,12 +842,14 @@ describe('HostDatabase', () => {
     });
 
     it('should warn when pingResponsive migration fails for a non-duplicate-column reason', () => {
-      const execSpy = jest.spyOn((db as any).db, 'exec').mockImplementation((...args: unknown[]) => {
-        const sql = args[0] as string;
-        if (sql.includes('ALTER TABLE hosts ADD COLUMN pingResponsive integer')) {
-          throw new Error('permission denied');
-        }
-      });
+      const execSpy = jest
+        .spyOn((db as any).db, 'exec')
+        .mockImplementation((...args: unknown[]) => {
+          const sql = args[0] as string;
+          if (sql.includes('ALTER TABLE hosts ADD COLUMN pingResponsive integer')) {
+            throw new Error('permission denied');
+          }
+        });
 
       db.createTable();
 
@@ -854,23 +860,21 @@ describe('HostDatabase', () => {
     });
 
     it('should log and rethrow getAllHosts failures', async () => {
-      const prepareSpy = jest
-        .spyOn((db as any).db, 'prepare')
-        .mockImplementation(() => {
-          throw new Error('select failed');
-        });
+      const prepareSpy = jest.spyOn((db as any).db, 'prepare').mockImplementation(() => {
+        throw new Error('select failed');
+      });
 
       await expect(db.getAllHosts()).rejects.toThrow('select failed');
-      expect(logger.error).toHaveBeenCalledWith('Failed to get all hosts:', { error: 'select failed' });
+      expect(logger.error).toHaveBeenCalledWith('Failed to get all hosts:', {
+        error: 'select failed',
+      });
       prepareSpy.mockRestore();
     });
 
     it('should log and rethrow getHost failures', async () => {
-      const prepareSpy = jest
-        .spyOn((db as any).db, 'prepare')
-        .mockImplementation(() => {
-          throw new Error('get failed');
-        });
+      const prepareSpy = jest.spyOn((db as any).db, 'prepare').mockImplementation(() => {
+        throw new Error('get failed');
+      });
 
       await expect(db.getHost('BrokenHost')).rejects.toThrow('get failed');
       expect(logger.error).toHaveBeenCalledWith('Failed to get host BrokenHost:', {
@@ -880,11 +884,9 @@ describe('HostDatabase', () => {
     });
 
     it('should log and rethrow getHostByMAC failures', async () => {
-      const prepareSpy = jest
-        .spyOn((db as any).db, 'prepare')
-        .mockImplementation(() => {
-          throw new Error('get by mac failed');
-        });
+      const prepareSpy = jest.spyOn((db as any).db, 'prepare').mockImplementation(() => {
+        throw new Error('get by mac failed');
+      });
 
       await expect(db.getHostByMAC('aa-bb-cc-dd-ee-ff')).rejects.toThrow('get by mac failed');
       expect(logger.error).toHaveBeenCalledWith('Failed to get host by MAC aa-bb-cc-dd-ee-ff:', {
@@ -894,13 +896,13 @@ describe('HostDatabase', () => {
     });
 
     it('should reject when updateHostSeen query execution throws', async () => {
-      const prepareSpy = jest
-        .spyOn((db as any).db, 'prepare')
-        .mockImplementation(() => {
-          throw new Error('update seen failed');
-        });
+      const prepareSpy = jest.spyOn((db as any).db, 'prepare').mockImplementation(() => {
+        throw new Error('update seen failed');
+      });
 
-      await expect(db.updateHostSeen('AA:BB:CC:DD:EE:FE', 'awake')).rejects.toThrow('update seen failed');
+      await expect(db.updateHostSeen('AA:BB:CC:DD:EE:FE', 'awake')).rejects.toThrow(
+        'update seen failed',
+      );
       prepareSpy.mockRestore();
     });
 
@@ -918,7 +920,7 @@ describe('HostDatabase', () => {
       await expect(
         db.updateHost('MacUpdateHost', {
           mac: 'aa-bb-cc-dd-ee-aa',
-        })
+        }),
       ).resolves.toBeUndefined();
 
       const updated = await db.getHost('MacUpdateHost');
@@ -926,37 +928,33 @@ describe('HostDatabase', () => {
     });
 
     it('should reject when deleting a missing host', async () => {
-      await expect(db.deleteHost('MissingDeleteHost')).rejects.toThrow('Host MissingDeleteHost not found');
+      await expect(db.deleteHost('MissingDeleteHost')).rejects.toThrow(
+        'Host MissingDeleteHost not found',
+      );
     });
 
     it('should reject when delete query throws', async () => {
-      const prepareSpy = jest
-        .spyOn((db as any).db, 'prepare')
-        .mockImplementation(() => {
-          throw new Error('delete failed');
-        });
+      const prepareSpy = jest.spyOn((db as any).db, 'prepare').mockImplementation(() => {
+        throw new Error('delete failed');
+      });
 
       await expect(db.deleteHost('AnyHost')).rejects.toThrow('delete failed');
       prepareSpy.mockRestore();
     });
 
     it('should reject when status update query throws', async () => {
-      const prepareSpy = jest
-        .spyOn((db as any).db, 'prepare')
-        .mockImplementation(() => {
-          throw new Error('status failed');
-        });
+      const prepareSpy = jest.spyOn((db as any).db, 'prepare').mockImplementation(() => {
+        throw new Error('status failed');
+      });
 
       await expect(db.updateHostStatus('AnyHost', 'awake')).rejects.toThrow('status failed');
       prepareSpy.mockRestore();
     });
 
     it('should log and rethrow close failures', async () => {
-      const closeSpy = jest
-        .spyOn((db as any).db, 'close')
-        .mockImplementation(() => {
-          throw new Error('close failed');
-        });
+      const closeSpy = jest.spyOn((db as any).db, 'close').mockImplementation(() => {
+        throw new Error('close failed');
+      });
 
       await expect(db.close()).rejects.toThrow('close failed');
       expect(logger.error).toHaveBeenCalledWith('Failed to close database connection:', {
