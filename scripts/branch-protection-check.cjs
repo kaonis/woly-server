@@ -5,7 +5,7 @@ const { execFileSync } = require('node:child_process');
 
 function parseArgs(argv) {
   const options = {
-    branch: 'main',
+    branch: 'master',
     json: false,
     help: false,
   };
@@ -134,7 +134,7 @@ function printHelp() {
       'Usage: node scripts/branch-protection-check.cjs [options]',
       '',
       'Options:',
-      '  --branch <name>  Branch to check (default: main)',
+      '  --branch <name>  Branch to check (default: master)',
       '  --json           Print machine-readable JSON output',
       '  -h, --help       Show this help text',
       '',

@@ -31,13 +31,13 @@
   },
   "private": true,
   "engines": {
-    "node": ">=24.0.0 <26.0.0",
+    "node": ">=24.0.0 <27.0.0",
     "npm": ">=10.0.0"
   },
   "dependencies": {
     "@kaonis/woly-protocol": "*",
     "axios": "^1.13.2",
-    "better-sqlite3": "^12.6.2",
+    "better-sqlite3": "^12.11.1",
     "cors": "^2.8.5",
     "dotenv": "^17.0.0",
     "express": "5.2.1",

@@ -17,7 +17,7 @@
 
 ### Prerequisites
 
-- Node.js 24 or 25 (see root `.nvmrc`; Node 26 is not supported by the pinned SQLite runtime)
+- Node.js 24, 25, or 26 (root `.nvmrc` pins the baseline local runtime)
 - npm 10+
 
 ### From monorepo root
@@ -420,7 +420,7 @@ All errors follow a standardized format:
 ### Build Image
 
 ```bash
-docker build -t woly-backend:latest .
+docker build -f apps/node-agent/Dockerfile -t woly-node-agent:latest .
 ```
 
 ### Run Container
@@ -429,16 +429,17 @@ docker build -t woly-backend:latest .
 docker run -d \
   --name woly-backend \
   --net host \
-  -v $(pwd)/db:/app/db \
-  -v $(pwd)/logs:/app/logs \
+  -v $(pwd)/apps/node-agent/db:/data \
+  -v $(pwd)/apps/node-agent/logs:/app/logs \
   -e NODE_ENV=production \
-  woly-backend:latest
+  -e DB_PATH=/data/woly.db \
+  woly-node-agent:latest
 ```
 
 ### Docker Compose
 
 ```bash
-docker-compose up -d
+docker compose -f apps/node-agent/docker-compose.yml up -d
 ```
 
 **Note:** Host networking mode is required for ARP scanning.

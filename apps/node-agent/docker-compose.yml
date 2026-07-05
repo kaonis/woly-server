@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   woly-backend:
-    build: .
+    build:
+      context: ../..
+      dockerfile: apps/node-agent/Dockerfile
     container_name: woly-backend
-    ports:
-      - "8082:8082"
     environment:
       - NODE_ENV=production
       - PORT=8082
@@ -21,11 +19,5 @@ services:
       - ./db:/data
       - ./logs:/app/logs
     restart: unless-stopped
-    networks:
-      - woly-network
     # Required for network scanning - use host network for ARP access
     network_mode: host
-
-networks:
-  woly-network:
-    driver: bridge

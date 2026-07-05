@@ -1,0 +1,15 @@
+.git
+.github
+.turbo
+coverage
+dist
+node_modules
+npm-debug.log
+
+**/.env
+**/.env.*
+**/db
+**/logs
+
+apps/cnc
+packages/woly-client

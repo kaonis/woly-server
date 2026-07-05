@@ -88,8 +88,8 @@ npm run test:ci
 
 ## Runtime Prerequisites
 
-- Node.js v24 or v25 is supported.
-- `.nvmrc` provides the baseline local version for consistency; Node 24 and 25 are supported by the pinned SQLite runtime.
+- Node.js v24, v25, or v26 is supported.
+- `.nvmrc` provides the baseline local version for consistency; Node 24 through 26 are supported by the pinned SQLite runtime.
 - Test preflight verifies that local socket bind is allowed because Supertest-based suites require it.
 - If preflight fails on socket bind, run tests outside restricted/sandboxed execution environments.
 
@@ -297,7 +297,7 @@ After running `npm run test:coverage`:
 
 Tests run automatically on:
 
-- Every push to `main` when automatic CI is enabled
+- Every push to `master` when automatic CI is enabled
 - Every pull request
 
 The CI pipeline:

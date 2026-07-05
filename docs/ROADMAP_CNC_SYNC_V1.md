@@ -100,4 +100,5 @@
 - 2026-02-18: Completed weekly manual-first operations review for issue #280 using `npm run ci:audit:manual -- --since 2026-02-16T18:35:12Z --fail-on-unexpected` (PASS) and `npm run ci:policy:check` (PASS).
 - 2026-02-18: Logged review decision in `docs/CI_MANUAL_REVIEW_LOG.md` and checkpoint updates in `docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md`.
 - 2026-07-03: Completed maintenance dependency/policy review using local-first gates; `npm audit --omit=dev --audit-level=high`, ESLint 10 watchdog, and workflow policy checks passed.
-- 2026-07-03: Confirmed Node 26 remains deferred because of the pinned SQLite runtime; validation and dependency inventory must run under supported Node 24/25 until the runtime compatibility gate is updated.
+- 2026-07-03: Confirmed Node 26 was deferred at that checkpoint because of the then-pinned SQLite runtime; validation and dependency inventory ran under supported Node 24/25 until the runtime compatibility gate was updated.
+- 2026-07-05: Advanced the SQLite runtime to `better-sqlite3@12.11.1`, which declares Node 26 support, and relaxed repo/app engine guards to allow Node 24 through 26 after local validation.

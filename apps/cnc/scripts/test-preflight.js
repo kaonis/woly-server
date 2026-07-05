@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 const major = Number(process.versions.node.split('.')[0]);
-if (major < 24 || major >= 26) {
-  console.error(`[preflight] Node.js ${process.version} detected. Node.js v24 or v25 is required.`);
+if (major < 24 || major >= 27) {
+  console.error(`[preflight] Node.js ${process.version} detected. Node.js v24, v25, or v26 is required.`);
   process.exit(1);
 }
 
