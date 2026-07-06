@@ -1225,6 +1225,94 @@ export class HostsController {
    *   put:
    *     summary: Associate an additional MAC address with a host
    *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Fully qualified name (hostname@location)
+   *         example: PHANTOM-MBP@home-network
+   *       - in: header
+   *         name: Idempotency-Key
+   *         schema:
+   *           type: string
+   *         description: Optional idempotency key to prevent duplicate commands
+   *         example: unique-request-id-123
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - mac
+   *             properties:
+   *               mac:
+   *                 type: string
+   *                 pattern: '^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'
+   *                 description: MAC address to associate with the host
+   *                 example: 'AA:BB:CC:DD:EE:FF'
+   *               makePrimary:
+   *                 type: boolean
+   *                 description: Promote the merged MAC to the primary MAC
+   *                 example: false
+   *               sourceFqn:
+   *                 type: string
+   *                 description: Optional source host FQN when merging duplicate hosts
+   *                 example: PHANTOM-MBP-OLD@home-network
+   *               deleteSourceHost:
+   *                 type: boolean
+   *                 description: Delete the source host after a successful merge
+   *                 example: false
+   *     responses:
+   *       200:
+   *         description: Host MAC merged successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 message:
+   *                   type: string
+   *                   example: Host MAC merged successfully
+   *                 secondaryMacs:
+   *                   type: array
+   *                   items:
+   *                     type: string
+   *                     pattern: '^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'
+   *                   example: ['AA:BB:CC:DD:EE:FF']
+   *                 primaryMac:
+   *                   type: string
+   *                   pattern: '^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'
+   *                   example: '11:22:33:44:55:66'
+   *                 commandId:
+   *                   type: string
+   *                   example: cmd-123
+   *                 state:
+   *                   type: string
+   *                   example: acknowledged
+   *                 correlationId:
+   *                   type: string
+   *                   example: corr-123
+   *               required:
+   *                 - success
+   *                 - message
+   *                 - secondaryMacs
+   *                 - primaryMac
+   *       400:
+   *         $ref: '#/components/responses/BadRequest'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
    */
   async mergeHostMac(req: Request, res: Response): Promise<void> {
     try {
@@ -1291,7 +1379,7 @@ export class HostsController {
       ) {
         const deleteResult = await this.commandRouter.routeDeleteHostCommand(
           parseResult.data.sourceFqn,
-          { idempotencyKey: null, correlationId },
+          { idempotencyKey, correlationId },
         );
         if (!deleteResult.success) {
           throw new Error(deleteResult.error || 'Merged MAC but failed to delete source host');
@@ -1323,6 +1411,76 @@ export class HostsController {
    *   delete:
    *     summary: Remove a merged MAC association from a host (undo)
    *     tags: [Hosts]
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: fqn
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Fully qualified name (hostname@location)
+   *         example: PHANTOM-MBP@home-network
+   *       - in: path
+   *         name: mac
+   *         required: true
+   *         schema:
+   *           type: string
+   *           pattern: '^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'
+   *         description: MAC address to remove from the host
+   *         example: 'AA:BB:CC:DD:EE:FF'
+   *       - in: header
+   *         name: Idempotency-Key
+   *         schema:
+   *           type: string
+   *         description: Optional idempotency key to prevent duplicate commands
+   *         example: unique-request-id-123
+   *     responses:
+   *       200:
+   *         description: Host MAC unmerged successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 message:
+   *                   type: string
+   *                   example: Host MAC unmerged successfully
+   *                 secondaryMacs:
+   *                   type: array
+   *                   items:
+   *                     type: string
+   *                     pattern: '^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'
+   *                   example: []
+   *                 primaryMac:
+   *                   type: string
+   *                   pattern: '^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'
+   *                   example: '11:22:33:44:55:66'
+   *                 commandId:
+   *                   type: string
+   *                   example: cmd-123
+   *                 state:
+   *                   type: string
+   *                   example: acknowledged
+   *                 correlationId:
+   *                   type: string
+   *                   example: corr-123
+   *               required:
+   *                 - success
+   *                 - message
+   *                 - secondaryMacs
+   *                 - primaryMac
+   *       400:
+   *         $ref: '#/components/responses/BadRequest'
+   *       401:
+   *         $ref: '#/components/responses/Unauthorized'
+   *       404:
+   *         $ref: '#/components/responses/NotFound'
+   *       500:
+   *         $ref: '#/components/responses/InternalError'
    */
   async unmergeHostMac(req: Request, res: Response): Promise<void> {
     try {

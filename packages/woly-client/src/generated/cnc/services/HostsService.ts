@@ -421,22 +421,98 @@ export class HostsService {
     }
     /**
      * Associate an additional MAC address with a host
+     * @param fqn Fully qualified name (hostname@location)
+     * @param requestBody
+     * @param idempotencyKey Optional idempotency key to prevent duplicate commands
+     * @returns any Host MAC merged successfully
      * @throws ApiError
      */
-    public static putApiHostsMergeMac(): CancelablePromise<void> {
+    public static putApiHostsMergeMac(
+        fqn: string,
+        requestBody: {
+            /**
+             * MAC address to associate with the host
+             */
+            mac: string;
+            /**
+             * Promote the merged MAC to the primary MAC
+             */
+            makePrimary?: boolean;
+            /**
+             * Optional source host FQN when merging duplicate hosts
+             */
+            sourceFqn?: string;
+            /**
+             * Delete the source host after a successful merge
+             */
+            deleteSourceHost?: boolean;
+        },
+        idempotencyKey?: string,
+    ): CancelablePromise<{
+        success: boolean;
+        message: string;
+        secondaryMacs: Array<string>;
+        primaryMac: string;
+        commandId?: string;
+        state?: string;
+        correlationId?: string;
+    }> {
         return __request(OpenAPI, {
             method: 'PUT',
             url: '/api/hosts/{fqn}/merge-mac',
+            path: {
+                'fqn': fqn,
+            },
+            headers: {
+                'Idempotency-Key': idempotencyKey,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Invalid request parameters`,
+                401: `Missing or invalid authentication`,
+                404: `Resource not found`,
+                500: `Internal server error`,
+            },
         });
     }
     /**
      * Remove a merged MAC association from a host (undo)
+     * @param fqn Fully qualified name (hostname@location)
+     * @param mac MAC address to remove from the host
+     * @param idempotencyKey Optional idempotency key to prevent duplicate commands
+     * @returns any Host MAC unmerged successfully
      * @throws ApiError
      */
-    public static deleteApiHostsMergeMac(): CancelablePromise<void> {
+    public static deleteApiHostsMergeMac(
+        fqn: string,
+        mac: string,
+        idempotencyKey?: string,
+    ): CancelablePromise<{
+        success: boolean;
+        message: string;
+        secondaryMacs: Array<string>;
+        primaryMac: string;
+        commandId?: string;
+        state?: string;
+        correlationId?: string;
+    }> {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/api/hosts/{fqn}/merge-mac/{mac}',
+            path: {
+                'fqn': fqn,
+                'mac': mac,
+            },
+            headers: {
+                'Idempotency-Key': idempotencyKey,
+            },
+            errors: {
+                400: `Invalid request parameters`,
+                401: `Missing or invalid authentication`,
+                404: `Resource not found`,
+                500: `Internal server error`,
+            },
         });
     }
     /**

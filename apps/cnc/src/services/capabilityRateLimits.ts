@@ -75,7 +75,7 @@ export function buildCncRateLimits(): CncRateLimits {
       maxCalls: parsePositiveIntFromEnv('WS_MAX_CONNECTIONS_PER_IP', DEFAULT_WS_MAX_CONNECTIONS_PER_IP),
       windowMs: null,
       scope: 'ip',
-      appliesTo: ['/ws/node'],
+      appliesTo: ['/ws/node', '/ws/mobile/hosts'],
       note: 'Concurrent connection cap per source IP.',
     },
     macVendorLookup: {

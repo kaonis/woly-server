@@ -1107,6 +1107,7 @@ describe('HostsController additional branches', () => {
           sourceFqn: 'desktop-old@lab',
           deleteSourceHost: true,
         },
+        headers: { 'idempotency-key': 'merge-key-1' },
         correlationId: 'cid-request',
       });
       const res = createMockResponse();
@@ -1116,10 +1117,10 @@ describe('HostsController additional branches', () => {
       expect(commandRouter.routeUpdateHostCommand).toHaveBeenCalledWith(
         'desktop@lab',
         { mac: 'AA:BB:CC:00:00:01', secondaryMacs: ['AA:BB:CC:00:00:02'] },
-        { idempotencyKey: null, correlationId: 'cid-request' },
+        { idempotencyKey: 'merge-key-1', correlationId: 'cid-request' },
       );
       expect(commandRouter.routeDeleteHostCommand).toHaveBeenCalledWith('desktop-old@lab', {
-        idempotencyKey: null,
+        idempotencyKey: 'merge-key-1',
         correlationId: 'cid-request',
       });
       expect(res.json).toHaveBeenCalledWith({

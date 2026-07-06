@@ -1042,6 +1042,56 @@ const getMergeCandidates = async (_req: Request, res: Response): Promise<void> =
  *   put:
  *     summary: Associate an additional MAC address with a host
  *     tags: [Hosts]
+ *     security:
+ *       - BearerAuth: []
+ *       - {}
+ *     parameters:
+ *       - in: path
+ *         name: name
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Host name
+ *         example: MY-DEVICE
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - mac
+ *             properties:
+ *               mac:
+ *                 type: string
+ *                 pattern: '^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'
+ *                 description: MAC address to associate with the host
+ *                 example: 'AA:BB:CC:DD:EE:FF'
+ *               makePrimary:
+ *                 type: boolean
+ *                 description: Promote the merged MAC to the primary MAC
+ *                 example: false
+ *               sourceHostName:
+ *                 type: string
+ *                 description: Optional source host name when merging duplicate hosts
+ *                 example: MY-DEVICE-OLD
+ *               deleteSourceHost:
+ *                 type: boolean
+ *                 description: Delete the source host after a successful merge
+ *                 example: false
+ *     responses:
+ *       200:
+ *         description: Host MAC merged successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Host'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       404:
+ *         description: Host not found
+ *       409:
+ *         description: Conflict (duplicate name/mac/ip)
  */
 const mergeHostMac = async (req: Request, res: Response): Promise<void> => {
   const name = req.params.name as string;
@@ -1095,6 +1145,36 @@ const mergeHostMac = async (req: Request, res: Response): Promise<void> => {
  *   delete:
  *     summary: Remove a merged MAC association from a host (undo)
  *     tags: [Hosts]
+ *     security:
+ *       - BearerAuth: []
+ *       - {}
+ *     parameters:
+ *       - in: path
+ *         name: name
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Host name
+ *         example: MY-DEVICE
+ *       - in: path
+ *         name: mac
+ *         required: true
+ *         schema:
+ *           type: string
+ *           pattern: '^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'
+ *         description: MAC address to remove from the host
+ *         example: 'AA:BB:CC:DD:EE:FF'
+ *     responses:
+ *       200:
+ *         description: Host MAC unmerged successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Host'
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       404:
+ *         description: Host not found
  */
 const unmergeHostMac = async (req: Request, res: Response): Promise<void> => {
   const name = req.params.name as string;
