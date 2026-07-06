@@ -102,4 +102,53 @@ describe('agent config', () => {
       'TUNNEL_MODE must be either "direct" or "cloudflare"'
     );
   });
+
+  it('throws when heartbeat interval is non-positive', async () => {
+    process.env.HEARTBEAT_INTERVAL = '0';
+
+    const { validateAgentConfig } = await import('../agent');
+
+    expect(() => validateAgentConfig()).toThrow(
+      'HEARTBEAT_INTERVAL must be a positive integer'
+    );
+  });
+
+  it('throws when reconnect attempts is malformed', async () => {
+    process.env.MAX_RECONNECT_ATTEMPTS = 'forever';
+
+    const { validateAgentConfig } = await import('../agent');
+
+    expect(() => validateAgentConfig()).toThrow(
+      'MAX_RECONNECT_ATTEMPTS must be a non-negative integer'
+    );
+  });
+
+  it('allows zero host update debounce', async () => {
+    process.env.NODE_HOST_UPDATE_DEBOUNCE_MS = '0';
+
+    const { agentConfig, validateAgentConfig } = await import('../agent');
+
+    expect(agentConfig.hostUpdateDebounceMs).toBe(0);
+    expect(() => validateAgentConfig()).not.toThrow();
+  });
+
+  it('ignores malformed session token timing when session token auth is disabled', async () => {
+    process.env.NODE_SESSION_TOKEN_URL = '';
+    process.env.NODE_SESSION_TOKEN_TIMEOUT_MS = 'invalid';
+
+    const { validateAgentConfig } = await import('../agent');
+
+    expect(() => validateAgentConfig()).not.toThrow();
+  });
+
+  it('throws for malformed session token timing when session token auth is enabled', async () => {
+    process.env.NODE_SESSION_TOKEN_URL = 'https://cnc.example.test/session-token';
+    process.env.NODE_SESSION_TOKEN_TIMEOUT_MS = 'invalid';
+
+    const { validateAgentConfig } = await import('../agent');
+
+    expect(() => validateAgentConfig()).toThrow(
+      'NODE_SESSION_TOKEN_TIMEOUT_MS must be a positive integer'
+    );
+  });
 });

@@ -143,7 +143,7 @@ class SqliteDatabase {
         // INSERT queries - check for RETURNING clause
         if (sqliteQuery.includes('RETURNING')) {
           // SQLite 3.35+ (included in better-sqlite3 v9.4+) supports RETURNING natively
-          // better-sqlite3 v12.6.2 includes SQLite 3.47.2, so we can use RETURNING directly
+          // better-sqlite3 v12.11.1 includes SQLite 3.53.2, so we can use RETURNING directly
           // Use .all() for RETURNING queries as .run() doesn't return rows
           const stmt = this.db.prepare(sqliteQuery);
           const rows = sqliteParams.length > 0 ? stmt.all(...sqliteParams) : stmt.all();

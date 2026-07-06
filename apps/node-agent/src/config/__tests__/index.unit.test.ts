@@ -1,7 +1,10 @@
-import { config } from '../index';
-
 describe('config module', () => {
   const originalEnv = process.env;
+  let config: Awaited<ReturnType<typeof loadConfig>>['config'];
+
+  async function loadConfig() {
+    return import('../index');
+  }
 
   beforeEach(() => {
     // Reset environment variables
@@ -14,6 +17,10 @@ describe('config module', () => {
   });
 
   describe('server configuration', () => {
+    beforeEach(async () => {
+      ({ config } = await loadConfig());
+    });
+
     it('should have default port', () => {
       expect(config.server.port).toBeDefined();
       expect(typeof config.server.port).toBe('number');
@@ -28,9 +35,20 @@ describe('config module', () => {
       expect(config.server.env).toBeDefined();
       expect(typeof config.server.env).toBe('string');
     });
+
+    it('should reject out-of-range ports', async () => {
+      jest.resetModules();
+      process.env.PORT = '70000';
+
+      await expect(loadConfig()).rejects.toThrow('PORT must be less than or equal to 65535');
+    });
   });
 
   describe('database configuration', () => {
+    beforeEach(async () => {
+      ({ config } = await loadConfig());
+    });
+
     it('should have database path', () => {
       expect(config.database.path).toBeDefined();
       expect(typeof config.database.path).toBe('string');
@@ -38,6 +56,10 @@ describe('config module', () => {
   });
 
   describe('network configuration', () => {
+    beforeEach(async () => {
+      ({ config } = await loadConfig());
+    });
+
     it('should have scan interval', () => {
       expect(config.network.scanInterval).toBeDefined();
       expect(typeof config.network.scanInterval).toBe('number');
@@ -55,9 +77,38 @@ describe('config module', () => {
       expect(typeof config.network.pingTimeout).toBe('number');
       expect(config.network.pingTimeout).toBeGreaterThan(0);
     });
+
+    it('should reject non-positive ping concurrency', async () => {
+      jest.resetModules();
+      process.env.PING_CONCURRENCY = '0';
+
+      await expect(loadConfig()).rejects.toThrow(
+        'PING_CONCURRENCY must be greater than 0'
+      );
+    });
+
+    it('should reject malformed numeric values', async () => {
+      jest.resetModules();
+      process.env.SCAN_INTERVAL = '15seconds';
+
+      await expect(loadConfig()).rejects.toThrow('SCAN_INTERVAL must be an integer');
+    });
+
+    it('should allow zero scan delay', async () => {
+      jest.resetModules();
+      process.env.SCAN_DELAY = '0';
+
+      const { config: loadedConfig } = await loadConfig();
+
+      expect(loadedConfig.network.scanDelay).toBe(0);
+    });
   });
 
   describe('cache configuration', () => {
+    beforeEach(async () => {
+      ({ config } = await loadConfig());
+    });
+
     it('should have MAC vendor TTL', () => {
       expect(config.cache.macVendorTTL).toBeDefined();
       expect(typeof config.cache.macVendorTTL).toBe('number');
@@ -72,6 +123,10 @@ describe('config module', () => {
   });
 
   describe('CORS configuration', () => {
+    beforeEach(async () => {
+      ({ config } = await loadConfig());
+    });
+
     it('should have CORS origins', () => {
       expect(config.cors.origins).toBeDefined();
       expect(Array.isArray(config.cors.origins)).toBe(true);
@@ -86,6 +141,10 @@ describe('config module', () => {
   });
 
   describe('logging configuration', () => {
+    beforeEach(async () => {
+      ({ config } = await loadConfig());
+    });
+
     it('should have log level', () => {
       expect(config.logging.level).toBeDefined();
       expect(typeof config.logging.level).toBe('string');
@@ -98,6 +157,10 @@ describe('config module', () => {
   });
 
   describe('configuration validation', () => {
+    beforeEach(async () => {
+      ({ config } = await loadConfig());
+    });
+
     it('should have all required top-level properties', () => {
       expect(config).toHaveProperty('server');
       expect(config).toHaveProperty('database');
@@ -122,6 +185,10 @@ describe('config module', () => {
   });
 
   describe('type safety', () => {
+    beforeEach(async () => {
+      ({ config } = await loadConfig());
+    });
+
     it('should export config as readonly object', () => {
       expect(Object.isFrozen(config)).toBe(false); // Config object itself is not frozen
       expect(config).toBeDefined();
