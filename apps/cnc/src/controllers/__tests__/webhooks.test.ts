@@ -63,6 +63,58 @@ describe('WebhooksController', () => {
     expect(mockedWebhookModel.create).not.toHaveBeenCalled();
   });
 
+  it('returns actionable details for unsupported webhook event filters', async () => {
+    const req = createMockRequest({
+      body: {
+        url: 'https://example.com/hooks/woly',
+        events: ['host.updated'],
+      },
+    });
+    const res = createMockResponse();
+
+    await controller.createWebhook(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: 'Bad Request',
+        message: 'Invalid webhook payload',
+        supportedEvents: expect.arrayContaining(['host.awake', 'node.disconnected']),
+        details: expect.arrayContaining([
+          expect.objectContaining({
+            path: ['events', 0],
+          }),
+        ]),
+      }),
+    );
+    expect(mockedWebhookModel.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate webhook event filters before registration', async () => {
+    const req = createMockRequest({
+      body: {
+        url: 'https://example.com/hooks/woly',
+        events: ['host.awake', 'host.awake'],
+      },
+    });
+    const res = createMockResponse();
+
+    await controller.createWebhook(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: expect.arrayContaining([
+          expect.objectContaining({
+            message: 'Webhook events must be unique',
+            path: ['events'],
+          }),
+        ]),
+      }),
+    );
+    expect(mockedWebhookModel.create).not.toHaveBeenCalled();
+  });
+
   it('creates webhooks when payload is valid', async () => {
     mockedWebhookModel.create.mockResolvedValue({
       id: 'webhook-1',

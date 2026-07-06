@@ -656,6 +656,8 @@
           "events": {
             "type": "array",
             "minItems": 1,
+            "uniqueItems": true,
+            "description": "Webhook event filters. Invalid or duplicate values are rejected with a 400 response.",
             "items": {
               "$ref": "#/components/schemas/WebhookEventType"
             }
@@ -1539,6 +1541,21 @@
             "type": "string",
             "description": "Error code (for authentication errors)",
             "example": "AUTH_UNAUTHORIZED"
+          },
+          "details": {
+            "type": "array",
+            "description": "Structured validation details when a request payload fails schema validation.",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "supportedEvents": {
+            "type": "array",
+            "description": "Supported webhook event filters returned with webhook validation errors.",
+            "items": {
+              "$ref": "#/components/schemas/WebhookEventType"
+            }
           }
         }
       }

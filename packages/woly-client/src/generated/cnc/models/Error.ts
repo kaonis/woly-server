@@ -2,6 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { WebhookEventType } from './WebhookEventType';
 export type Error = {
     /**
      * Error type
@@ -15,5 +16,13 @@ export type Error = {
      * Error code (for authentication errors)
      */
     code?: string;
+    /**
+     * Structured validation details when a request payload fails schema validation.
+     */
+    details?: Array<Record<string, any>>;
+    /**
+     * Supported webhook event filters returned with webhook validation errors.
+     */
+    supportedEvents?: Array<WebhookEventType>;
 };
 
