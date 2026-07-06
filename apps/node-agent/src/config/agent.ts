@@ -7,8 +7,15 @@ dotenv.config({
 
 function getEnvNumber(key: string, defaultValue: number): number {
   const rawValue = process.env[key];
-  const parsedValue = rawValue ? parseInt(rawValue, 10) : defaultValue;
-  return Number.isNaN(parsedValue) ? defaultValue : parsedValue;
+  if (rawValue === undefined || rawValue.trim() === '') {
+    return defaultValue;
+  }
+
+  if (!/^-?\d+$/.test(rawValue.trim())) {
+    return Number.NaN;
+  }
+
+  return Number.parseInt(rawValue, 10);
 }
 
 function getEnvBoolean(key: string, defaultValue: boolean): boolean {
@@ -156,5 +163,41 @@ export function validateAgentConfig(): void {
         'CNC_URL must use wss:// in production to prevent token interception'
       );
     }
+  }
+
+  const positiveIntegerFields: Array<[string, number]> = [
+    ['HEARTBEAT_INTERVAL', agentConfig.heartbeatInterval],
+    ['RECONNECT_INTERVAL', agentConfig.reconnectInterval],
+    ['NODE_MAX_BUFFERED_HOST_EVENTS', agentConfig.maxBufferedHostEvents],
+    ['NODE_HOST_EVENT_FLUSH_BATCH_SIZE', agentConfig.hostEventFlushBatchSize],
+    ['NODE_INITIAL_SYNC_CHUNK_SIZE', agentConfig.initialSyncChunkSize],
+    ['NODE_HOST_STALE_AFTER_MS', agentConfig.hostStaleAfterMs],
+  ];
+
+  for (const [key, value] of positiveIntegerFields) {
+    if (!Number.isInteger(value) || value <= 0) {
+      throw new Error(`${key} must be a positive integer`);
+    }
+  }
+
+  if (agentConfig.sessionTokenUrl) {
+    const sessionTokenPositiveIntegerFields: Array<[string, number]> = [
+      ['NODE_SESSION_TOKEN_TIMEOUT_MS', agentConfig.sessionTokenRequestTimeoutMs],
+      ['NODE_SESSION_TOKEN_REFRESH_BUFFER_SECONDS', agentConfig.sessionTokenRefreshBufferSeconds],
+    ];
+
+    for (const [key, value] of sessionTokenPositiveIntegerFields) {
+      if (!Number.isInteger(value) || value <= 0) {
+        throw new Error(`${key} must be a positive integer`);
+      }
+    }
+  }
+
+  if (!Number.isInteger(agentConfig.hostUpdateDebounceMs) || agentConfig.hostUpdateDebounceMs < 0) {
+    throw new Error('NODE_HOST_UPDATE_DEBOUNCE_MS must be a non-negative integer');
+  }
+
+  if (!Number.isInteger(agentConfig.maxReconnectAttempts) || agentConfig.maxReconnectAttempts < 0) {
+    throw new Error('MAX_RECONNECT_ATTEMPTS must be a non-negative integer');
   }
 }

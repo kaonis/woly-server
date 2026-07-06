@@ -1,15 +1,17 @@
 # SECURITY NOTES
 
-## Dependency Risk Snapshot (Last Updated: 2026-02-07)
+## Dependency Risk Snapshot (Last Updated: 2026-07-06)
 
 This document tracks known security vulnerabilities and remediation status.
 
-### Current Status: 3 High Severity Vulnerabilities (Accepted Risk)
+### Current Status: No High Severity Production Vulnerabilities
 
-Running `npm audit` reports:
+Running `npm audit --omit=dev --audit-level=high` reports:
 
-- **3 high severity vulnerabilities** in the `ip` package dependency chain
-- **0 fixable vulnerabilities** (all remaining vulnerabilities have no patches available)
+- **0 vulnerabilities**
+
+Historical `ip` package risk notes remain below for audit context, but the
+current production audit gate is clean.
 
 ## Resolved Vulnerabilities (2026-02-07)
 
@@ -18,7 +20,7 @@ Running `npm audit` reports:
 - **node-tar: Arbitrary File Overwrite and Symlink Poisoning** in versions ≤7.5.2 ([GHSA-8qq5-rm4j-mr97](https://github.com/advisories/GHSA-8qq5-rm4j-mr97))
 - **node-tar: Race Condition via Unicode Ligature Collisions on macOS APFS** in versions ≤7.5.3 ([GHSA-r6q2-hw4h-h46w](https://github.com/advisories/GHSA-r6q2-hw4h-h46w))
 - **node-tar: Hardlink Path Traversal** in versions <7.5.7 ([GHSA-34x7-hfp2-rc4v](https://github.com/advisories/GHSA-34x7-hfp2-rc4v))
-- **Resolution**: Migrated from `sqlite3@5.1.7` to `better-sqlite3@12.6.2`
+- **Resolution**: Migrated from `sqlite3@5.1.7` to `better-sqlite3`; current pinned workspace resolution is `better-sqlite3@12.11.1`
 - **Impact**: Eliminated 5 high severity vulnerabilities by removing the `sqlite3` → `node-gyp` → `tar` dependency chain entirely
 - **Additional Benefits**:
   - Better performance (synchronous API, faster queries)
@@ -26,7 +28,7 @@ Running `npm audit` reports:
   - Improved type safety
   - No native build dependency on tar
 
-## Known Vulnerabilities (Accepted Risk)
+## Historical Vulnerabilities (Resolved/Monitoring Context)
 
 ### 🔴 CVE-2024-29415: ip SSRF Improper Categorization in isPublic
 
@@ -43,12 +45,10 @@ The `ip.isPublic()` function incorrectly categorizes certain IP ranges, potentia
 Despite the high CVSS score, this vulnerability has **minimal impact** on this application because:
 
 1. **Function Not Used**: The vulnerable `isPublic()` function is NOT used by `get-ip-range` or anywhere in our codebase
-
    - `get-ip-range` only uses `ip.toLong()` and `ip.fromLong()` for IP range calculations
    - We verified via code inspection that `isPublic()` and `isPrivate()` are not called
 
 2. **Network Discovery Context**:
-
    - `local-devices` is used purely for local network ARP scanning
    - Only operates on RFC1918 private network ranges (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
    - No user-supplied IPs are processed for public/private validation
@@ -146,5 +146,5 @@ If you discover a security vulnerability, please email the maintainers directly 
 
 ---
 
-**Last Audit**: 2026-02-07  
-**Next Review**: 2026-03-07 (monthly cadence)
+**Last Audit**: 2026-07-06  
+**Next Review**: 2026-08-06 (monthly cadence)
