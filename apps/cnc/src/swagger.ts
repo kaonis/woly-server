@@ -909,7 +909,7 @@ const options: swaggerJsdoc.Options = {
                 },
                 protocol: {
                   type: 'string',
-                  example: '1.3.0',
+                  example: '1.6.0',
                 },
               },
               required: ['cncApi', 'protocol'],

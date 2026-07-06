@@ -56,6 +56,37 @@ const shutdownPromise = CncApi.HostsService.postApiHostsShutdown(
 const pingPromise = CncApi.HostsService.getApiHostsPing('Office-Mac@Home');
 const scanPromise = CncApi.HostsService.postApiHostsScan();
 const portScanPromise = CncApi.HostsService.getApiHostsScanPorts('Office-Mac@Home');
+const cncMergeMacPromise = CncApi.HostsService.putApiHostsMergeMac(
+  'Office-Mac@Home',
+  {
+    mac: '80:6D:97:60:39:09',
+    makePrimary: false,
+    sourceFqn: 'Office-Mac-Old@Home',
+    deleteSourceHost: true,
+  },
+  'merge-idempotency-key',
+).then((response) => {
+  const success: boolean = response.success;
+  const primaryMac: string = response.primaryMac;
+  const firstSecondaryMac: string | undefined = response.secondaryMacs[0];
+
+  void success;
+  void primaryMac;
+  void firstSecondaryMac;
+  return response;
+});
+const cncUnmergeMacPromise = CncApi.HostsService.deleteApiHostsMergeMac(
+  'Office-Mac@Home',
+  '80:6D:97:60:39:09',
+  'unmerge-idempotency-key',
+).then((response) => {
+  const message: string = response.message;
+  const commandId: string | undefined = response.commandId;
+
+  void message;
+  void commandId;
+  return response;
+});
 const macVendorPromise = CncApi.HostsService.getApiHostsMacVendor('80:6D:97:60:39:08');
 const schedulesPromise = CncApi.HostsService.getApiSchedules();
 const hostSchedulesPromise = CncApi.HostsService.getApiHostsSchedules('Office-Mac@Home');
@@ -69,6 +100,28 @@ const updateSchedulePromise = CncApi.HostsService.putApiHostsSchedules('schedule
 });
 const deleteSchedulePromise = CncApi.HostsService.deleteApiHostsSchedules('schedule-1');
 const nodeAgentHealthPromise = NodeAgentApi.HealthService.getHealth();
+const nodeAgentMergeMacPromise = NodeAgentApi.HostsService.putHostsMergeMac('Office-Mac', {
+  mac: '80:6D:97:60:39:09',
+  makePrimary: false,
+  sourceHostName: 'Office-Mac-Old',
+  deleteSourceHost: true,
+}).then((host) => {
+  const primaryMac: string = host.mac;
+  const firstSecondaryMac: string | undefined = host.secondaryMacs?.[0];
+
+  void primaryMac;
+  void firstSecondaryMac;
+  return host;
+});
+const nodeAgentUnmergeMacPromise = NodeAgentApi.HostsService.deleteHostsMergeMac(
+  'Office-Mac',
+  '80:6D:97:60:39:09',
+).then((host) => {
+  const primaryMac: string = host.mac;
+
+  void primaryMac;
+  return host;
+});
 
 void operatorTokenPromise;
 void capabilitiesPromise;
@@ -80,6 +133,8 @@ void shutdownPromise;
 void pingPromise;
 void scanPromise;
 void portScanPromise;
+void cncMergeMacPromise;
+void cncUnmergeMacPromise;
 void macVendorPromise;
 void schedulesPromise;
 void hostSchedulesPromise;
@@ -87,3 +142,5 @@ void createSchedulePromise;
 void updateSchedulePromise;
 void deleteSchedulePromise;
 void nodeAgentHealthPromise;
+void nodeAgentMergeMacPromise;
+void nodeAgentUnmergeMacPromise;

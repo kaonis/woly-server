@@ -168,22 +168,69 @@ export class HostsService {
     }
     /**
      * Associate an additional MAC address with a host
+     * @param name Host name
+     * @param requestBody
+     * @returns Host Host MAC merged successfully
      * @throws ApiError
      */
-    public static putHostsMergeMac(): CancelablePromise<void> {
+    public static putHostsMergeMac(
+        name: string,
+        requestBody: {
+            /**
+             * MAC address to associate with the host
+             */
+            mac: string;
+            /**
+             * Promote the merged MAC to the primary MAC
+             */
+            makePrimary?: boolean;
+            /**
+             * Optional source host name when merging duplicate hosts
+             */
+            sourceHostName?: string;
+            /**
+             * Delete the source host after a successful merge
+             */
+            deleteSourceHost?: boolean;
+        },
+    ): CancelablePromise<Host> {
         return __request(OpenAPI, {
             method: 'PUT',
             url: '/hosts/{name}/merge-mac',
+            path: {
+                'name': name,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                400: `Invalid request parameters`,
+                404: `Host not found`,
+                409: `Conflict (duplicate name/mac/ip)`,
+            },
         });
     }
     /**
      * Remove a merged MAC association from a host (undo)
+     * @param name Host name
+     * @param mac MAC address to remove from the host
+     * @returns Host Host MAC unmerged successfully
      * @throws ApiError
      */
-    public static deleteHostsMergeMac(): CancelablePromise<void> {
+    public static deleteHostsMergeMac(
+        name: string,
+        mac: string,
+    ): CancelablePromise<Host> {
         return __request(OpenAPI, {
             method: 'DELETE',
             url: '/hosts/{name}/merge-mac/{mac}',
+            path: {
+                'name': name,
+                'mac': mac,
+            },
+            errors: {
+                400: `Invalid request parameters`,
+                404: `Host not found`,
+            },
         });
     }
     /**
