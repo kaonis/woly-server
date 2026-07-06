@@ -36,3 +36,6 @@ logs/*.log
 npm-debug.log
 yarn-error.log
 apps/node-agent/logs/
+
+# Local code-index artifacts
+.codegraph/
