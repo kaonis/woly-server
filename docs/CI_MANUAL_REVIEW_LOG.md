@@ -269,3 +269,13 @@ Period reviewed: maintenance review loop after 2026-07-03T15:34:54Z
 - Budget and throughput assessment: Scoped audit (`ci:audit:latest -- --fail-on-unexpected`) using checkpoint `2026-07-03T15:34:54Z` analyzed 10 non-manual runs; all were allowlisted `CNC Sync Policy` pull request runs.
 - Decision: Continue manual-first budget mode
 - Follow-up actions: Configure `master` branch protection to require the `CNC Sync Policy / policy-check` status check; `ci:branch-protection:check -- --json` currently reports branch protection is not enabled.
+
+Date: 2026-10-01
+Reviewer: Codex maintenance review loop
+Period reviewed: latest 50 workflow runs, sampled from 2026-08-21 onward
+
+- Unexpected automatic workflow runs observed: No in the sampled runs
+- Local gate policy followed: Yes; dependency/security inventory, lint, typecheck, all 1,331 CI tests, build, protocol/mobile contract checks, client consumer typecheck, and `validate:standard` passed locally.
+- Budget and throughput assessment: The latest 50 sampled runs were all allowlisted: 44 `CNC Sync Policy` pull request runs and 6 scheduled `Dependency Health` runs. This bounded sample does not cover the full period since July. Generated client build caching is disabled because spec generation reads sibling app sources outside its package cache inputs.
+- Decision: Continue manual-first budget mode
+- Follow-up actions: Configure `master` branch protection to require the `CNC Sync Policy / policy-check` status check; branch protection remains absent.

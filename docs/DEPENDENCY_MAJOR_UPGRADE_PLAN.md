@@ -239,3 +239,20 @@ Issue #144 is complete when:
   - Current `better-sqlite3@12.11.1` metadata includes Node `26.x` in its supported engine range.
   - Relaxed repo, CNC, and node-agent Node engine ranges from `>=24.0.0 <26.0.0` to `>=24.0.0 <27.0.0`.
   - TypeScript 6, lint-staged 17, and other major upgrades remain deferred; `npm outdated` remains inventory unless a scoped compatibility/security reason is documented.
+- 2026-10-01 (maintenance security lock checkpoint):
+  - Production audit initially reported 6 vulnerable packages (4 high, 1 moderate, 1 low); the full audit reported 10 (6 high, 3 moderate, 1 low).
+  - Updated only vulnerable dependency families and their required children using:
+    - `npm update axios body-parser brace-expansion ip-address js-yaml qs @humanfs/node baseline-browser-mapping browserslist fast-uri --package-lock-only --ignore-scripts`.
+  - Locked security versions:
+    - `axios` `1.18.1` -> `1.20.0`; `body-parser` `2.2.2` -> `2.3.0`; `ip-address` `10.2.0` -> `10.7.2`; `qs` `6.15.3` -> `6.16.0`.
+    - All `brace-expansion` copies: `1.1.15` -> `1.1.21`, `2.1.1` -> `2.1.7`, and `5.0.7` -> `5.0.12`.
+    - `js-yaml` `3.15.0` -> `3.15.2` and `4.3.0` -> `4.3.2`, preserving both major lines.
+    - Development transitives: `@humanfs/node` `0.16.7` -> `0.16.8`, `baseline-browser-mapping` `2.10.41` -> `2.11.26`, `browserslist` `4.28.4` -> `4.29.3`, and `fast-uri` `3.1.3` -> `3.1.8`.
+  - Required child updates include `@humanfs/core` `0.19.2` and new `@humanfs/types` `0.15.0`; Browserslist data/helpers; and `type-is` `2.1.0`. Patched `body-parser` requires `content-type ^2.0.0`, so nested `content-type` `2.1.0` is a required transitive major, while the existing root `1.0.5` remains for other consumers.
+  - Restored unrelated unchanged-version peer metadata removed by npm's lock rewrite; direct manifests, ESLint/typescript-eslint versions, and deferred majors remain unchanged. Existing Renovate tooling/codegen PRs retain ownership of their upgrades.
+  - Validation under Node `v26.7.0` / npm `11.19.0`:
+    - Fresh `npm ci` PASS.
+    - `npm audit --omit=dev --audit-level=high` PASS, 0 vulnerabilities.
+    - `npm audit --audit-level=moderate` PASS, 0 vulnerabilities.
+    - `npm run deps:check-eslint10 -- --json` PASS: latest ESLint `10.11.0`, plugin/parser `8.71.0`, peer range `^8.57.0 || ^9.0.0 || ^10.0.0`; watchdog retained without changing the installed toolchain.
+  - TypeScript 6, lint-staged 17, commitlint 21, openapi-typescript-codegen 0.31, and other major upgrade deferrals remain unchanged; outdated versions remain inventory.
