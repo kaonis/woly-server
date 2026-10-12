@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
-import { createWebhookRequestSchema } from '@kaonis/woly-protocol';
+import { WEBHOOK_EVENT_TYPES, createWebhookRequestSchema } from '@kaonis/woly-protocol';
 import WebhookModel from '../models/Webhook';
 import logger from '../utils/logger';
 
@@ -15,6 +15,15 @@ const deliveriesParamsSchema = z.object({
 const deliveriesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).optional(),
 }).passthrough();
+
+function webhookValidationResponse(issues: z.ZodIssue[]): Record<string, unknown> {
+  return {
+    error: 'Bad Request',
+    message: 'Invalid webhook payload',
+    details: issues,
+    supportedEvents: [...WEBHOOK_EVENT_TYPES],
+  };
+}
 
 export class WebhooksController {
   /**
@@ -49,11 +58,7 @@ export class WebhooksController {
   async createWebhook(req: Request, res: Response): Promise<void> {
     const parsed = createWebhookRequestSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({
-        error: 'Bad Request',
-        message: 'Invalid webhook payload',
-        details: parsed.error.issues,
-      });
+      res.status(400).json(webhookValidationResponse(parsed.error.issues));
       return;
     }
 
