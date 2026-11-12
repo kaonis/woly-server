@@ -11,16 +11,20 @@ const ALLOWED_AUTOMATED_TRIGGERS = new Map([
   ['dependency-health.yml', new Set(['schedule'])],
 ]);
 // Heavy gates that run on the self-hosted runner (repo variable CI_RUNNER),
-// with the automatic triggers each may use. They cost no Actions minutes, may
-// run longer than the hosted budget limit, and every job must send fork PRs to
-// a GitHub-hosted runner so untrusted code never reaches the self-hosted
-// machine.
+// with the automatic triggers each may use. They cost no Actions minutes and
+// may run longer than the hosted budget limit. Every job must use exactly the
+// canonical runs-on expression, which sends PRs from forks (or from a deleted
+// head repo) to a GitHub-hosted runner. This keeps trusted workflows honest; it
+// is not the security boundary, since a fork PR can edit both the workflow and
+// this script. The boundary is the repo's approval requirement for outside
+// contributors' runs plus the sandboxed runner.
 const SELF_HOSTED_WORKFLOWS = new Map([
   ['ci.yml', new Set(['push', 'pull_request'])],
   ['cross-service-e2e-smoke.yml', new Set()],
 ]);
 const SELF_HOSTED_MAX_TIMEOUT_MINUTES = 15;
-const FORK_GUARD = 'github.event.pull_request.head.repo.fork';
+const SELF_HOSTED_RUNS_ON =
+  "${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest') || vars.CI_RUNNER || 'ubuntu-latest' }}";
 
 function parseArgs(argv) {
   const options = {
@@ -141,9 +145,9 @@ function validateWorkflow(filePath) {
   }
 
   for (const job of jobs) {
-    if (selfHosted && !(job.runsOn ?? '').includes(FORK_GUARD)) {
+    if (selfHosted && job.runsOn !== SELF_HOSTED_RUNS_ON) {
       violations.push(
-        `job \`${job.id}\` \`runs-on\` must route fork PRs to a GitHub-hosted runner (\`${FORK_GUARD}\`)`
+        `job \`${job.id}\` \`runs-on\` must route fork PRs to a GitHub-hosted runner (expected exactly \`${SELF_HOSTED_RUNS_ON}\`)`
       );
     }
 
@@ -261,6 +265,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  SELF_HOSTED_RUNS_ON,
   parseArgs,
   parseJobs,
   validateWorkflow,

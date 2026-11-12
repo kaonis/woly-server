@@ -271,7 +271,7 @@ For full production rollout guidance (topology, secrets, TLS, backup/restore, an
 
 GitHub Actions is budget-scoped:
 
-- Heavy validation workflow (`.github/workflows/ci.yml`) runs on every push to `master` and every PR, on the self-hosted runner named by the `CI_RUNNER` repo variable (no Actions minutes). Fork PRs always run on GitHub-hosted runners and need maintainer approval; if `CI_RUNNER` is unset, jobs fall back to `ubuntu-latest`.
+- Heavy validation workflow (`.github/workflows/ci.yml`) runs on every push to `master` and every PR, on the self-hosted runner named by the `CI_RUNNER` repo variable (no Actions minutes). PRs from forks are routed to GitHub-hosted runners, but a fork PR can edit that routing, so the security boundary is elsewhere: the repo requires approval before any outside contributor's workflow runs (review changes to `.github/workflows/` and `scripts/` before approving), and the self-hosted runner is sandboxed. If `CI_RUNNER` is unset, jobs fall back to `ubuntu-latest`.
 - Lightweight policy workflow (`.github/workflows/cnc-sync-policy.yml`) runs automatically on PR updates and enforces:
   - PR checklist and review-pass requirements
   - conventional commit subject parity with local `commit-msg` hook

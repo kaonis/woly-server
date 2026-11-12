@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { validateWorkflow } = require('../manual-ci-workflow-policy-check.cjs');
+const { SELF_HOSTED_RUNS_ON, validateWorkflow } = require('../manual-ci-workflow-policy-check.cjs');
 
 function writeWorkflow(tempDir, name, source) {
   const filePath = path.join(tempDir, name);
@@ -122,55 +122,89 @@ test('validateWorkflow rejects schedule trigger for default workflow policy', ()
   assert.match(result.violations.join('\n'), /forbidden trigger present: `schedule`/);
 });
 
-function selfHostedWorkflow(runsOn, timeout) {
-  return [
-    'name: CI',
-    '',
-    'on:',
-    '  workflow_dispatch:',
-    '  push:',
-    '    branches: [master]',
-    '  pull_request:',
-    '',
-    'jobs:',
-    '  validate:',
-    `    runs-on: ${runsOn}`,
-    `    timeout-minutes: ${timeout}`,
-    '    steps:',
-    '      - run: echo ok',
-    '',
-  ].join('\n');
+function selfHostedWorkflow(runsOn, timeout, { triggers = ['push', 'pull_request'], jobs = ['validate'] } = {}) {
+  const lines = ['name: CI', '', 'on:', '  workflow_dispatch:'];
+  for (const trigger of triggers) {
+    lines.push(`  ${trigger}:`);
+  }
+  lines.push('', 'jobs:');
+  for (const job of jobs) {
+    lines.push(
+      `  ${job}:`,
+      `    runs-on: ${typeof runsOn === 'function' ? runsOn(job) : runsOn}`,
+      `    timeout-minutes: ${timeout}`,
+      '    steps:',
+      '      - run: echo ok'
+    );
+  }
+  lines.push('');
+  return lines.join('\n');
 }
 
-const FORK_GUARDED = "${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || vars.CI_RUNNER || 'ubuntu-latest' }}";
+function check(name, source) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'woly-policy-'));
+  return validateWorkflow(writeWorkflow(tempDir, name, source));
+}
 
 test('validateWorkflow accepts push and pull_request on self-hosted ci workflow with fork guard', () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'woly-policy-'));
-  const filePath = writeWorkflow(tempDir, 'ci.yml', selfHostedWorkflow(FORK_GUARDED, 15));
-
-  const result = validateWorkflow(filePath);
+  const result = check('ci.yml', selfHostedWorkflow(SELF_HOSTED_RUNS_ON, 15));
   assert.deepEqual(result.violations, []);
   assert.equal(result.passed, true);
 });
 
 test('validateWorkflow rejects self-hosted workflow job without fork guard', () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'woly-policy-'));
-  const filePath = writeWorkflow(
-    tempDir,
-    'ci.yml',
-    selfHostedWorkflow('${{ vars.CI_RUNNER || \'ubuntu-latest\' }}', 15)
-  );
-
-  const result = validateWorkflow(filePath);
+  const result = check('ci.yml', selfHostedWorkflow("${{ vars.CI_RUNNER || 'ubuntu-latest' }}", 15));
   assert.equal(result.passed, false);
   assert.match(result.violations.join('\n'), /must route fork PRs to a GitHub-hosted runner/);
 });
 
-test('validateWorkflow rejects self-hosted workflow timeout above 15 minutes', () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'woly-policy-'));
-  const filePath = writeWorkflow(tempDir, 'ci.yml', selfHostedWorkflow(FORK_GUARDED, 20));
+test('validateWorkflow rejects a reordered guard that checks CI_RUNNER first', () => {
+  const reordered =
+    "${{ vars.CI_RUNNER || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest') || 'ubuntu-latest' }}";
+  const result = check('ci.yml', selfHostedWorkflow(reordered, 15));
+  assert.equal(result.passed, false);
+  assert.match(result.violations.join('\n'), /must route fork PRs/);
+});
 
-  const result = validateWorkflow(filePath);
+test('validateWorkflow rejects the fail-open head.repo.fork guard', () => {
+  const failOpen =
+    "${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || vars.CI_RUNNER || 'ubuntu-latest' }}";
+  const result = check('ci.yml', selfHostedWorkflow(failOpen, 15));
+  assert.equal(result.passed, false);
+});
+
+test('validateWorkflow checks every job of a self-hosted workflow', () => {
+  const result = check(
+    'ci.yml',
+    selfHostedWorkflow((job) => (job === 'second' ? 'woly-ci-mini' : SELF_HOSTED_RUNS_ON), 15, {
+      jobs: ['first', 'second'],
+    })
+  );
+  assert.equal(result.passed, false);
+  assert.match(result.violations.join('\n'), /job `second`/);
+  assert.doesNotMatch(result.violations.join('\n'), /job `first`/);
+});
+
+test('validateWorkflow rejects automatic triggers on the manual self-hosted smoke workflow', () => {
+  const result = check(
+    'cross-service-e2e-smoke.yml',
+    selfHostedWorkflow(SELF_HOSTED_RUNS_ON, 15, { triggers: ['push'] })
+  );
+  assert.equal(result.passed, false);
+  assert.match(result.violations.join('\n'), /forbidden trigger present: `push`/);
+});
+
+test('validateWorkflow fails closed on a multi-line runs-on in a self-hosted workflow', () => {
+  const source = selfHostedWorkflow(SELF_HOSTED_RUNS_ON, 15).replace(
+    `    runs-on: ${SELF_HOSTED_RUNS_ON}`,
+    `    runs-on: >-\n      ${SELF_HOSTED_RUNS_ON}`
+  );
+  const result = check('ci.yml', source);
+  assert.equal(result.passed, false);
+});
+
+test('validateWorkflow rejects self-hosted workflow timeout above 15 minutes', () => {
+  const result = check('ci.yml', selfHostedWorkflow(SELF_HOSTED_RUNS_ON, 20));
   assert.equal(result.passed, false);
   assert.match(result.violations.join('\n'), /timeout `20` exceeds limit `15`/);
 });

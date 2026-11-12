@@ -35,8 +35,9 @@ Each CNC feature PR must link all of the following:
 GitHub-hosted Actions runs only bare-minimum policy checks on pull requests.
 The approved scheduled exception is the weekly dependency health watchdog.
 `ci.yml` runs on every push and PR on the self-hosted runner (`CI_RUNNER` repo
-variable), which uses no Actions minutes; fork PRs fall back to GitHub-hosted
-runners. Heavy validation still runs locally before merge.
+variable), which uses no Actions minutes. Fork PRs are routed to GitHub-hosted
+runners, and outside contributors' runs need maintainer approval (check any
+workflow or script changes first). Heavy validation still runs locally before merge.
 
 ## 5. Required Local Pre-Merge Gates
 

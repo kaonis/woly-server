@@ -8,16 +8,21 @@ on:
   workflow_dispatch:
 
 # Jobs run on the self-hosted runner named by the CI_RUNNER repo variable
-# (GitHub-hosted when it is unset). Fork PRs always use GitHub-hosted runners,
-# so untrusted code never reaches the self-hosted machine.
+# (GitHub-hosted when it is unset). PRs from forks, or whose head repo is gone,
+# go to GitHub-hosted runners. That routing is a convenience, not the security
+# boundary: a fork PR can edit this file. Untrusted code is kept off the
+# self-hosted runner by the repo setting that requires approval for all outside
+# contributors' workflow runs, and the runner itself is sandboxed.
+# PR runs cancel superseded runs; push and dispatch runs are keyed by commit, so
+# none is dropped while the single runner is busy.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   protocol-compatibility:
     name: Protocol Compatibility Check
-    runs-on: ${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest') || vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     permissions:
       contents: read
@@ -62,7 +67,7 @@ jobs:
 
   validate:
     name: Build, Lint, Typecheck, Test, Smoke
-    runs-on: ${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || vars.CI_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest') || vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     needs: protocol-compatibility
     permissions:
