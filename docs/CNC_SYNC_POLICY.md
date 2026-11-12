@@ -32,9 +32,11 @@ Each CNC feature PR must link all of the following:
 
 ## 4. CI Budget Rule
 
-GitHub Actions runs only bare-minimum policy checks on pull requests.
+GitHub-hosted Actions runs only bare-minimum policy checks on pull requests.
 The approved scheduled exception is the weekly dependency health watchdog.
-Heavy validation runs locally before merge.
+`ci.yml` runs on every push and PR on the self-hosted runner (`CI_RUNNER` repo
+variable), which uses no Actions minutes; fork PRs fall back to GitHub-hosted
+runners. Heavy validation still runs locally before merge.
 
 ## 5. Required Local Pre-Merge Gates
 

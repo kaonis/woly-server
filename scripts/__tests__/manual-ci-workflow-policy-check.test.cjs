@@ -71,9 +71,9 @@ test('validateWorkflow rejects pull_request trigger for default workflow policy'
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'woly-policy-'));
   const filePath = writeWorkflow(
     tempDir,
-    'ci.yml',
+    'eslint10-compat-watchdog.yml',
     [
-      'name: CI',
+      'name: Watchdog',
       '',
       'on:',
       '  workflow_dispatch:',
@@ -120,4 +120,57 @@ test('validateWorkflow rejects schedule trigger for default workflow policy', ()
   const result = validateWorkflow(filePath);
   assert.equal(result.passed, false);
   assert.match(result.violations.join('\n'), /forbidden trigger present: `schedule`/);
+});
+
+function selfHostedWorkflow(runsOn, timeout) {
+  return [
+    'name: CI',
+    '',
+    'on:',
+    '  workflow_dispatch:',
+    '  push:',
+    '    branches: [master]',
+    '  pull_request:',
+    '',
+    'jobs:',
+    '  validate:',
+    `    runs-on: ${runsOn}`,
+    `    timeout-minutes: ${timeout}`,
+    '    steps:',
+    '      - run: echo ok',
+    '',
+  ].join('\n');
+}
+
+const FORK_GUARDED = "${{ (github.event.pull_request.head.repo.fork && 'ubuntu-latest') || vars.CI_RUNNER || 'ubuntu-latest' }}";
+
+test('validateWorkflow accepts push and pull_request on self-hosted ci workflow with fork guard', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'woly-policy-'));
+  const filePath = writeWorkflow(tempDir, 'ci.yml', selfHostedWorkflow(FORK_GUARDED, 15));
+
+  const result = validateWorkflow(filePath);
+  assert.deepEqual(result.violations, []);
+  assert.equal(result.passed, true);
+});
+
+test('validateWorkflow rejects self-hosted workflow job without fork guard', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'woly-policy-'));
+  const filePath = writeWorkflow(
+    tempDir,
+    'ci.yml',
+    selfHostedWorkflow('${{ vars.CI_RUNNER || \'ubuntu-latest\' }}', 15)
+  );
+
+  const result = validateWorkflow(filePath);
+  assert.equal(result.passed, false);
+  assert.match(result.violations.join('\n'), /must route fork PRs to a GitHub-hosted runner/);
+});
+
+test('validateWorkflow rejects self-hosted workflow timeout above 15 minutes', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'woly-policy-'));
+  const filePath = writeWorkflow(tempDir, 'ci.yml', selfHostedWorkflow(FORK_GUARDED, 20));
+
+  const result = validateWorkflow(filePath);
+  assert.equal(result.passed, false);
+  assert.match(result.violations.join('\n'), /timeout `20` exceeds limit `15`/);
 });

@@ -10,6 +10,17 @@ const ALLOWED_AUTOMATED_TRIGGERS = new Map([
   ['cnc-sync-policy.yml', new Set(['pull_request'])],
   ['dependency-health.yml', new Set(['schedule'])],
 ]);
+// Heavy gates that run on the self-hosted runner (repo variable CI_RUNNER),
+// with the automatic triggers each may use. They cost no Actions minutes, may
+// run longer than the hosted budget limit, and every job must send fork PRs to
+// a GitHub-hosted runner so untrusted code never reaches the self-hosted
+// machine.
+const SELF_HOSTED_WORKFLOWS = new Map([
+  ['ci.yml', new Set(['push', 'pull_request'])],
+  ['cross-service-e2e-smoke.yml', new Set()],
+]);
+const SELF_HOSTED_MAX_TIMEOUT_MINUTES = 15;
+const FORK_GUARD = 'github.event.pull_request.head.repo.fork';
 
 function parseArgs(argv) {
   const options = {
@@ -71,6 +82,7 @@ function parseJobs(lines) {
       activeJob = {
         id: jobMatch[1],
         timeoutMinutes: null,
+        runsOn: null,
       };
       jobs.push(activeJob);
       continue;
@@ -84,6 +96,11 @@ function parseJobs(lines) {
     if (timeoutMatch) {
       activeJob.timeoutMinutes = Number.parseInt(timeoutMatch[1], 10);
     }
+
+    const runsOnMatch = line.match(/^\s{4}runs-on:\s*(.+?)\s*$/);
+    if (runsOnMatch) {
+      activeJob.runsOn = runsOnMatch[1];
+    }
   }
 
   return jobs;
@@ -95,7 +112,12 @@ function validateWorkflow(filePath) {
   const lines = source.split('\n');
   const violations = [];
   const jobs = parseJobs(lines);
-  const allowedAutomatedTriggers = ALLOWED_AUTOMATED_TRIGGERS.get(workflowFile) ?? new Set();
+  const selfHosted = SELF_HOSTED_WORKFLOWS.has(workflowFile);
+  const allowedAutomatedTriggers =
+    SELF_HOSTED_WORKFLOWS.get(workflowFile) ??
+    ALLOWED_AUTOMATED_TRIGGERS.get(workflowFile) ??
+    new Set();
+  const maxTimeout = selfHosted ? SELF_HOSTED_MAX_TIMEOUT_MINUTES : MAX_TIMEOUT_MINUTES;
 
   if (!/^\s*workflow_dispatch:\s*$/m.test(source)) {
     violations.push('missing `workflow_dispatch` trigger');
@@ -119,16 +141,22 @@ function validateWorkflow(filePath) {
   }
 
   for (const job of jobs) {
+    if (selfHosted && !(job.runsOn ?? '').includes(FORK_GUARD)) {
+      violations.push(
+        `job \`${job.id}\` \`runs-on\` must route fork PRs to a GitHub-hosted runner (\`${FORK_GUARD}\`)`
+      );
+    }
+
     if (job.timeoutMinutes === null) {
       violations.push(
-        `job \`${job.id}\` missing \`timeout-minutes\` (required <= ${MAX_TIMEOUT_MINUTES})`
+        `job \`${job.id}\` missing \`timeout-minutes\` (required <= ${maxTimeout})`
       );
       continue;
     }
 
-    if (job.timeoutMinutes > MAX_TIMEOUT_MINUTES) {
+    if (job.timeoutMinutes > maxTimeout) {
       violations.push(
-        `job \`${job.id}\` timeout \`${job.timeoutMinutes}\` exceeds limit \`${MAX_TIMEOUT_MINUTES}\``
+        `job \`${job.id}\` timeout \`${job.timeoutMinutes}\` exceeds limit \`${maxTimeout}\``
       );
     }
   }
