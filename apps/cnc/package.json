@@ -13,7 +13,7 @@
     "init-db": "ts-node src/init-db.ts",
     "test": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --watchman=false",
     "test:watch": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --watch",
-    "test:ci": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --watchman=false --ci --coverage --maxWorkers=2",
+    "test:ci": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --watchman=false --ci --coverage --maxWorkers=2 --testPathIgnorePatterns=crossService.e2e.smoke",
     "test:e2e:smoke": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --watchman=false --runInBand src/services/__tests__/crossService.e2e.smoke.test.ts",
     "test:schema-gate": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --watchman=false --ci --runInBand src/services/__tests__/nodeManager.test.ts",
     "test:coverage": "npm run test:preflight && node ../../node_modules/jest/bin/jest.js --watchman=false --coverage",

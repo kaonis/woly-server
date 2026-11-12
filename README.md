@@ -271,7 +271,7 @@ For full production rollout guidance (topology, secrets, TLS, backup/restore, an
 
 GitHub Actions is budget-scoped:
 
-- Heavy validation workflow (`.github/workflows/ci.yml`) runs manual-only.
+- Heavy validation workflow (`.github/workflows/ci.yml`) runs on every push to `master` and every PR, on the self-hosted runner named by the `CI_RUNNER` repo variable (no Actions minutes). PRs from forks are routed to GitHub-hosted runners, but a fork PR can edit that routing, so the security boundary is elsewhere: the repo requires approval before any outside contributor's workflow runs (review changes to `.github/workflows/` and `scripts/` before approving), and the self-hosted runner is sandboxed. If `CI_RUNNER` is unset, jobs fall back to `ubuntu-latest`.
 - Lightweight policy workflow (`.github/workflows/cnc-sync-policy.yml`) runs automatically on PR updates and enforces:
   - PR checklist and review-pass requirements
   - conventional commit subject parity with local `commit-msg` hook
@@ -282,7 +282,7 @@ Current validation flow:
 1. Lightweight PR policy gate (`.github/workflows/cnc-sync-policy.yml`) for linked issues + checklist compliance
 2. Protocol compatibility gate (schema tests, cross-repo contracts, app protocol contracts, C&C schema gate)
 3. Standard validation gate via `npm run validate:standard` (`lint`, `typecheck`, `test:ci`, `build`, cross-service smoke)
-4. Upload coverage reports as artifacts when `ci.yml` is manually dispatched
+4. Upload coverage reports as artifacts on every `ci.yml` run
 
 Required local gate before PR merge:
 
@@ -308,7 +308,7 @@ Dependency update review cadence and decision rules are documented in:
 - [docs/DEPENDENCY_TRIAGE_WORKFLOW.md](docs/DEPENDENCY_TRIAGE_WORKFLOW.md)
 - [docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md](docs/DEPENDENCY_MAJOR_UPGRADE_PLAN.md)
 
-**Note:** Branch protection requirements should match the current CI mode (manual-only vs automatic). Use `npm run ci:branch-protection:check` to verify `master` requires the CNC policy status check.
+**Note:** Branch protection requirements should match the current CI mode (`ci.yml` now runs automatically). Use `npm run ci:branch-protection:check` to verify `master` requires the CNC policy status check.
 
 ## Tech Stack
 

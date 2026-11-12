@@ -1,13 +1,15 @@
 name: Cross-Service E2E Smoke
 
 on:
+  # Manual only: ci.yml already runs this suite on every push and PR through
+  # `npm run validate:standard`. Runs on the CI_RUNNER self-hosted runner.
   workflow_dispatch:
 
 jobs:
   smoke:
     name: Node Agent <-> C&C Smoke
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest') || vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 15
     permissions:
       contents: read
 

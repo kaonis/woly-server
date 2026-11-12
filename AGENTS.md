@@ -94,8 +94,8 @@ A CNC feature is not mergeable unless:
 
 ## Budget Mode CI
 
-- GitHub Actions: keep only low-cost policy checks on pull requests.
-- Heavy gates run locally before merge:
+- GitHub Actions: `ci.yml` (protocol compatibility and `validate:standard`) runs on every push and PR on the self-hosted runner (`CI_RUNNER` repo variable); other heavy workflows stay manual. Fork PRs are routed to GitHub-hosted runners, but that routing is editable by the PR itself: before approving an outside contributor's run, review any change to `.github/workflows/` or `scripts/`.
+- Heavy gates still run locally before merge:
   - `npm ci`
   - `npm run build -w packages/protocol`
   - `npm run test -w packages/protocol -- contract.cross-repo`
