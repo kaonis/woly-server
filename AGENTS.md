@@ -44,7 +44,7 @@ Use this full lifecycle for every change:
 5. Address review feedback in the same worktree, then re-run the review pass.
 6. After merge or explicit cancellation, clean up worktree from the primary checkout:
    ```bash
-   cd /Users/phantom/projects/woly-server
+   cd <primary-checkout>  # e.g. ../woly-server
    git worktree remove ../woly-server-<topic>
    ```
 7. Delete leftover local branch only after cleanup if it still exists:
