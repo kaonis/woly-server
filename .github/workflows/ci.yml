@@ -68,7 +68,9 @@ jobs:
   validate:
     name: Build, Lint, Typecheck, Test, Smoke
     runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest') || vars.CI_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 15
+    # The full workspace gate shares a 4 GiB runner with other CI work.
+    # Keep individual test deadlines intact while allowing the gate to finish.
+    timeout-minutes: 30
     needs: protocol-compatibility
     permissions:
       contents: read
