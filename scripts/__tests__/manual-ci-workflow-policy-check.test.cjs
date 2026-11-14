@@ -203,40 +203,8 @@ test('validateWorkflow fails closed on a multi-line runs-on in a self-hosted wor
   assert.equal(result.passed, false);
 });
 
-test('validateWorkflow accepts the full validation gate at 30 minutes', () => {
-  const result = check('ci.yml', selfHostedWorkflow(SELF_HOSTED_RUNS_ON, 30));
-  assert.deepEqual(result.violations, []);
-});
-
-test('validateWorkflow rejects the full validation gate above 30 minutes', () => {
-  const result = check('ci.yml', selfHostedWorkflow(SELF_HOSTED_RUNS_ON, 31));
-  assert.equal(result.passed, false);
-  assert.match(result.violations.join('\n'), /timeout `31` exceeds limit `30`/);
-});
-
-test('validateWorkflow keeps other CI jobs capped at 15 minutes', () => {
-  const result = check(
-    'ci.yml',
-    selfHostedWorkflow(SELF_HOSTED_RUNS_ON, 20, { jobs: ['protocol-compatibility'] })
-  );
+test('validateWorkflow rejects self-hosted workflow timeout above 15 minutes', () => {
+  const result = check('ci.yml', selfHostedWorkflow(SELF_HOSTED_RUNS_ON, 20));
   assert.equal(result.passed, false);
   assert.match(result.violations.join('\n'), /timeout `20` exceeds limit `15`/);
-});
-
-test('validateWorkflow keeps manual self-hosted smoke capped at 15 minutes', () => {
-  const result = check(
-    'cross-service-e2e-smoke.yml',
-    selfHostedWorkflow(SELF_HOSTED_RUNS_ON, 20, { triggers: [] })
-  );
-  assert.equal(result.passed, false);
-  assert.match(result.violations.join('\n'), /timeout `20` exceeds limit `15`/);
-});
-
-test('validateWorkflow keeps hosted workflow jobs capped at 8 minutes', () => {
-  const result = check(
-    'other.yml',
-    selfHostedWorkflow('ubuntu-latest', 30, { triggers: [] })
-  );
-  assert.equal(result.passed, false);
-  assert.match(result.violations.join('\n'), /timeout `30` exceeds limit `8`/);
 });

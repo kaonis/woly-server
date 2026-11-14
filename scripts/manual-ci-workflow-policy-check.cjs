@@ -23,8 +23,6 @@ const SELF_HOSTED_WORKFLOWS = new Map([
   ['cross-service-e2e-smoke.yml', new Set()],
 ]);
 const SELF_HOSTED_MAX_TIMEOUT_MINUTES = 15;
-// Only the full workspace validation gate needs the larger shared-runner budget.
-const SELF_HOSTED_JOB_TIMEOUT_OVERRIDES = new Map([['ci.yml:validate', 30]]);
 const SELF_HOSTED_RUNS_ON =
   "${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest') || vars.CI_RUNNER || 'ubuntu-latest' }}";
 
@@ -123,6 +121,7 @@ function validateWorkflow(filePath) {
     SELF_HOSTED_WORKFLOWS.get(workflowFile) ??
     ALLOWED_AUTOMATED_TRIGGERS.get(workflowFile) ??
     new Set();
+  const maxTimeout = selfHosted ? SELF_HOSTED_MAX_TIMEOUT_MINUTES : MAX_TIMEOUT_MINUTES;
 
   if (!/^\s*workflow_dispatch:\s*$/m.test(source)) {
     violations.push('missing `workflow_dispatch` trigger');
@@ -146,10 +145,6 @@ function validateWorkflow(filePath) {
   }
 
   for (const job of jobs) {
-    const maxTimeout = selfHosted
-      ? (SELF_HOSTED_JOB_TIMEOUT_OVERRIDES.get(`${workflowFile}:${job.id}`) ??
-        SELF_HOSTED_MAX_TIMEOUT_MINUTES)
-      : MAX_TIMEOUT_MINUTES;
     if (selfHosted && job.runsOn !== SELF_HOSTED_RUNS_ON) {
       violations.push(
         `job \`${job.id}\` \`runs-on\` must route fork PRs to a GitHub-hosted runner (expected exactly \`${SELF_HOSTED_RUNS_ON}\`)`

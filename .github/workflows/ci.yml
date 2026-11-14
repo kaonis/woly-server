@@ -35,7 +35,8 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24.x'
-          cache: 'npm'
+          cache: ${{ runner.environment != 'self-hosted' && 'npm' || '' }}
+          package-manager-cache: ${{ runner.environment != 'self-hosted' }}
 
       - name: Install dependencies
         run: npm ci
@@ -68,9 +69,7 @@ jobs:
   validate:
     name: Build, Lint, Typecheck, Test, Smoke
     runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest') || vars.CI_RUNNER || 'ubuntu-latest' }}
-    # The full workspace gate shares a 4 GiB runner with other CI work.
-    # Keep individual test deadlines intact while allowing the gate to finish.
-    timeout-minutes: 30
+    timeout-minutes: 15
     needs: protocol-compatibility
     permissions:
       contents: read
@@ -83,7 +82,8 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24.x'
-          cache: 'npm'
+          cache: ${{ runner.environment != 'self-hosted' && 'npm' || '' }}
+          package-manager-cache: ${{ runner.environment != 'self-hosted' }}
 
       - name: Install dependencies
         run: npm ci

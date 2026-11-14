@@ -18,8 +18,10 @@ automatically on the self-hosted runner, while other heavy workflows stay manual
   - added-line secret pattern screening for common leaked credential formats
 - GitHub CodeQL default setup is disabled (`state: not-configured`) to prevent automatic dynamic runs.
 - Hosted workflow jobs are capped at 8 minutes. Self-hosted workflow jobs are
-  capped at 15 minutes, except `ci.yml`'s full `validate` job, which allows 30
-  minutes on the shared 4 GiB runner. Individual test deadlines stay unchanged.
+  capped at 15 minutes. Individual test deadlines stay unchanged.
+- Main CI uses persistent local npm caches on self-hosted runners, skipping
+  optional GitHub cache restore/upload traffic. GitHub-hosted jobs retain remote
+  caching. Dependency installation and validation commands stay unchanged.
 
 ## Required Local Gate Before PR
 
