@@ -2,20 +2,26 @@
 
 Date: 2026-02-15
 
-This repository is currently in a temporary budget-control mode where heavy GitHub
-Actions workflows are manual-only, with low-cost policy/dependency exceptions.
+This repository uses a temporary budget-control mode: the main CI workflow runs
+automatically on the self-hosted runner, while other heavy workflows stay manual.
 
 ## Current Policy
 
-- Heavy workflows are limited to `workflow_dispatch`.
-- Automatic runs are allowed only for low-cost checks:
+- `ci.yml` runs on pushes and PRs, with `workflow_dispatch` also available.
+  Its jobs use `CI_RUNNER`, with fork PRs routed to GitHub-hosted runners.
+- Other heavy workflows are limited to `workflow_dispatch`.
+- Automatic low-cost checks are also allowed:
   - `pull_request` on `.github/workflows/cnc-sync-policy.yml`
   - weekly `schedule` on `.github/workflows/dependency-health.yml`
 - The low-cost PR policy workflow also performs:
   - conventional commit subject checks against PR commits
   - added-line secret pattern screening for common leaked credential formats
 - GitHub CodeQL default setup is disabled (`state: not-configured`) to prevent automatic dynamic runs.
-- Each workflow job has `timeout-minutes` capped at 8 to limit manual-run spend and prevent hangs.
+- Hosted workflow jobs are capped at 8 minutes. Self-hosted workflow jobs are
+  capped at 15 minutes. Individual test deadlines stay unchanged.
+- Main CI uses persistent local npm caches on self-hosted runners, skipping
+  optional GitHub cache restore/upload traffic. GitHub-hosted jobs retain remote
+  caching. Dependency installation and validation commands stay unchanged.
 
 ## Required Local Gate Before PR
 
@@ -83,7 +89,7 @@ npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --fail-on-unexpected
 npm run ci:audit:manual -- --since 2026-02-15T15:11:32Z --json
 ```
 
-Run policy guard to verify workflow files still enforce manual-only mode:
+Run the policy guard to verify workflow triggers, runner routing and time budgets:
 
 ```bash
 npm run ci:policy:check

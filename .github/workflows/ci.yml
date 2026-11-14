@@ -35,7 +35,8 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24.x'
-          cache: 'npm'
+          cache: ${{ runner.environment != 'self-hosted' && 'npm' || '' }}
+          package-manager-cache: ${{ runner.environment != 'self-hosted' }}
 
       - name: Install dependencies
         run: npm ci
@@ -81,7 +82,8 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24.x'
-          cache: 'npm'
+          cache: ${{ runner.environment != 'self-hosted' && 'npm' || '' }}
+          package-manager-cache: ${{ runner.environment != 'self-hosted' }}
 
       - name: Install dependencies
         run: npm ci
